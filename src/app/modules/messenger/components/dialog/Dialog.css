@@ -1,0 +1,42 @@
+.dialog {
+    width: 68%;
+    border-radius: 10px;
+    border: 6px solid #611fad;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* background-color: #611fad; */
+}
+
+.dialog__header {
+    display: flex;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: black;
+}
+
+.dialog__footer {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.dialog__footer .dialog__footer-input {
+    display: block;
+    width: 99%;
+    height: 60px;
+    border-radius: 5px;
+    outline: 2px solid blue;
+    border: none;
+    margin-right: 4px;
+    font-size: 20px;
+}
+
+.dialog__footer .dialog__footer-send {
+    font-size: 16px;
+}

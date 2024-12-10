@@ -1,0 +1,32 @@
+.chat {
+    /* width: 100%; */
+    height: 45px;
+    border-radius: 5px;
+    background-color: #9a9191;
+    margin-bottom: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat:hover {
+    background-color: #555;
+}
+
+.chat._active {
+    background-color: #555;
+}
+
+.chat.chat__title {
+    font-size: 24px;
+}
+
+.chat .chat__members {
+    display: flex;
+    font-size: 14px;
+}
+
+.chat .chat__members .chat__members-label {
+    margin-right: 5px;
+}

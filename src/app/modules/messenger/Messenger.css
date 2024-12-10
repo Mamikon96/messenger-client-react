@@ -1,0 +1,20 @@
+.messenger {
+    /* position: absolute; */
+    /* top: 50%; */
+    /* left: 50%; */
+    /* transform: translate(-50%, -50%); */
+    /* height: 600px; */
+    /* width: 900px; */
+    height: 90vh;
+    width: 100%;
+    /* border: 6px solid #611fad; */
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    justify-content: space-around;
+}
+
+._dark {
+    font-size: 20px;
+    color: white;
+}

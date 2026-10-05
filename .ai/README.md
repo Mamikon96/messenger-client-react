@@ -10,10 +10,10 @@
 ## Маршрутизатор: задача → файлы
 | Задача | Читать |
 |---|---|
-| Любая задача разработки (старт) | `rules/memory-protocol.md`, `memory/frontend/tasks.md` |
-| Новый/изменённый компонент, слайс, стили | `rules/code-style.md` (+ `memory/frontend/architecture.md`, если трогаешь структуру) |
+| Любая задача разработки (старт) | `rules/memory-protocol.md`, `memory/tasks.md` |
+| Новый/изменённый компонент, слайс, стили | `rules/code-style.md` (+ `memory/architecture.md`, если трогаешь структуру) |
 | Написать/починить тесты, реализовать новое поведение | `rules/testing.md` |
-| Баг, регрессия, «что сейчас сломано» | `memory/frontend/state.md` |
+| Баг, регрессия, «что сейчас сломано» | `memory/state.md` |
 | Нужна новая библиотека/паттерн | `rules/tech-approval.md`, затем заголовки `memory/**/decisions.md` |
 | Закрыть задачу (приёмка, ревью) | `rules/acceptance.md` |
 | Любая git-операция: коммит, ветка, слияние, тег, push, PR | `rules/git-flow.md` (**обязательно**) |

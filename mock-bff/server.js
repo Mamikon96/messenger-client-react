@@ -1,4 +1,4 @@
-// Локальный mock-BFF по контракту .ai/memory/frontend/auth-contract.md.
+// Локальный mock-BFF по контракту .ai/memory/auth-contract.md.
 // Только для разработки и e2e: сессии и state живут в памяти процесса, провайдер — фейковый.
 const http = require('http');
 const crypto = require('crypto');

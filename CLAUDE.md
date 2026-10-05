@@ -10,17 +10,17 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 - `npm run accept` — приёмка: проверка памяти + unit + e2e (`scripts/accept.sh`)
 
 ## Структура
-`src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/frontend/architecture.md`.
+`src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/architecture.md`.
 
 ## Контекст для AI: читай только нужное
 Правила и память разложены по файлам в `.ai/`. **Не читай всё подряд** — открывай файлы по маршрутизатору `.ai/README.md`:
 
 | Задача | Файлы |
 |---|---|
-| Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/frontend/tasks.md` |
+| Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/tasks.md` |
 | Компоненты, слайсы, стили | `.ai/rules/code-style.md` |
 | Тесты / новое поведение | `.ai/rules/testing.md` |
-| Баги, текущее состояние | `.ai/memory/frontend/state.md` |
+| Баги, текущее состояние | `.ai/memory/state.md` |
 | Новая библиотека/подход | `.ai/rules/tech-approval.md` |
 | Закрытие задачи | `.ai/rules/acceptance.md` |
 | Любая git-операция (коммит, ветка, слияние, push, PR) | `.ai/rules/git-flow.md` |

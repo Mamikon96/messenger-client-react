@@ -2,12 +2,14 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit'
 // import chatsReducer from './reducers/chatsReducer'
 import chatsSlice from './reducers/chats'
 import activeChatSlice from './reducers/activeChat'
+import messagesSlice from './reducers/messages'
 import usersSlice from './reducers/users'
 import authSlice, { logout } from './reducers/auth'
 
 const appReducer = combineReducers({
   chats: chatsSlice,
   activeChat: activeChatSlice,
+  messages: messagesSlice,
   users: usersSlice,
   auth: authSlice
 })

@@ -9,6 +9,7 @@
 |---|---|---|
 | chats | `[]` чатов `{id, title, name}` | `addChat` (id = nanoid) |
 | activeChat | `{}` — копия выбранного чата | `setActiveChat` (merge) |
+| messages | `[]` `{id, chatId, authorId, text, ts}` | `addMessage` (id = nanoid, ts = Date.now()) |
 | users | `[]` `{id, name}` | `addUser` |
 | auth | `{status, user}` | thunks `checkSession`, `logout` |
 
@@ -19,7 +20,7 @@
 ## Компоненты
 - `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат); вторая `Action` с именем пользователя → `UserMenu` («Выйти», ошибка выхода — `role=alert`)
 - `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
-- `Messenger` (класс `_dark`) = `Chats` (список `Chat`) + `Dialog` (заголовок, область сообщений, ввод)
+- `Messenger` (класс `_dark`) = `Chats` (список `Chat`) + `Dialog` (заголовок, сообщения активного чата, ввод; автор = `auth.user.id`)
 - `Login` — две ссылки-кнопки (Google, GitHub) на `/api/auth/{provider}/start`: полная навигация браузера, состояния и диспатча нет
 
 ## Сервисы

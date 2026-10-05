@@ -20,6 +20,7 @@
     "eject": "react-scripts eject",
     "test:unit": "react-scripts test --watchAll=false",
     "test:e2e": "playwright test",
+    "mock-bff": "node mock-bff/server.js",
     "accept": "bash scripts/accept.sh"
   },
   "eslintConfig": {

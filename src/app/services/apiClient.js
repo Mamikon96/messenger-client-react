@@ -33,7 +33,7 @@ async function parseBody(response) {
     }
 }
 
-export async function apiRequest(path, { method = "GET", body, signal } = {}) {
+export async function apiRequest(path, { method = "GET", body, signal, skipUnauthorizedHandler = false } = {}) {
     const httpMethod = method.toUpperCase();
     const headers = {};
     if (body !== undefined) {
@@ -54,7 +54,7 @@ export async function apiRequest(path, { method = "GET", body, signal } = {}) {
 
     if (!response.ok) {
         try {
-            if (response.status === 401 && unauthorizedHandler) {
+            if (response.status === 401 && !skipUnauthorizedHandler && unauthorizedHandler) {
                 unauthorizedHandler();
             }
         } catch {

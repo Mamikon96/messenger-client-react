@@ -1,11 +1,12 @@
 # Состояние frontend
-> Проверено: 2026-10-05 @ 83c8cea+dirty
+> Проверено: 2026-10-05 @ 8edce6a+dirty
 
 ## Общее
-Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: 1 unit (`src/app/reducers/chats.test.js`), 1 e2e smoke (`e2e/smoke.spec.js`).
+Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: unit (`chats`, `auth`, `apiClient`, `authApi`), 1 e2e smoke (`e2e/smoke.spec.js`).
 
 ## Что работает
-- Redux store с тремя слайсами: `chats`, `activeChat`, `users` (только `addChat`, `setActiveChat`, `addUser`)
+- Redux store с четырьмя слайсами: `chats`, `activeChat`, `users` (только `addChat`, `setActiveChat`, `addUser`) и `auth` (`status`: loading/anonymous/authenticated/error + `user`, thunk `checkSession`; UI его пока не использует — FE-14)
+- `src/app/services/apiClient.js` и `authApi.js` (`fetchSession`, `logout`); csrfToken хранится только в apiClient
 - Хедер с кнопкой «Join» → popover с формой `JoinForm`, создающей чат (`addChat`)
 - Список чатов, выбор активного чата, подсветка `_active`
 - Каркас окна диалога (заголовок = title активного чата, поле ввода, кнопка Send)
@@ -24,7 +25,7 @@
 10. `README.md` пустой (одна строка).
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (проверка памяти ✓, unit 1/1 ✓, e2e 22/22 ✓ (смоук 1, контрактные 18, proxy 3)) · FE-11
+`npm run accept` → код выхода 0 (проверка памяти ✓, unit 37/37 ✓, e2e 22/22 ✓ (смоук 1, контрактные 18, proxy 3)) · FE-13
 
 ## Фокус сейчас
-Не определён — выбрать из `tasks.md` (цепочка авторизации: FE-11 → FE-12 → FE-13 → FE-14; также FE-02).
+Не определён — выбрать из `tasks.md` (цепочка авторизации: FE-13 в работе → FE-14; также FE-02).

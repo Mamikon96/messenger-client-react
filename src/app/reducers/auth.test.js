@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession } from './auth';
+import reducer, { checkSession, logout } from './auth';
 import * as authApi from '../services/authApi';
 
 jest.mock('../services/authApi');
@@ -81,5 +81,33 @@ describe('auth slice', () => {
     await promise;
 
     expect(store.getState().auth.status).toBe('authenticated');
+  });
+  describe('logout', () => {
+    const loggedInStore = async () => {
+      authApi.fetchSession.mockResolvedValue(user);
+      const store = makeStore();
+      await store.dispatch(checkSession());
+      return store;
+    };
+
+    it('успех → anonymous без пользователя, запрос через authApi.logout', async () => {
+      const store = await loggedInStore();
+      authApi.logout.mockResolvedValue(undefined);
+
+      await store.dispatch(logout());
+
+      expect(authApi.logout).toHaveBeenCalledTimes(1);
+      expect(store.getState().auth).toEqual({ status: 'anonymous', user: null });
+    });
+
+    it('ошибка → остаёмся authenticated с пользователем, thunk отклонён', async () => {
+      const store = await loggedInStore();
+      authApi.logout.mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const result = await store.dispatch(logout());
+
+      expect(logout.rejected.match(result)).toBe(true);
+      expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+    });
   });
 });

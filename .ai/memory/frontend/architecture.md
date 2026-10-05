@@ -10,12 +10,14 @@
 | chats | `[]` чатов `{id, title, name}` | `addChat` (id = nanoid) |
 | activeChat | `{}` — копия выбранного чата | `setActiveChat` (merge) |
 | users | `[]` `{id, name}` | `addUser` |
-| auth | `{status, user}` | thunk `checkSession` |
+| auth | `{status, user}` | thunks `checkSession`, `logout` |
+
+`default` экспорт `store.js` построен на `rootReducer` (`combineReducers` + сброс): на `logout.fulfilled` состояние `undefined` → все слайсы в начальное, `auth` → `anonymous`.
 
 Примечание: `activeChat` хранит копию чата, а не id; `Chat` сравнивает `activeChat.id === chat.id`.
 
 ## Компоненты
-- `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат)
+- `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат); вторая `Action` с именем пользователя → `UserMenu` («Выйти», ошибка выхода — `role=alert`)
 - `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
 - `Messenger` (класс `_dark`) = `Chats` (список `Chat`) + `Dialog` (заголовок, область сообщений, ввод)
 - `Login` — две ссылки-кнопки (Google, GitHub) на `/api/auth/{provider}/start`: полная навигация браузера, состояния и диспатча нет

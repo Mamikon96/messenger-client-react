@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-05 @ b1797d8+dirty
+> Проверено: 2026-10-05 @ 83c8cea+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `../decisions.md` SH-D02, `CLAUDE.md`).
@@ -9,7 +9,6 @@ _(пусто)_
 
 ## Бэклог
 - **FE-02 (P1)** Сообщения: слайс `messages` (chatId, authorId, text, ts), отправка из `Dialog`, рендер в `dialog__content`, очистка поля, Enter для отправки.
-- **FE-11 (P1)** Подключить mock-BFF к dev и e2e (решено: файл setupProxy.js в `src` на `http-proxy-middleware` 2.x, явно в devDependencies — поле `proxy` в `package.json` не проксирует навигации с `Accept: text/html`; требует уточнения: каталог mock-BFF и имя npm-скрипта): CRA proxy `/api` на mock-BFF, npm-скрипт запуска, `playwright.config.js` поднимает mock-BFF и dev-сервер, `scripts/accept.sh` работает без ручных шагов; сначала e2e-проверка, что `/api/...` и навигация на start доходят до mock-BFF через порт 3100; критерий: `npm run accept` = 0, текущий `e2e/smoke.spec.js` зелёный. Зависит от: FE-10.
 - **FE-12 (P1)** Единый apiClient `src/app/services/` поверх `fetch`: same-origin cookie, CSRF-заголовок на изменяющие методы, JSON и ошибки, единая точка-хук для 401 (поведение подключает FE-16); сначала unit-тесты с подменой `fetch` (M3); критерий: тесты зелёные, существующее поведение UI не меняется. Зависит от: FE-09.
 - **FE-13 (P1)** Слайс `auth` (`status` + `user`) в `src/app/reducers/` и `authApi` в `src/app/services/` (проверка сессии, logout) поверх apiClient, thunk проверки сессии, подключение в `src/app/store.js`; токенов/csrfToken в state нет; сначала unit-тесты слайса и thunk с подменой `authApi`/`fetch`; критерий: тесты зелёные, UI не меняется. Зависит от: FE-12.
 - **FE-14 (P1)** Гейт входа в `src/App.js` по `auth.status` (проверка сессии при старте → загрузка / экран входа / мессенджер) и экран `Login` с кнопками Google и GitHub — полная навигация на `/api/auth/{provider}/start`; удалить `src/app/services/loginService.js`, ключ `user` в localStorage и поле имени в `Login`; переписать `e2e/smoke.spec.js` под вход через mock-BFF (требует уточнения: тексты UI); сначала unit-тест гейта (подмена `authApi`) и e2e входа через оба провайдера; критерий: `npm run accept` = 0. Зависит от: FE-11, FE-13.
@@ -42,3 +41,4 @@ _(пусто)_
 - 2026-10-05 — Ветка `develop` (от `main`, e4827d4) запушена в `origin`; PR задач теперь идут в `develop` (обновлён `git-flow.md`; решение SH-D08; приёмка: ревью не требуется — только документация/процесс)
 - 2026-10-05 — FE-09: контракт auth API зафиксирован в `.ai/memory/frontend/auth-contract.md` (эндпоинты, тело сессии, `auth_error`, коды, CSRF, срок сессии 7 дней); решения FE-D04…FE-D06; на контракт ссылаются FE-10…FE-14 (приёмка: `npm run accept` ✓; ревью не требуется — только документация, код не менялся)
 - 2026-10-05 — FE-10: локальный mock-BFF по контракту auth API (`mock-bff/server.js`, `npm run mock-bff`, порт 3200) и контрактный тест `e2e/mock-bff.contract.spec.js` (18 тестов, идут при `MOCK_BFF_URL`; в приёмку подключает FE-11) (приёмка: `npm run accept` ✓; ревью: react-reviewer APPROVE; решение FE-D03)
+- 2026-10-05 — FE-11: mock-BFF подключён к dev и e2e — `src/setupProxy.js` (`/api`, `/mock-provider`, `http-proxy-middleware` 2.x), `playwright.config.js` поднимает mock-BFF и dev-сервер (порт mock-BFF — `MOCK_BFF_PORT`, по умолчанию 3200), контрактные тесты FE-10 идут в приёмке, e2e `e2e/mock-bff-proxy.spec.js` (приёмка: `npm run accept` ✓, 22 e2e; ревью: react-reviewer APPROVE WITH FIXES, миноры про единый порт исправлены; решение FE-D03)

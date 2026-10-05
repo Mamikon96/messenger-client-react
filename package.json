@@ -42,6 +42,7 @@
     ]
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "http-proxy-middleware": "^2.0.10"
   }
 }

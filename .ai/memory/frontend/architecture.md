@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-05 @ 83c8cea+dirty
+> Проверено: 2026-10-05 @ 8edce6a+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App` → если `loginService.isLoggedIn()` (читает localStorage["user"]) …(сейчас инвертировано, см. `state.md` #1) `Login` иначе `Header` + `Messenger`.

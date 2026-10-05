@@ -162,3 +162,25 @@ describe("apiClient", () => {
         await expect(apiRequest("/api/x")).rejects.toMatchObject({ status: 502, data: null });
     });
 });
+
+describe("apiClient: skipUnauthorizedHandler", () => {
+    beforeEach(() => {
+        global.fetch = jest.fn();
+        setUnauthorizedHandler(null);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+    });
+
+    it("401 с skipUnauthorizedHandler не вызывает хук, но бросает ApiError", async () => {
+        const handler = jest.fn();
+        setUnauthorizedHandler(handler);
+        fetch.mockResolvedValue(reply(401));
+
+        await expect(
+            apiRequest("/api/auth/session", { skipUnauthorizedHandler: true })
+        ).rejects.toBeInstanceOf(ApiError);
+        expect(handler).not.toHaveBeenCalled();
+    });
+});

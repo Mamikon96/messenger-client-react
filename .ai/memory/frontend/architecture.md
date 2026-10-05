@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-05 @ e4827d4+dirty
+> Проверено: 2026-10-05 @ b1797d8+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App` → если `loginService.isLoggedIn()` (читает localStorage["user"]) …(сейчас инвертировано, см. `state.md` #1) `Login` иначе `Header` + `Messenger`.
@@ -23,7 +23,10 @@
 - `LoginService` (singleton, `src/app/services/loginService.js`) — ключ localStorage `user`, метод `isLoggedIn()`.
 
 ## Внешние данные
-Сетевого слоя нет, бэкенда в проекте нет (SH-D04): всё состояние в Redux в памяти браузера.
+Сетевого слоя в приложении пока нет, бэкенда в проекте нет (SH-D04): всё состояние в Redux в памяти браузера.
+
+## mock-BFF (`mock-bff/server.js`)
+Локальный Node-сервер (только `http`, без пакетов) по `auth-contract.md`: фейковый провайдер `/mock-provider/{provider}/authorize` (`?deny=1` — отказ), сессии и state в памяти. Запуск: `npm run mock-bff` (порт `MOCK_BFF_PORT`, по умолчанию 3200). Контрактный тест — `e2e/mock-bff.contract.spec.js` (идёт только при `MOCK_BFF_URL`; в приёмку подключает FE-11). Cookie `Secure` на `http://localhost` принимают Chromium и Firefox — для e2e (Chromium) достаточно.
 
 ## AI-контекст
 Правила работы — `.ai/rules/`, память — `.ai/memory/`, маршрутизатор «задача → файлы» — `.ai/README.md`; `CLAUDE.md` — только индекс.

@@ -2,6 +2,7 @@ import { rootReducer } from './store';
 import { addChat } from './reducers/chats';
 import { setActiveChat } from './reducers/activeChat';
 import { addUser } from './reducers/users';
+import { addMessage } from './reducers/messages';
 import { checkSession, logout } from './reducers/auth';
 
 const user = { id: '1', name: 'Ann', avatarUrl: 'http://a/b.png', provider: 'google' };
@@ -11,6 +12,7 @@ const filledState = () => {
   state = rootReducer(state, addChat({ title: 'Room', name: 'Ann' }));
   state = rootReducer(state, addUser({ name: 'Ann' }));
   state = rootReducer(state, setActiveChat({ title: 'Room' }));
+  state = rootReducer(state, addMessage({ chatId: '1', authorId: '1', text: 'hi' }));
   return rootReducer(state, checkSession.fulfilled(user, 'req'));
 };
 
@@ -20,6 +22,7 @@ describe('rootReducer: сброс store при выходе', () => {
 
     expect(state.chats).toHaveLength(1);
     expect(state.users).toHaveLength(1);
+    expect(state.messages).toHaveLength(1);
     expect(state.activeChat).toEqual({ title: 'Room' });
     expect(state.auth).toEqual({ status: 'authenticated', user });
   });
@@ -29,6 +32,7 @@ describe('rootReducer: сброс store при выходе', () => {
 
     expect(state).toEqual({
       chats: [],
+      messages: [],
       users: [],
       activeChat: {},
       auth: { status: 'anonymous', user: null },

@@ -40,3 +40,29 @@
 .dialog__footer .dialog__footer-send {
     font-size: 16px;
 }
+
+.dialog__content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 8px 76px;
+}
+
+.dialog__message {
+    align-self: flex-start;
+    max-width: 70%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background-color: #e6e0f0;
+    color: black;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.dialog__message._own {
+    align-self: flex-end;
+    background-color: #611fad;
+    color: white;
+}

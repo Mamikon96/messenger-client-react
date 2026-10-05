@@ -51,6 +51,7 @@ describe('меню пользователя', () => {
     expect(authApi.logout).toHaveBeenCalledTimes(1);
     expect(store.getState()).toEqual({
       chats: [],
+      messages: [],
       users: [],
       activeChat: {},
       auth: { status: 'anonymous', user: null },

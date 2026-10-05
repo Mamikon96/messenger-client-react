@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-05 @ 2c63ef5+dirty
+> Проверено: 2026-10-05 @ b1d9f18+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `../decisions.md` SH-D02, `CLAUDE.md`).
@@ -8,7 +8,6 @@
 _(пусто)_
 
 ## Бэклог
-- **FE-02 (P1)** Сообщения: слайс `messages` (chatId, authorId, text, ts), отправка из `Dialog`, рендер в `dialog__content`, очистка поля, Enter для отправки.
 > Решено пользователем: FE-01 (вход через localStorage) заменена FE-14 и удалена из бэклога; FE-07 (персистентность store) отменена — store сбрасывается при logout, данные сессии в localStorage не хранятся (FE-D04); из FE-06 убраны тесты `loginService`.
 - **FE-03 (P2)** Доработать `JoinForm`: подписи полей, `id`/`htmlFor`, валидация, закрытие popover и сброс формы после создания.
 - **FE-04 (P2)** Связать пользователей и чаты: участники чата, реальный счётчик в `Chat` вместо `0`, текущий пользователь как автор.
@@ -17,6 +16,7 @@ _(пусто)_
 - **FE-16 (P2)** Истечение сессии: глобальная обработка 401 из apiClient → сразу сброс store и экран входа с сообщением «сессия истекла», черновик не сохраняется (решено; требует уточнения: время жизни сессии, текст сообщения); mock-BFF умеет инвалидировать сессию; сначала unit-тест реакции на 401 и e2e (mock-BFF или `page.route`); критерий: `npm run accept` = 0. Зависит от: FE-12, FE-15.
 - **FE-17 (P2)** Ошибка входа после OAuth (отказ пользователя, ошибка провайдера/state): показ сообщения на экране входа по сигналу из контракта (требует уточнения: способ передачи ошибки в контракте, тексты UI); сначала unit-тест `Login` и e2e через mock-BFF; критерий: `npm run accept` = 0. Зависит от: FE-14.
 - **FE-20 (P3)** Доработки по ревью FE-13/FE-14: убрать предупреждение `act` при клике «Повторить» в `src/App.test.js` (обернуть клик в `act`); вернуть фокус после «Повторить»; защита от параллельных `checkSession` (`condition`); строгая проверка полей `user` (массив, `id`) в `authApi.fetchSession`; отмена повторного `checkSession` при размонтировании (пересмотреть в FE-15); тесты — до правки; критерий: `npm run accept` = 0.
+- **FE-21 (P3)** Доработки `Dialog` по ревью FE-02: селектор сообщений по `chatId` (`createSelector`/`useMemo`) вместо фильтра на каждый рендер; автопрокрутка `dialog__content` к последнему сообщению; подсказки для пустого чата и «чат не выбран»; `aria-label`/роли вместо CSS-локаторов в `e2e/messages.spec.js`; тесты — до правки; критерий: `npm run accept` = 0.
 - **FE-08 (P3)** Заполнить README (запуск, структура), настроить стили/тему (`_dark` сейчас хардкод в `Messenger`).
 - **FE-18 (P3)** Судьба слайса `users` после перехода на `auth.user` (`src/app/reducers/users.js`, `addUser`): удалить или перепрофилировать (требует уточнения); тесты затронутого поведения — до правки; критерий: `npm run accept` = 0. Зависит от: FE-14.
 - **FE-19 (P3)** Синхронизация выхода между вкладками (требует уточнения: нужна ли и механизм — подход согласовать по `tech-approval.md`); сначала e2e с двумя страницами; критерий: выход в одной вкладке переводит другую на экран входа. Зависит от: FE-15.
@@ -43,3 +43,4 @@ _(пусто)_
 - 2026-10-05 — FE-13: слайс `auth` (`status`: loading/anonymous/authenticated/error, `user`; токенов и csrfToken в state нет) `src/app/reducers/auth.js` с thunk `checkSession`, `authApi` (`fetchSession`, `logout`) `src/app/services/authApi.js`, подключение в `store.js`; в `apiClient` добавлена опция `skipUnauthorizedHandler` (401 на стартовой проверке не вызывает глобальный хук); ошибка сети/5xx/битый ответ → `error`, не `anonymous`; 37 unit-тестов (приёмка: `npm run accept` ✓; ревью: react-reviewer APPROVE; решение FE-D04/FE-D05)
 - 2026-10-05 — FE-14: гейт входа в `src/App.js` по `auth.status` (загрузка / `Login` / мессенджер / ошибка с «Повторить»; `checkSession` в `useEffect` с abort), `Login` с ссылками «Войти через Google/GitHub» на `/api/auth/{provider}/start`, удалены `loginService` и ключ `user`; unit `App.test.js`, e2e `login.spec.js`, переписан `smoke.spec.js`; остаточные миноры — FE-20 (приёмка: `npm run accept` ✓, 42 unit, 26 e2e; ревью: react-reviewer APPROVE; решение FE-D04)
 - 2026-10-05 — FE-15: выход через меню пользователя (кнопка с именем в хедере → «Выйти»): thunk `logout` (`src/app/reducers/auth.js`), `rootReducer` в `src/app/store.js` сбрасывает все слайсы на `logout.fulfilled`, `UserMenu` (`src/app/modules/header/components/user-menu/`); сбой выхода — сообщение в меню, store не сбрасывается; 401 на logout — обычная ошибка (глобально — FE-16); unit `auth`/`store`/`UserMenu`, e2e `logout.spec.js` (приёмка: `npm run accept` ✓, 50 unit, 30 e2e; ревью: react-reviewer APPROVE после APPROVE WITH FIXES; решение FE-D04)
+- 2026-10-05 — FE-02: слайс `messages` (`addMessage`: id nanoid, ts), `Dialog` — отправка по Send/Enter (Shift+Enter — перенос, trim, пустое и без пользователя/чата не отправляется), сообщения активного чата, `_own` для своих; сброс при logout; unit `messages`/`Dialog`/`store`, e2e `messages.spec.js`; остаточные миноры — FE-21 (приёмка: `npm run accept` ✓, 62 unit, 33 e2e; ревью: react-reviewer APPROVE после APPROVE WITH FIXES; решение FE-D03)

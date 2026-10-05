@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-05 @ b1d9f18+dirty
+> Проверено: 2026-10-05 @ a9ef05b+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `../decisions.md` SH-D02, `CLAUDE.md`).
@@ -44,3 +44,4 @@ _(пусто)_
 - 2026-10-05 — FE-14: гейт входа в `src/App.js` по `auth.status` (загрузка / `Login` / мессенджер / ошибка с «Повторить»; `checkSession` в `useEffect` с abort), `Login` с ссылками «Войти через Google/GitHub» на `/api/auth/{provider}/start`, удалены `loginService` и ключ `user`; unit `App.test.js`, e2e `login.spec.js`, переписан `smoke.spec.js`; остаточные миноры — FE-20 (приёмка: `npm run accept` ✓, 42 unit, 26 e2e; ревью: react-reviewer APPROVE; решение FE-D04)
 - 2026-10-05 — FE-15: выход через меню пользователя (кнопка с именем в хедере → «Выйти»): thunk `logout` (`src/app/reducers/auth.js`), `rootReducer` в `src/app/store.js` сбрасывает все слайсы на `logout.fulfilled`, `UserMenu` (`src/app/modules/header/components/user-menu/`); сбой выхода — сообщение в меню, store не сбрасывается; 401 на logout — обычная ошибка (глобально — FE-16); unit `auth`/`store`/`UserMenu`, e2e `logout.spec.js` (приёмка: `npm run accept` ✓, 50 unit, 30 e2e; ревью: react-reviewer APPROVE после APPROVE WITH FIXES; решение FE-D04)
 - 2026-10-05 — FE-02: слайс `messages` (`addMessage`: id nanoid, ts), `Dialog` — отправка по Send/Enter (Shift+Enter — перенос, trim, пустое и без пользователя/чата не отправляется), сообщения активного чата, `_own` для своих; сброс при logout; unit `messages`/`Dialog`/`store`, e2e `messages.spec.js`; остаточные миноры — FE-21 (приёмка: `npm run accept` ✓, 62 unit, 33 e2e; ревью: react-reviewer APPROVE после APPROVE WITH FIXES; решение FE-D03)
+- 2026-10-05 — Продукт и бэкенд: исследование предметной области (подходы, плюсы/минусы, ловушки, фазы), цель — реальный мессенджер для малой закрытой группы (до ~1 000 пользователей, без E2EE), бэкенд Node + WebSocket + PostgreSQL в отдельном проекте; решения SH-D09, SH-D10, соглашения — `.ai/memory/product-agreements.md` (приёмка: ревью не требуется — только документация; frontend-задачи в бэклог не заводились: ждём контракт API/событий и проект бэкенда)

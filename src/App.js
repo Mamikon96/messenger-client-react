@@ -4,6 +4,7 @@ import './App.css';
 import Header from './app/modules/header/Header';
 import Login from './app/modules/login/Login';
 import Messenger from './app/modules/messenger/Messenger';
+import { Button } from './app/modules/ui/button/Button';
 import { checkSession } from './app/reducers/auth';
 
 function App() {
@@ -34,7 +35,7 @@ function App() {
         return (
           <div className="App__status" role="alert">
             <p className="App__message">Не удалось проверить сессию. Проверьте соединение и попробуйте снова.</p>
-            <button className="App__retry" type="button" onClick={handleRetry}>Повторить</button>
+            <Button className="App__retry" onClick={handleRetry}>Повторить</Button>
           </div>
         );
       default:

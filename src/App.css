@@ -5,40 +5,6 @@
   overflow: hidden;
 }
 
-button {
-  height: 50px;
-  width: 200px;
-  background-color: rgb(8, 11, 181);
-  border-radius: 10px;
-  font-size: 24px;
-  color: white;
-  cursor: pointer;
-  text-decoration: none;
-  outline: none;
-  border: none;
-  transition-duration: 0.4s;
-}
-
-button:hover {
-  background-color: rgb(49, 52, 203);
-}
-
-button:active {
-  transform: translateY(2px);
-}
-
-input {
-  width: 200px;
-  height: 30px;
-  border-radius: 5px;
-  border: none;
-  outline: 2px solid blue;
-}
-
-input:focus {
-  outline: 4px solid rgb(111, 111, 240);
-  border: none;
-}
 .App__status {
   display: flex;
   flex-direction: column;

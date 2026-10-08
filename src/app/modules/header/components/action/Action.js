@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./Action.css";
 import Popover from "../../../popover/Popover";
+import { Button } from "../../../ui/button/Button";
 
 export const Action = ({name, popoverTemplate}) => {
 
@@ -14,9 +15,7 @@ export const Action = ({name, popoverTemplate}) => {
 
     return (
         <>
-            <button className="action-button"
-                        onClick={handleAction}
-            >{name}</button>
+            <Button className="action-button" onClick={handleAction}>{name}</Button>
             {
                 isShowPopover
                     ?   <Popover content={popoverTemplate}

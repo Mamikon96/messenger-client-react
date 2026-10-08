@@ -30,11 +30,7 @@
     display: block;
     width: 99%;
     height: 60px;
-    border-radius: 5px;
-    outline: 2px solid blue;
-    border: none;
     margin-right: 4px;
-    font-size: 20px;
 }
 
 .dialog__footer .dialog__footer-send {

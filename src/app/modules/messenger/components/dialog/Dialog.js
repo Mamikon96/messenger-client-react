@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { addMessage } from "../../../../reducers/messages";
 import "./Dialog.css";
+import { Button } from "../../../ui/button/Button";
+import { Input } from "../../../ui/input/Input";
 
 function Dialog() {
     const activeChat = useSelector((state) => state.activeChat);
@@ -45,15 +47,16 @@ function Dialog() {
                 ))}
             </div>
             <div className="dialog__footer">
-                <textarea
+                <Input
+                    multiline
                     className="dialog__footer-input"
                     aria-label="Сообщение"
                     value={text}
                     disabled={!hasChat}
                     onChange={(event) => setText(event.target.value)}
                     onKeyDown={handleKeyDown}
-                ></textarea>
-                <button className="dialog__footer-send" disabled={!hasChat} onClick={send}>Send</button>
+                />
+                <Button className="dialog__footer-send" disabled={!hasChat} onClick={send}>Send</Button>
             </div>
         </div>
     );

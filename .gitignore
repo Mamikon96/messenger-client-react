@@ -25,3 +25,6 @@ yarn-error.log*
 # playwright
 /test-results
 /playwright-report
+
+# документ интеграции от бэкенда (локальная копия, не коммитится)
+/docs/client-integration.md

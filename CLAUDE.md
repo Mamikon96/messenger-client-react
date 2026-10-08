@@ -1,6 +1,6 @@
 # messenger-client-react
 
-Клиент мессенджера на React (Create React App). Бэкенда нет — всё состояние живёт в Redux в памяти браузера.
+Клиент мессенджера на React (Create React App). Бэкенд — отдельный проект `messenger-server`; контракт API — `docs/client-integration.md` (локальная копия, в `.gitignore`, FE-D12). Состояние живёт в Redux в памяти браузера.
 
 ## Стек
 React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2 + react-redux 9, Jest + Testing Library (unit), Playwright (e2e, `e2e/`), обычный CSS.

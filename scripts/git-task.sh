@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 die() { echo "  ✗ $1" >&2; exit 1; }
 SLUG_RE='^[a-z0-9]+(-[a-z0-9]+)*$'
 
-TASKS=.ai/memory/frontend/tasks.md
+TASKS=.ai/memory/tasks.md
 
 ensure_develop() {
   git show-ref --verify --quiet refs/heads/develop && return 0

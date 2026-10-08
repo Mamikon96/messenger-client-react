@@ -15,11 +15,11 @@ for f in README.md decisions.md; do
   [ -f "$MEM/$f" ] || fail "нет файла $MEM/$f"
 done
 
-check_side() {
-  local side=$1 tp=$2 dp=$3   # tp = FE (задачи), dp = FE-D (решения)
-  local dir="$MEM/$side"
+check_files() {
+  local tp=$1   # tp = FE (префикс задач)
+  local dir="$MEM"
 
-  for f in state.md tasks.md decisions.md architecture.md; do
+  for f in state.md tasks.md architecture.md; do
     [ -f "$dir/$f" ] || fail "нет файла $dir/$f"
   done
 
@@ -61,28 +61,21 @@ check_side() {
     done_bad=$(awk '/^## Сделано/{f=1;next} /^## /{f=0} f && /^- /' "$dir/tasks.md" | grep -vE '^- [0-9]{4}-[0-9]{2}-[0-9]{2} — ' || true)
     [ -z "$done_bad" ] || fail "$dir/tasks.md: записи «Сделано» без даты 'ГГГГ-ММ-ДД — ': $(echo "$done_bad" | head -1)"
   fi
-
-  if [ -f "$dir/decisions.md" ]; then
-    local did ddups dbad
-    did=$(grep -oE '^## [A-Z]+-D[0-9]+' "$dir/decisions.md" | sed 's/^## //')
-    ddups=$(echo "$did" | sort | uniq -d)
-    [ -z "$ddups" ] || fail "$dir/decisions.md: повторяющиеся ID: $(echo $ddups)"
-    dbad=$(echo "$did" | grep -vE "^$dp[0-9]+$" || true)
-    [ -z "$dbad" ] || fail "$dir/decisions.md: ID не со своим префиксом $dp: $(echo $dbad)"
-  fi
 }
 
-check_side frontend FE FE-D
+check_files FE
 
-# Общие решения: SH-Dxx, уникальные
+# Решения: SH-Dxx (общие) и FE-Dxx (frontend), ID уникальны
 if [ -f "$MEM/decisions.md" ]; then
-  sh_ids=$(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions.md" | sed 's/^## //')
-  [ -z "$(echo "$sh_ids" | sort | uniq -d)" ] || fail "$MEM/decisions.md: повторяющиеся ID"
-  [ -z "$(echo "$sh_ids" | grep -vE '^SH-D[0-9]+$' || true)" ] || fail "$MEM/decisions.md: ID не вида SH-Dxx"
+  d_ids=$(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions.md" | sed 's/^## //')
+  d_dups=$(echo "$d_ids" | sort | uniq -d)
+  [ -z "$d_dups" ] || fail "$MEM/decisions.md: повторяющиеся ID: $(echo $d_dups)"
+  d_bad=$(echo "$d_ids" | grep -vE '^(SH|FE)-D[0-9]+$' || true)
+  [ -z "$d_bad" ] || fail "$MEM/decisions.md: ID не вида SH-Dxx/FE-Dxx: $(echo $d_bad)"
 fi
 
 # Актуальность: изменённые (относительно HEAD) файлы кода не должны быть новее tasks.md — память обновляют после любых правок
-tasks="$MEM/frontend/tasks.md"
+tasks="$MEM/tasks.md"
 if [ -f "$tasks" ]; then
   while IFS= read -r p; do
     [ -f "$p" ] && [ "$p" -nt "$tasks" ] && fail "$p изменён позже $tasks — актуализируй задачи в памяти (и штамп)"

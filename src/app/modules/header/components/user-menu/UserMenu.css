@@ -1,16 +1,13 @@
 .user-menu {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-}
-
-.user-menu__logout {
-    height: 40px;
-    font-size: 20px;
-    cursor: pointer;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-md);
 }
 
 .user-menu__error {
     margin: 0;
-    color: rgb(181, 8, 8);
+    color: var(--color-danger);
 }

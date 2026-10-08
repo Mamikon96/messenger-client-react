@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import "./UserMenu.css";
 import { logout } from "../../../../reducers/auth";
+import { Button } from "../../../ui/button/Button";
 
 export const UserMenu = () => {
     const dispatch = useDispatch();
@@ -21,7 +22,7 @@ export const UserMenu = () => {
 
     return (
         <div className="user-menu">
-            <button className="user-menu__logout" type="button" disabled={isPending} onClick={handleLogout}>Выйти</button>
+            <Button className="user-menu__logout" variant="secondary" loading={isPending} onClick={handleLogout}>Выйти</Button>
             {isError && <p className="user-menu__error" role="alert">Не удалось выйти. Попробуйте снова.</p>}
         </div>
     );

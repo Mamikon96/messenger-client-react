@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Button } from "./Button";
 
@@ -46,5 +46,43 @@ describe("Button", () => {
     test("без loading нет aria-busy", () => {
         render(<Button>Go</Button>);
         expect(screen.getByRole("button")).not.toHaveAttribute("aria-busy");
+    });
+
+    describe("href: кнопка-ссылка", () => {
+        test("рендерит ссылку с теми же классами", () => {
+            render(<Button href="/go" variant="secondary" className="extra">Go</Button>);
+            const link = screen.getByRole("link", { name: "Go" });
+            expect(link).toHaveAttribute("href", "/go");
+            expect(link).toHaveClass("button", "_secondary", "extra");
+            expect(link).not.toHaveAttribute("type");
+        });
+
+        test("loading: aria-busy и aria-disabled, переход отменяется, onClick не вызывается", () => {
+            const onClick = jest.fn();
+            render(<Button href="/go" loading onClick={onClick}>Go</Button>);
+            const link = screen.getByRole("link", { name: /Go/ });
+            expect(link).toHaveAttribute("aria-busy", "true");
+            expect(link).toHaveAttribute("aria-disabled", "true");
+            const notPrevented = fireEvent.click(link);
+            expect(notPrevented).toBe(false);
+            expect(onClick).not.toHaveBeenCalled();
+        });
+
+        test("disabled ведёт себя как неактивная ссылка", () => {
+            render(<Button href="/go" disabled>Go</Button>);
+            const link = screen.getByRole("link", { name: "Go" });
+            expect(link).toHaveAttribute("aria-disabled", "true");
+            expect(fireEvent.click(link)).toBe(false);
+        });
+
+        test("активная ссылка не отменяет переход и вызывает onClick", () => {
+            const onClick = jest.fn();
+            render(<Button href="/go" onClick={onClick}>Go</Button>);
+            const handler = (event) => event.preventDefault();
+            document.addEventListener("click", handler);
+            fireEvent.click(screen.getByRole("link", { name: "Go" }));
+            document.removeEventListener("click", handler);
+            expect(onClick).toHaveBeenCalledTimes(1);
+        });
     });
 });

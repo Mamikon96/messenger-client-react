@@ -1,5 +1,7 @@
 /* Дизайн-токены (FE-D07, визуальное направление FE-D09). Светлая тема — по умолчанию; тёмная — [data-theme="dark"] на <html> (FE-D08). */
 :root {
+  color-scheme: light;
+
   /* Цвета: поверхности, текст, границы */
   --color-bg: #f6f7f9;
   --color-surface: #ffffff;
@@ -48,6 +50,8 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --color-bg: #0f1115;
   --color-surface: #171a20;
   --color-surface-2: #1f232b;

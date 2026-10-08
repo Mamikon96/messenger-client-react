@@ -5,7 +5,7 @@ import "./Messenger.css"
 
 function Messenger() {
     return (
-        <div className="messenger _dark">
+        <div className="messenger">
             <Chats></Chats>
             <Dialog></Dialog>
         </div>

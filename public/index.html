@@ -25,6 +25,21 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>React App</title>
+    <!-- Тема до первой отрисовки (без вспышки). Логика совпадает с src/app/modules/theme/theme.js -->
+    <script>
+      (function () {
+        var mode = 'system';
+        try {
+          var stored = localStorage.getItem('theme');
+          if (stored === 'light' || stored === 'dark') mode = stored;
+        } catch (e) {}
+        var dark = mode === 'dark';
+        try {
+          if (mode === 'system') dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

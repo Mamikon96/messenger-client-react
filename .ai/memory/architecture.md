@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-05 @ 5a8f454+dirty
+> Проверено: 2026-10-08 @ dd3e8f8+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
@@ -22,6 +22,9 @@
 - `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
 - `Messenger` (класс `_dark`) = `Chats` (список `Chat`) + `Dialog` (заголовок, сообщения активного чата, ввод; автор = `auth.user.id`)
 - `Login` — две ссылки-кнопки (Google, GitHub) на `/api/auth/{provider}/start`: полная навигация браузера, состояния и диспатча нет
+
+## Стили и темы
+- Дизайн-токены (FE-D07) — `src/styles/tokens.css` (CSS custom properties: цвета, типографика, отступы, радиусы, тени, анимации), подключены первым импортом в `src/index.js`. Светлая тема в `:root`, тёмная в `[data-theme="dark"]` (атрибут на `<html>`, переключение — FE-23). Компоненты пока используют старые литеральные цвета; миграция на токены — FE-24…FE-29.
 
 ## Сервисы
 - `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `logout`); `loginService` и ключ localStorage `user` удалены (FE-14).

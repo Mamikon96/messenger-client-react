@@ -40,3 +40,49 @@ test('сбой проверки сессии: сообщение и «Повто
   await page.getByRole('button', { name: 'Повторить' }).click();
   await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
 });
+
+const errors = [
+  { code: 'access_denied', text: 'Вход отменён' },
+  { code: 'provider_error', text: 'Ошибка провайдера' },
+  { code: 'invalid_state', text: 'Попытка входа устарела' },
+  { code: 'something_else', text: 'Не удалось войти' },
+];
+
+for (const { code, text } of errors) {
+  test(`ошибка OAuth ${code}: сообщение на экране входа, адрес очищен`, async ({ page }) => {
+    await page.goto(`/?auth_error=${code}`);
+    await expect(page.getByRole('alert')).toHaveText(text);
+    await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+  });
+}
+
+test('после ошибки повторный вход через провайдера проходит', async ({ page }) => {
+  await page.goto('/?auth_error=access_denied');
+  await page.getByRole('link', { name: 'Войти через GitHub' }).click();
+  await expect(page.getByText('Join').first()).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('клик по провайдеру показывает «Переход…», остальные кнопки неактивны', async ({ page }) => {
+  // 204: браузер не уходит со страницы, поэтому состояние ожидания перехода можно проверить.
+  await page.route('**/api/auth/google/start', (route) => route.fulfill({ status: 204 }));
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Войти через Google' }).click();
+  await expect(page.getByRole('link', { name: /Переход…/ })).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('link', { name: 'Войти через GitHub' })).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('экран входа в тёмной теме: фон и текст из токенов', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  const card = page.locator('.login__card');
+  await expect(card).toBeVisible();
+  const [bg, pageBg] = await Promise.all([
+    card.evaluate((el) => getComputedStyle(el).backgroundColor),
+    page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ]);
+  expect(bg).not.toBe('rgb(255, 255, 255)');
+  expect(bg).not.toBe(pageBg);
+});
+

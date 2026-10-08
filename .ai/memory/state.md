@@ -1,8 +1,8 @@
 # Состояние frontend
-> Проверено: 2026-10-08 @ dd3e8f8+dirty
+> Проверено: 2026-10-08 @ 3bad34e+dirty
 
 ## Общее
-Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`), e2e: `smoke`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF контрактные и proxy.
+Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`), e2e: `smoke`, `tokens`, `theme`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF контрактные и proxy.
 
 ## Что работает
 - Redux store с пятью слайсами: `chats`, `activeChat`, `messages` (`addMessage`), `users` (только `addChat`, `setActiveChat`, `addUser`) и `auth` (`status`: loading/anonymous/authenticated/error + `user`, thunks `checkSession`, `logout`); `rootReducer` сбрасывает весь store на `logout.fulfilled`
@@ -11,6 +11,7 @@
 - Список чатов, выбор активного чата, подсветка `_active`
 - Окно диалога: сообщения активного чата, отправка по Send/Enter (Shift+Enter — перенос), свои сообщения справа (`_own`)
 - Дизайн-токены `src/styles/tokens.css` (светлая тема в `:root`, тёмная в `[data-theme="dark"]`, AA проверен тестом); компоненты пока на старых цветах (FE-24…FE-29) (FE-22)
+- Тема light/dark/system: `useTheme`, `data-theme` на `<html>` до отрисовки, выбор в localStorage (FE-23); переключателя в UI ещё нет (FE-28)
 - mock-BFF (`mock-bff/server.js`, `npm run mock-bff`) по `auth-contract.md`; dev-сервер и e2e проксируют на него `/api` (FE-11)
 - Гейт входа в `src/App.js` по `auth.status`: «Загрузка…» / экран `Login` (ссылки «Войти через Google/GitHub» на `/api/auth/{provider}/start`) / мессенджер / ошибка с кнопкой «Повторить»
 
@@ -23,9 +24,10 @@
 6. `console.log` в: `Chats.js` (2), `JoinForm.js`.
 7. `src/app/modules/messenger/components/chats/Chats.js`: `handleClick.bind(this, chat)` в функциональном компоненте, лишний параметр `index`.
 8. `README.md` пустой (одна строка).
+9. Промежуточно, до FE-24…FE-29: фоны компонентов захардкожены (`Chat.css`, `Actions.css`, `Dialog.css`), поэтому в тёмной теме светлый текст стоит на светло-сером фоне и контраст нарушен; сама тема работает, переключателя в UI нет (FE-28).
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (проверка памяти ✓, unit ✓, e2e 37/37 ✓) · FE-22 · 2026-10-08
+`npm run accept` → код выхода 0 (проверка памяти ✓, 135 unit ✓, 44 e2e ✓) · FE-23 · 2026-10-08
 
 ## Фокус сейчас
-Задача не взята. Следующие по редизайну UI — FE-23 (темы) и FE-24 (UI-примитивы), см. `tasks.md`.
+Задача не взята. Следующая по редизайну UI — FE-24 (UI-примитивы), см. `tasks.md`.

@@ -12,9 +12,6 @@
     overflow: hidden;
     display: flex;
     justify-content: space-around;
-}
-
-._dark {
     font-size: 20px;
-    color: white;
+    color: var(--color-text);
 }

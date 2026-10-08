@@ -6,6 +6,9 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import store from './app/store'
 import { Provider } from 'react-redux'
+import { initTheme } from './app/modules/theme/theme';
+
+initTheme();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

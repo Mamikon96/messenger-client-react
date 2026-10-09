@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession, logout } from './auth';
+import reducer, { checkSession, logout, selectAuthStatus, selectAuthUser } from './auth';
 import * as authApi from '../services/authApi';
 
 jest.mock('../services/authApi');
@@ -108,6 +108,17 @@ describe('auth slice', () => {
 
       expect(logout.rejected.match(result)).toBe(true);
       expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+    });
+  });
+
+  describe('селекторы', () => {
+    it('selectAuthStatus возвращает статус', () => {
+      expect(selectAuthStatus({ auth: { status: 'authenticated', user } })).toBe('authenticated');
+    });
+
+    it('selectAuthUser возвращает пользователя или null', () => {
+      expect(selectAuthUser({ auth: { status: 'authenticated', user } })).toBe(user);
+      expect(selectAuthUser({ auth: { status: 'anonymous', user: null } })).toBeNull();
     });
   });
 });

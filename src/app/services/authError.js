@@ -1,4 +1,4 @@
-// Ошибка OAuth приходит редиректом на /?auth_error=<код> (auth-contract.md, FE-D06); тексты — FE-D11.
+// Ошибка OAuth приходит редиректом на /?auth_error=<код> (docs/client-integration.md, FE-D06); тексты — FE-D11.
 const PARAM = "auth_error";
 const GENERIC_MESSAGE = "Не удалось войти";
 const MESSAGES = {

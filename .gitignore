@@ -34,3 +34,6 @@ yarn-error.log*
 
 # локальные артефакты playwright-mcp
 /.playwright-mcp
+
+# локальная заметка для бэкенда (не для репозитория)
+/docs/backend-google-oauth-invalid-client.md

@@ -4,7 +4,7 @@
 - Один компонент = папка с `Name.js` + `Name.css`; папки в kebab-case, файлы — PascalCase.
 - Расположение: `src/app/modules/<module>/`, вложенные части — `components/<name>/`.
 - Классы по БЭМ: `block__element`, модификаторы с префиксом `_` (`_active`, `_dark`).
-- Функциональные компоненты и хуки. Экспорт: `export default` для модулей, именованный для мелких частей в `components/`.
+- Функциональные компоненты и хуки. Экспорт: файл-компонент (в т. ч. в `components/`) экспортирует свой компонент по `export default`; именованный экспорт — для вспомогательного (селекторы, утилиты, константы, вспомогательные компоненты рядом с основным) (FE-D19).
 - Слайсы RTK: `createSlice`, id через `nanoid()`, экспорт actions + `default` reducer; регистрация в `src/app/store.js`.
 - Состояние формы — `useState` + общий `handleChange` по `event.target.name`.
 - Стили — обычный CSS, один файл на компонент. JavaScript, без TypeScript.

@@ -107,8 +107,9 @@ cmd_start() {
   check_repo
   [ "$id" = chore ] || check_task "$id"
   cur=$(git symbolic-ref --short -q HEAD)
-  if [ "$cur" != "$branch" ] && [ -n "$(git status --porcelain)" ] && [ "$allow_dirty" -eq 0 ]; then
-    git status --short >&2
+  # Незакоммиченный tasks.md не считается чужой правкой: задачу заводят в нём до старта, запись уезжает в её ветку
+  if [ "$cur" != "$branch" ] && [ -n "$(git status --porcelain -- . ':!.ai/memory/tasks.md')" ] && [ "$allow_dirty" -eq 0 ]; then
+    git status --short -- . ':!.ai/memory/tasks.md' >&2
     die "в рабочем дереве есть незакоммиченные изменения (ветка '$cur'): при переключении они «приедут» в $branch. Закоммитить/убрать, либо — только с согласия пользователя — start --allow-dirty"
   fi
   base=$(base_branch)

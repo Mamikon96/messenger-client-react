@@ -164,6 +164,14 @@ cmd_commit() {
 
   bash scripts/check-memory.sh >/dev/null || { bash scripts/check-memory.sh || true; die "память не актуальна — коммит отменён"; }
 
+  # Задачи, меняющие поведение приложения (src/, mock-bff/), закрываются только со свежим QA-отчётом qa-tester (FE-D17)
+  # Пути нормализуются к виду от корня репозитория (./src/x, src, абсолютный путь, a/../src/x); realpath -m работает и для удалённых/новых файлов
+  local root
+  root=$(git rev-parse --show-toplevel)
+  if realpath -m --relative-to="$root" -- "$@" | grep -qE '^(src|mock-bff)(/|$)'; then
+    bash scripts/check-state.sh --require-qa || die "нет свежего QA-отчёта с вердиктом PASS — коммит отменён (запустить qa-tester, исправить проблемы, повторить)"
+  fi
+
   git add -- "$@"
   git diff --cached --quiet && die "нечего коммитить в указанных файлах"
   git diff --cached --stat

@@ -6,7 +6,7 @@ const login = async (page) => {
   await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
 };
 
-test('кнопка при фокусе с клавиатуры получает видимую обводку', async ({ page }) => {
+test('[UC-UI-01] кнопка при фокусе с клавиатуры получает видимую обводку', async ({ page }) => {
   await login(page);
   await page.keyboard.press('Tab');
   const focused = page.locator(':focus-visible');
@@ -19,7 +19,7 @@ test('кнопка при фокусе с клавиатуры получает 
   expect(outline.width).toBeGreaterThan(0);
 });
 
-test('поле формы Join при фокусе получает обводку акцентным цветом темы', async ({ page }) => {
+test('[UC-UI-01] поле формы Join при фокусе получает обводку акцентным цветом темы', async ({ page }) => {
   await login(page);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   const input = page.getByRole('textbox', { name: 'Название чата' });

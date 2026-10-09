@@ -6,7 +6,7 @@ const login = async (page) => {
   await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
 };
 
-test('выход через меню пользователя: экран входа, сессия на сервере закрыта', async ({ page }) => {
+test('[UC-SESSION-03] выход через меню пользователя: экран входа, сессия на сервере закрыта', async ({ page }) => {
   await login(page);
 
   await page.getByRole('button', { name: 'Mock google user' }).click();
@@ -17,7 +17,7 @@ test('выход через меню пользователя: экран вхо
   expect((await page.request.get('/api/auth/session')).status()).toBe(401);
 });
 
-test('после выхода перезагрузка показывает экран входа', async ({ page }) => {
+test('[UC-SESSION-03] после выхода перезагрузка показывает экран входа', async ({ page }) => {
   await login(page);
   await page.getByRole('button', { name: 'Mock google user' }).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
@@ -28,7 +28,7 @@ test('после выхода перезагрузка показывает эк
   await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
 });
 
-test('после выхода чаты предыдущего пользователя не видны', async ({ page }) => {
+test('[UC-SESSION-05] после выхода чаты предыдущего пользователя не видны', async ({ page }) => {
   await login(page);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   await page.locator('input[name="title"]').fill('Secret room');
@@ -46,7 +46,7 @@ test('после выхода чаты предыдущего пользоват
   await expect(page.getByText('Secret room')).toHaveCount(0);
 });
 
-test('сбой выхода: сообщение, остаёмся в мессенджере', async ({ page }) => {
+test('[UC-SESSION-04] сбой выхода: сообщение, остаёмся в мессенджере', async ({ page }) => {
   await login(page);
   await page.route('**/api/auth/logout', (route) => route.abort());
 

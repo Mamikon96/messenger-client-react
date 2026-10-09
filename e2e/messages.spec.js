@@ -16,7 +16,7 @@ const createChat = async (page, title) => {
   await page.locator('.chat', { hasText: title }).click();
 };
 
-test('сообщение отправляется кнопкой и Enter, поле очищается', async ({ page }) => {
+test('[UC-MSG-01] сообщение отправляется кнопкой и Enter, поле очищается', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
 
@@ -32,7 +32,7 @@ test('сообщение отправляется кнопкой и Enter, по�
   await expect(input).toHaveValue('');
 });
 
-test('сообщения не смешиваются между чатами', async ({ page }) => {
+test('[UC-MSG-03] сообщения не смешиваются между чатами', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
   await page.locator('.dialog__footer-input').fill('Только в A');
@@ -43,7 +43,7 @@ test('сообщения не смешиваются между чатами', a
   await expect(page.locator('.dialog__content').getByText('Только в A')).toHaveCount(0);
 });
 
-test('после выхода сообщения предыдущего пользователя не видны', async ({ page }) => {
+test('[UC-SESSION-05] после выхода сообщения предыдущего пользователя не видны', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
   await page.locator('.dialog__footer-input').fill('Секрет');
@@ -56,4 +56,24 @@ test('после выхода сообщения предыдущего поль
 
   await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
   await expect(page.getByText('Секрет')).toHaveCount(0);
+});
+
+test('[UC-MSG-02] Shift+Enter переносит строку, пустое сообщение и пробелы не отправляются', async ({ page }) => {
+  await login(page);
+  await createChat(page, 'Room A');
+  const input = page.locator('.dialog__footer-input');
+  const messages = page.locator('.dialog__message');
+
+  await input.fill('Строка 1');
+  await input.press('Shift+Enter');
+  await input.pressSequentially('Строка 2');
+  await expect(input).toHaveValue('Строка 1\nСтрока 2');
+  await expect(messages).toHaveCount(0);
+
+  await input.fill('');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await input.fill('   ');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await input.press('Enter');
+  await expect(messages).toHaveCount(0);
 });

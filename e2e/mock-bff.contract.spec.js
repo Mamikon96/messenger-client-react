@@ -1,7 +1,7 @@
 const { test, expect, request } = require('@playwright/test');
 
 // Контракт auth API (.ai/memory/auth-contract.md) против mock-BFF.
-// Ручной запуск: `npm run mock-bff` и `MOCK_BFF_URL=http://localhost:3200 npx playwright test e2e/mock-bff.contract.spec.js`.
+// Ручной запуск: `npm run mock-bff` и `MOCK_BFF_URL=http://localhost:3333 npx playwright test e2e/mock-bff.contract.spec.js`.
 // Без MOCK_BFF_URL пропускается: в приёмку mock-BFF подключает FE-11.
 const baseURL = process.env.MOCK_BFF_URL;
 

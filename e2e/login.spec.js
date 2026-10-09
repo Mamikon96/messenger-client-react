@@ -7,7 +7,7 @@ const providers = [
 ];
 
 for (const { provider, button } of providers) {
-  test(`вход через ${provider}: экран входа → мессенджер, сессия принадлежит провайдеру`, async ({ page }) => {
+  test(`[UC-AUTH-01] вход через ${provider}: экран входа → мессенджер, сессия принадлежит провайдеру`, async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Войти через GitHub' })).toBeVisible();
@@ -21,14 +21,14 @@ for (const { provider, button } of providers) {
   });
 }
 
-test('после перезагрузки сессия сохраняется и вход не показывается', async ({ page }) => {
+test('[UC-SESSION-01] после перезагрузки сессия сохраняется и вход не показывается', async ({ page }) => {
   await page.goto('/api/auth/github/start');
   await page.goto('/');
   await expect(page.getByText('Join').first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Войти через GitHub' })).toHaveCount(0);
 });
 
-test('сбой проверки сессии: сообщение и «Повторить» восстанавливает работу', async ({ page }) => {
+test('[UC-SESSION-02] сбой проверки сессии: сообщение и «Повторить» восстанавливает работу', async ({ page }) => {
   let fail = true;
   await page.route('**/api/auth/session', (route) => (fail ? route.abort() : route.fallback()));
   await page.goto('/');
@@ -49,7 +49,7 @@ const errors = [
 ];
 
 for (const { code, text } of errors) {
-  test(`ошибка OAuth ${code}: сообщение на экране входа, адрес очищен`, async ({ page }) => {
+  test(`[UC-AUTH-03] ошибка OAuth ${code}: сообщение на экране входа, адрес очищен`, async ({ page }) => {
     await page.goto(`/?auth_error=${code}`);
     await expect(page.getByRole('alert')).toHaveText(text);
     await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
@@ -57,14 +57,14 @@ for (const { code, text } of errors) {
   });
 }
 
-test('после ошибки повторный вход через провайдера проходит', async ({ page }) => {
+test('[UC-AUTH-04] после ошибки повторный вход через провайдера проходит', async ({ page }) => {
   await page.goto('/?auth_error=access_denied');
   await page.getByRole('link', { name: 'Войти через GitHub' }).click();
   await expect(page.getByText('Join').first()).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
-test('клик по провайдеру показывает «Переход…», остальные кнопки неактивны', async ({ page }) => {
+test('[UC-AUTH-02] клик по провайдеру показывает «Переход…», остальные кнопки неактивны', async ({ page }) => {
   // 204: браузер не уходит со страницы, поэтому состояние ожидания перехода можно проверить.
   await page.route('**/api/auth/google/start', (route) => route.fulfill({ status: 204 }));
   await page.goto('/');
@@ -73,7 +73,7 @@ test('клик по провайдеру показывает «Переход�
   await expect(page.getByRole('link', { name: 'Войти через GitHub' })).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('экран входа в тёмной теме: фон и текст из токенов', async ({ page }) => {
+test('[UC-THEME-04] экран входа в тёмной теме: фон и текст из токенов', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
   const card = page.locator('.login__card');

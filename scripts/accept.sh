@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Приёмка задачи: unit + e2e. Задача считается завершённой только при exit code 0.
+# Приёмка задачи: память + кейсы/API/код + unit + e2e. Задача считается завершённой только при exit code 0.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bash scripts/check-memory.sh
+# Память и статика — первыми (fail-fast до долгих unit/e2e); в --behavior они не повторяются
+bash scripts/check-state.sh
 
 echo "==> Unit-тесты (Jest)"
 CI=true npx react-scripts test --watchAll=false
 
-echo "==> E2E-тесты (Playwright)"
-CI=true npx playwright test
+echo "==> Тесты чекера состояния (node --test)"
+node --test scripts/check-state.test.js
+
+# Прогон e2e + матрица «кейс → результат»: упавший тест = нарушенный user-кейс (docs/user-cases.md)
+bash scripts/check-state.sh --behavior --no-precheck
 
 echo "==> Все тесты зелёные"

@@ -19,6 +19,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 |---|---|
 | Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/tasks.md` |
 | Компоненты, слайсы, стили | `.ai/rules/code-style.md` |
+| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` |
 | Тесты / новое поведение | `.ai/rules/testing.md` |
 | Баги, текущее состояние | `.ai/memory/state.md` |
 | Новая библиотека/подход | `.ai/rules/tech-approval.md` |

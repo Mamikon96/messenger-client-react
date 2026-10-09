@@ -16,7 +16,22 @@
       "Bash(*.claude/settings.json*)"
     ],
     "deny": [
-      "Bash(*approve-usecases*)"
+      "Bash(scripts/approve-usecases.sh*)",
+      "Bash(./scripts/approve-usecases.sh*)",
+      "Bash(./approve-usecases.sh*)",
+      "Bash(/*approve-usecases.sh*)",
+      "Bash(bash scripts/approve-usecases.sh*)",
+      "Bash(bash ./scripts/approve-usecases.sh*)",
+      "Bash(bash approve-usecases.sh*)",
+      "Bash(bash /*approve-usecases.sh*)",
+      "Bash(sh scripts/approve-usecases.sh*)",
+      "Bash(sh ./scripts/approve-usecases.sh*)",
+      "Bash(sh approve-usecases.sh*)",
+      "Bash(sh /*approve-usecases.sh*)",
+      "Bash(source *approve-usecases.sh*)",
+      "Bash(. *approve-usecases.sh*)",
+      "Bash(bash -c *approve-usecases*)",
+      "Bash(sh -c *approve-usecases*)"
     ]
   }
 }

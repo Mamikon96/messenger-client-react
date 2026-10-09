@@ -13,6 +13,7 @@
 | Любая задача разработки (старт) | `rules/memory-protocol.md`, `memory/tasks.md` |
 | Новый/изменённый компонент, слайс, стили | `rules/code-style.md` (+ `memory/architecture.md`, если трогаешь структуру) |
 | Написать/починить тесты, реализовать новое поведение, user-кейсы `docs/user-cases.md` | `rules/testing.md` |
+| Архитектура, паттерны, ревью кода (**обязательно** для `react-engineer` при дизайне и `react-reviewer`) | `rules/patterns.md` (+ скилл `react-patterns`, `memory/architecture.md`, заголовки `decisions.md`) |
 | Баг, регрессия, «что сейчас сломано» | `memory/state.md` |
 | Нужна новая библиотека/паттерн | `rules/tech-approval.md`, затем заголовки `memory/**/decisions.md` |
 | Закрыть задачу (приёмка, ревью, проход `qa-tester`) | `rules/acceptance.md` |

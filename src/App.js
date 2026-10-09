@@ -5,12 +5,12 @@ import Header from './app/modules/header/Header';
 import Login from './app/modules/login/Login';
 import Messenger from './app/modules/messenger/Messenger';
 import { Button } from './app/modules/ui/button/Button';
-import { checkSession } from './app/reducers/auth';
+import { checkSession, selectAuthStatus } from './app/reducers/auth';
 import { clearAuthErrorFromUrl, readAuthError } from './app/services/authError';
 
 function App() {
   const dispatch = useDispatch();
-  const status = useSelector((state) => state.auth.status);
+  const status = useSelector(selectAuthStatus);
   // Ошибка OAuth читается один раз при старте: Login перемонтируется после «Повторить», а сообщение должно остаться.
   const [authError] = useState(() => readAuthError(window.location.search));
 

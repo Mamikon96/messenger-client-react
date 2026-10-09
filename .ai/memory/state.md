@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-09 @ 754a10b+dirty
+> Проверено: 2026-10-09 @ 6656085
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF контрактные и proxy.
@@ -32,10 +32,9 @@
     - `src/app/reducers/chats.js`, `messages.js`, `users.js`, `activeChat.js`: модель стора не совпадает с API (`nanoid`, `authorId`/`text`/`ts` вместо `senderId`/`body`/`createdAt`/`seq`, `activeChat` — копия чата).
     - `mock-bff/server.js`: ошибки с пустым телом, cookie всегда `Secure`, только auth; остальные `/api/*` — 404.
     - `src/app/services/authError.js`: нет текстов для `not_allowed`, `login_taken`.
-    - `src/setupProxy.js`: проксируется только mock-BFF, `/ws` нет; путь `/ws` бэкенда совпадает с HMR-сокетом CRA (гипотеза, проверить запуском — FE-33, FE-D14).
-
-## Последняя приёмка
-`npm run accept` → код выхода 0 (проверка памяти ✓, 206 unit ✓, 53 e2e ✓) · FE-25 · 2026-10-08
+    - `src/setupProxy.js`: `/api` и `/mock-provider` проксируются на `BACKEND_URL` (по умолчанию `http://localhost:3333`), `/ws` нет; путь `/ws` бэкенда совпадает с HMR-сокетом CRA (гипотеза, проверить запуском — FE-33, FE-D14). Порт реального бэкенда — всегда 3333 (решено пользователем 2026-10-09); e2e и qa-tester задают `BACKEND_URL` на mock-BFF (3333); `/ws` и `.env.example` — FE-33.
+11. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29.
+`npm run accept` → код выхода 0 (память ✓, состояние ✓, 71 тест чекера ✓, 206 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · QA PASS 19/19 · chore user-cases-state-check · 2026-10-09
 
 ## Фокус сейчас
 Задача не взята. Интеграция с реальным API: порядок и зависимости — в `tasks.md` (FE-33, FE-34 → FE-35, FE-36 → FE-37 → …); UI-задачи FE-26, FE-27 ждут нормализованный стор.

@@ -125,7 +125,7 @@ function createServer() {
 }
 
 if (require.main === module) {
-  const port = process.env.MOCK_BFF_PORT || 3200;
+  const port = process.env.MOCK_BFF_PORT || 3333;
   createServer().listen(port, () => console.log(`mock-bff: http://localhost:${port}`));
 }
 

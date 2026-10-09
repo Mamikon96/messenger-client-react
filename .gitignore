@@ -28,3 +28,9 @@ yarn-error.log*
 
 # документ интеграции от бэкенда (локальная копия, не коммитится)
 /docs/client-integration.md
+
+# отчёт и скриншоты агента qa-tester (локальные артефакты)
+/.qa
+
+# локальные артефакты playwright-mcp
+/.playwright-mcp

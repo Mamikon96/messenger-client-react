@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-09 @ 754a10b+dirty
+> Проверено: 2026-10-09 @ 8b57504+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
@@ -42,7 +42,7 @@
 Бэкенд `messenger-server` — отдельный проект (SH-D04); контракт — `docs/client-integration.md` (FE-D12), REST под `/api`, WebSocket `/ws`. Сейчас в клиенте подключён только auth; чаты и сообщения пока локально в Redux, нормализованный стор и сетевой слой — FE-35…FE-42 (`tasks.md`). Состояние в памяти браузера, персистентности нет (FE-D04, FE-D15).
 
 ## mock-BFF (`mock-bff/server.js`)
-Локальный Node-сервер (только `http`, без пакетов) по прежнему контракту auth (`auth-contract.md`, история; расхождения с docs — FE-34): фейковый провайдер `/mock-provider/{provider}/authorize` (`?deny=1` — отказ), сессии и state в памяти. Запуск: `npm run mock-bff` (порт `MOCK_BFF_PORT`, по умолчанию 3200). Dev-сервер проксирует `/api` и `/mock-provider` на него через `src/setupProxy.js` (`http-proxy-middleware` 2.x, devDependency). `playwright.config.js` поднимает mock-BFF и dev (3100) и задаёт `MOCK_BFF_URL`; тесты — `e2e/mock-bff.contract.spec.js` (прямо в mock-BFF), `e2e/mock-bff-proxy.spec.js` (через dev-сервер). Cookie `Secure` на `http://localhost` принимают Chromium и Firefox — для e2e (Chromium) достаточно.
+Локальный Node-сервер (только `http`, без пакетов) по прежнему контракту auth (`auth-contract.md`, история; расхождения с docs — FE-34): фейковый провайдер `/mock-provider/{provider}/authorize` (`?deny=1` — отказ), сессии и state в памяти. Запуск: `npm run mock-bff` (порт `MOCK_BFF_PORT`, по умолчанию 3333). Dev-сервер проксирует `/api` и `/mock-provider` через `src/setupProxy.js` (`http-proxy-middleware` 2.x, devDependency) на `BACKEND_URL`, по умолчанию — реальный бэкенд `http://localhost:3333`. `playwright.config.js` поднимает mock-BFF и dev (3100) с `BACKEND_URL` на mock-BFF и задаёт `MOCK_BFF_URL`; для ручной работы с mock-BFF — `BACKEND_URL=http://localhost:3333 npm start`; тесты — `e2e/mock-bff.contract.spec.js` (прямо в mock-BFF), `e2e/mock-bff-proxy.spec.js` (через dev-сервер). Cookie `Secure` на `http://localhost` принимают Chromium и Firefox — для e2e (Chromium) достаточно.
 
 ## AI-контекст
 Правила работы — `.ai/rules/`, память — `.ai/memory/`, маршрутизатор «задача → файлы» — `.ai/README.md`; `CLAUDE.md` — только индекс.

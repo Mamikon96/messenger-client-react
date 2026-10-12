@@ -56,6 +56,9 @@ check_files() {
       echo "$wip" | grep -q 'Осталось' || fail "$dir/tasks.md: в «В работе» есть задачи без блока «Осталось»"
     fi
 
+    # «В работе»: у каждой задачи полный контракт (.ai/rules/task-contract.md)
+    bash scripts/check-contract.sh "$dir/tasks.md" || fail "$dir/tasks.md: неполный контракт задачи (см. выше)"
+
     # «Сделано»: каждая запись начинается с даты
     local done_bad
     done_bad=$(awk '/^## Сделано/{f=1;next} /^## /{f=0} f && /^- /' "$dir/tasks.md" | grep -vE '^- [0-9]{4}-[0-9]{2}-[0-9]{2} — ' || true)

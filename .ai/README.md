@@ -10,13 +10,13 @@
 ## Маршрутизатор: задача → файлы
 | Задача | Читать |
 |---|---|
-| Любая задача разработки (старт) | `rules/memory-protocol.md`, `memory/tasks.md` |
+| Любая задача разработки (старт) | `rules/memory-protocol.md`, `memory/tasks.md`, `rules/task-contract.md` |
 | Новый/изменённый компонент, слайс, стили | `rules/code-style.md` (+ `memory/architecture.md`, если трогаешь структуру) |
 | Написать/починить тесты, реализовать новое поведение, user-кейсы `docs/user-cases.md` | `rules/testing.md` |
 | Архитектура, паттерны, ревью кода (**обязательно** для `react-engineer` при дизайне и `react-reviewer`) | `rules/patterns.md` (+ скилл `react-patterns`, `memory/architecture.md`, заголовки `decisions.md`) |
 | Баг, регрессия, «что сейчас сломано» | `memory/state.md` |
 | Нужна новая библиотека/паттерн | `rules/tech-approval.md`, затем заголовки `memory/**/decisions.md` |
-| Закрыть задачу (приёмка, ревью, проход `qa-tester`) | `rules/acceptance.md` |
+| Закрыть задачу (приёмка, ревью, проход `qa-tester`) | `rules/acceptance.md` (+ `memory/failures.md` при REJECT/FAIL) |
 | Любая git-операция: коммит, ветка, слияние, тег, push, PR | `rules/git-flow.md` (**обязательно**) |
 | Финальный отчёт | `rules/report-format.md` |
 | Сомнение, неоднозначность, не хватает данных (**любая** задача) | `rules/ask-user.md` (**обязательно**) |

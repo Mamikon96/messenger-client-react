@@ -8,4 +8,4 @@
 - Слайсы RTK: `createSlice`, id через `nanoid()`, экспорт actions + `default` reducer; регистрация в `src/app/store.js`.
 - Состояние формы — `useState` + общий `handleChange` по `event.target.name`.
 - Стили — обычный CSS, один файл на компонент. JavaScript, без TypeScript.
-- Без `console.log` в коде, который остаётся в проекте.
+- Без `console.log` (проверяет ESLint, FE-D25; для ошибок — `console.error`).

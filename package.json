@@ -69,7 +69,200 @@
           "scripts/**/*.test.js"
         ],
         "rules": {
+          "jest/no-conditional-expect": "off",
+          "jest/no-identical-title": "off",
+          "jest/no-interpolation-in-snapshots": "off",
+          "jest/no-jasmine-globals": "off",
+          "jest/no-jest-import": "off",
+          "jest/no-mocks-import": "off",
+          "jest/valid-describe-callback": "off",
+          "jest/valid-expect": "off",
+          "jest/valid-expect-in-promise": "off",
+          "jest/valid-title": "off",
+          "testing-library/await-async-query": "off",
+          "testing-library/await-async-utils": "off",
+          "testing-library/no-await-sync-query": "off",
+          "testing-library/no-container": "off",
+          "testing-library/no-debugging-utils": "off",
+          "testing-library/no-dom-import": "off",
+          "testing-library/no-node-access": "off",
+          "testing-library/no-promise-in-fire-event": "off",
+          "testing-library/no-render-in-setup": "off",
+          "testing-library/no-unnecessary-act": "off",
+          "testing-library/no-wait-for-empty-callback": "off",
+          "testing-library/no-wait-for-multiple-assertions": "off",
+          "testing-library/no-wait-for-side-effects": "off",
+          "testing-library/no-wait-for-snapshot": "off",
+          "testing-library/prefer-find-by": "off",
+          "testing-library/prefer-presence-queries": "off",
+          "testing-library/prefer-query-by-disappearance": "off",
+          "testing-library/prefer-screen-queries": "off",
+          "testing-library/render-result-naming-convention": "off",
           "no-template-curly-in-string": "off"
+        }
+      },
+      {
+        "files": [
+          "src/**/*.js"
+        ],
+        "excludedFiles": [
+          "src/app/services/**",
+          "src/**/*.test.js",
+          "src/setupTests.js"
+        ],
+        "rules": {
+          "no-restricted-globals": [
+            "error",
+            "addEventListener",
+            "blur",
+            "close",
+            "closed",
+            "confirm",
+            "defaultStatus",
+            "defaultstatus",
+            "event",
+            "external",
+            "find",
+            "focus",
+            "frameElement",
+            "frames",
+            "history",
+            "innerHeight",
+            "innerWidth",
+            "length",
+            "location",
+            "locationbar",
+            "menubar",
+            "moveBy",
+            "moveTo",
+            "name",
+            "onblur",
+            "onerror",
+            "onfocus",
+            "onload",
+            "onresize",
+            "onunload",
+            "open",
+            "opener",
+            "opera",
+            "outerHeight",
+            "outerWidth",
+            "pageXOffset",
+            "pageYOffset",
+            "parent",
+            "print",
+            "removeEventListener",
+            "resizeBy",
+            "resizeTo",
+            "screen",
+            "screenLeft",
+            "screenTop",
+            "screenX",
+            "screenY",
+            "scroll",
+            "scrollbars",
+            "scrollBy",
+            "scrollTo",
+            "scrollX",
+            "scrollY",
+            "self",
+            "status",
+            "statusbar",
+            "stop",
+            "toolbar",
+            "top",
+            {
+              "name": "fetch",
+              "message": "Почему: HTTP живёт только в src/app/services/ (.ai/rules/patterns.md, «Слои и зависимости»). Как исправить: вынесите запрос в src/app/services/*Api.js через apiRequest; компонент или thunk вызывает сервис."
+            }
+          ],
+          "no-restricted-properties": [
+            "error",
+            {
+              "object": "require",
+              "property": "ensure",
+              "message": "Please use import() instead. More info: https://facebook.github.io/create-react-app/docs/code-splitting"
+            },
+            {
+              "object": "System",
+              "property": "import",
+              "message": "Please use import() instead. More info: https://facebook.github.io/create-react-app/docs/code-splitting"
+            },
+            {
+              "object": "window",
+              "property": "fetch",
+              "message": "Почему: HTTP живёт только в src/app/services/ (.ai/rules/patterns.md, «Слои и зависимости»). Как исправить: вынесите запрос в src/app/services/*Api.js через apiRequest; компонент или thunk вызывает сервис."
+            },
+            {
+              "object": "globalThis",
+              "property": "fetch",
+              "message": "Почему: HTTP живёт только в src/app/services/ (.ai/rules/patterns.md, «Слои и зависимости»). Как исправить: вынесите запрос в src/app/services/*Api.js через apiRequest; компонент или thunk вызывает сервис."
+            }
+          ]
+        }
+      },
+      {
+        "files": [
+          "src/**/*.js"
+        ],
+        "rules": {
+          "no-restricted-syntax": [
+            "error",
+            "WithStatement",
+            {
+              "selector": "CallExpression[callee.object.name='console'][callee.property.name='log']",
+              "message": "Почему: console.log не остаётся в коде проекта (.ai/rules/code-style.md). Как исправить: удалите вызов; для диагностики используйте тест, для ошибок — console.error."
+            }
+          ]
+        }
+      },
+      {
+        "files": [
+          "src/app/services/**/*.js"
+        ],
+        "rules": {
+          "no-restricted-imports": [
+            "error",
+            {
+              "patterns": [
+                {
+                  "group": [
+                    "**/modules",
+                    "**/modules/**"
+                  ],
+                  "message": "Почему: services/ и reducers/ не зависят от UI: импорты идут modules → reducers → services (.ai/rules/patterns.md). Как исправить: передайте нужное параметром или вынесите общее в services/ или reducers/."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "files": [
+          "src/app/reducers/**/*.js"
+        ],
+        "rules": {
+          "no-restricted-imports": [
+            "error",
+            {
+              "patterns": [
+                {
+                  "group": [
+                    "**/modules",
+                    "**/modules/**"
+                  ],
+                  "message": "Почему: services/ и reducers/ не зависят от UI: импорты идут modules → reducers → services (.ai/rules/patterns.md). Как исправить: передайте нужное параметром или вынесите общее в services/ или reducers/."
+                },
+                {
+                  "group": [
+                    "**/store",
+                    "**/store.js"
+                  ],
+                  "message": "Почему: слайсы не импортируют store.js: store собирает слайсы, обратная зависимость даёт цикл (.ai/rules/patterns.md). Как исправить: получайте состояние через getState в thunk или через селектор, а не из store."
+                }
+              ]
+            }
+          ]
         }
       }
     ]

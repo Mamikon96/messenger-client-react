@@ -1,8 +1,8 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ ff530c7+dirty
+> Проверено: 2026-10-13 @ 161b502+dirty
 
 ## Общее
-Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевого слоя и персистентности сообщений нет; бэкенда в проекте нет. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF контрактные и proxy.
+Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53).
 
 ## Что работает
 - Redux store с пятью слайсами: `chats`, `activeChat`, `messages` (`addMessage`), `users` (только `addChat`, `setActiveChat`, `addUser`) и `auth` (`status`: loading/anonymous/authenticated/error + `user`, thunks `checkSession`, `logout`); `rootReducer` сбрасывает весь store на `logout.fulfilled`
@@ -18,21 +18,22 @@
 - Гейт входа в `src/App.js` по `auth.status`: «Загрузка…» / экран `Login` (ссылки «Войти через Google/GitHub» на `/api/auth/{provider}/start`) / мессенджер / ошибка с кнопкой «Повторить»
 
 ## Известные проблемы
-1. `src/app/modules/form/join-form/JoinForm.js`: `<label htmlFor="name">` без соответствующего `id` у инпутов; поле `title` без подписи; форма не очищается и не закрывает popover после Join; нет валидации.
-2. `src/app/modules/messenger/components/dialog/Dialog.js`: автор сообщения не показывается (имена — FE-04), нет автопрокрутки вниз.
-3. `src/app/modules/messenger/components/chat/Chat.js`: количество участников захардкожено `{0}`.
-4. `src/app/modules/form/Form.js` (+ css) — пустой файл.
-5. `src/app/modules/header/components/action/Action.js`: `OVERLAY_OPACITY` объявлена внутри компонента; пустая ветка рендера `""`.
-6. `src/app/modules/messenger/components/chats/Chats.js`: `handleClick.bind(this, chat)` в функциональном компоненте, лишний параметр `index`.
-7. `README.md` пустой (одна строка).
-8. Промежуточно, до FE-24…FE-29: фоны компонентов захардкожены (`Chat.css`, `Actions.css`, `Dialog.css`), поэтому в тёмной теме светлый текст стоит на светло-сером фоне и контраст нарушен; сама тема работает, переключателя в UI нет (FE-28).
+Каждая проблема — со ссылкой на задачу бэклога (→ FE-NN), где описано исправление; подробности — там, здесь не дублируются.
+1. `src/app/modules/form/join-form/JoinForm.js`: `<label htmlFor="name">` без соответствующего `id` у инпутов; поле `title` без подписи; форма не очищается и не закрывает popover после Join; нет валидации. → FE-44
+2. `src/app/modules/messenger/components/dialog/Dialog.js`: автор сообщения не показывается (имена — FE-04), нет автопрокрутки вниз. → FE-27
+3. `src/app/modules/messenger/components/chat/Chat.js`: количество участников захардкожено `{0}`. → FE-26
+4. `src/app/modules/form/Form.js` (+ css) — пустой файл. → FE-05
+5. `src/app/modules/header/components/action/Action.js`: `OVERLAY_OPACITY` объявлена внутри компонента; пустая ветка рендера `""`. → FE-29
+6. `src/app/modules/messenger/components/chats/Chats.js`: `handleClick.bind(this, chat)` в функциональном компоненте, лишний параметр `index`. → FE-26
+7. `README.md` пустой (одна строка). → FE-08
+8. Промежуточно, до FE-24…FE-29: фоны компонентов захардкожены (`Chat.css`, `Actions.css`, `Dialog.css`), поэтому в тёмной теме светлый текст стоит на светло-сером фоне и контраст нарушен; сама тема работает, переключателя в UI нет (FE-28). → FE-26…FE-29
 9. Расхождение с `docs/client-integration.md` (FE-D12; план — FE-33…FE-45):
     - `src/app/services/apiClient.js`: хук 401 (`setUnauthorizedHandler`) нигде не зарегистрирован — истёкшая сессия не ведёт на экран входа; в `ApiError` нет `error.code` и `Retry-After`; нет повтора на `403 csrf_invalid`.
     - `src/app/reducers/chats.js`, `messages.js`, `users.js`, `activeChat.js`: модель стора не совпадает с API (`nanoid`, `authorId`/`text`/`ts` вместо `senderId`/`body`/`createdAt`/`seq`, `activeChat` — копия чата).
     - `mock-bff/server.js`: ошибки с пустым телом, cookie всегда `Secure`, только auth; остальные `/api/*` — 404.
     - `src/app/services/authError.js`: нет текстов для `not_allowed`, `login_taken`.
     - `src/setupProxy.js`: `/api` и `/mock-provider` проксируются на `BACKEND_URL` (по умолчанию `http://localhost:3333`), `/ws` нет; путь `/ws` бэкенда совпадает с HMR-сокетом CRA (гипотеза, проверить запуском — FE-33, FE-D14). Порт реального бэкенда — всегда 3333 (решено пользователем 2026-10-09); e2e и qa-tester задают `BACKEND_URL` на mock-BFF (3333); `/ws` и `.env.example` — FE-33.
-10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29.
+10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
 `npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, 105 тестов чекеров ✓, 208 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE · QA не проводился (FE-50, пропущен по решению пользователя) · FE-50 · 2026-10-13

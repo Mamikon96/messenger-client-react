@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-MEM=.ai/memory
+MEM=${MEM_DIR:-.ai/memory}   # MEM_DIR — для тестов (scripts/check-memory.test.js)
 errors=0
 fail() { echo "  ✗ $1"; errors=$((errors + 1)); }
 
@@ -37,9 +37,11 @@ check_files() {
   done
 
   if [ -f "$dir/tasks.md" ]; then
-    for sec in "## В работе" "## Бэклог" "## Сделано"; do
+    for sec in "## В работе" "## Бэклог"; do
       grep -q "^$sec" "$dir/tasks.md" || fail "$dir/tasks.md: нет секции '$sec'"
     done
+    # История закрытых задач — в архиве done.md (FE-D27), чтобы старт задачи не читал её
+    grep -q '^## Сделано' "$dir/tasks.md" && fail "$dir/tasks.md: раздел «Сделано» — перенеси записи в $dir/done.md"
 
     # Уникальность ID и правильный префикс
     local ids dups bad
@@ -59,10 +61,16 @@ check_files() {
     # «В работе»: у каждой задачи полный контракт (.ai/rules/task-contract.md)
     bash scripts/check-contract.sh "$dir/tasks.md" || fail "$dir/tasks.md: неполный контракт задачи (см. выше)"
 
-    # «Сделано»: каждая запись начинается с даты
+  fi
+
+  # Архив «Сделано»: раздел есть, каждая запись начинается с даты
+  if [ ! -f "$dir/done.md" ]; then
+    fail "нет файла $dir/done.md (архив «Сделано»)"
+  else
+    grep -q '^## Сделано' "$dir/done.md" || fail "$dir/done.md: нет секции '## Сделано'"
     local done_bad
-    done_bad=$(awk '/^## Сделано/{f=1;next} /^## /{f=0} f && /^- /' "$dir/tasks.md" | grep -vE '^- [0-9]{4}-[0-9]{2}-[0-9]{2} — ' || true)
-    [ -z "$done_bad" ] || fail "$dir/tasks.md: записи «Сделано» без даты 'ГГГГ-ММ-ДД — ': $(echo "$done_bad" | head -1)"
+    done_bad=$(awk '/^## Сделано/{f=1;next} /^## /{f=0} f && /^- /' "$dir/done.md" | grep -vE '^- [0-9]{4}-[0-9]{2}-[0-9]{2} — ' || true)
+    [ -z "$done_bad" ] || fail "$dir/done.md: записи «Сделано» без даты 'ГГГГ-ММ-ДД — ': $(echo "$done_bad" | head -1)"
   fi
 }
 

@@ -1,4 +1,20 @@
 {
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/session-brief.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/stop-memory-check.sh" }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "ask": [
       "Edit(docs/user-cases.md)",

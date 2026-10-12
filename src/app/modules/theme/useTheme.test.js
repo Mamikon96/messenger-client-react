@@ -128,10 +128,10 @@ describe("useTheme", () => {
 
     test("несколько потребителей видят одно состояние", () => {
         initTheme();
-        const a = renderHook(() => useTheme());
-        const b = renderHook(() => useTheme());
-        act(() => a.result.current.setMode("dark"));
-        expect(b.result.current.mode).toBe("dark");
+        const { result: first } = renderHook(() => useTheme());
+        const { result: second } = renderHook(() => useTheme());
+        act(() => first.current.setMode("dark"));
+        expect(second.current.mode).toBe("dark");
     });
 
     test("после unmount потребитель не получает обновлений и слушатель снимается", () => {

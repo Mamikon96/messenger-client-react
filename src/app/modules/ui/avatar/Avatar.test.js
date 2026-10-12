@@ -41,8 +41,8 @@ describe("Avatar", () => {
 
     test("цвет фона детерминирован по id и различается у разных id", () => {
         const color = (id) => {
-            const { container, unmount } = render(<Avatar name="X" id={id} />);
-            const value = container.firstChild.style.backgroundColor;
+            const { unmount } = render(<Avatar name="X" id={id} />);
+            const value = screen.getByRole("img", { name: "X" }).style.backgroundColor;
             unmount();
             return value;
         };
@@ -51,7 +51,7 @@ describe("Avatar", () => {
     });
 
     test("размер задаётся модификатором", () => {
-        const { container } = render(<Avatar name="A" size="lg" />);
-        expect(container.firstChild).toHaveClass("avatar", "_lg");
+        render(<Avatar name="A" size="lg" />);
+        expect(screen.getByRole("img", { name: "A" })).toHaveClass("avatar", "_lg");
     });
 });

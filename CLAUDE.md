@@ -7,7 +7,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 
 ## Команды
 - `npm start` — dev-сервер · `npm run build` — сборка · `npm test` — unit (watch)
-- `npm run accept` — приёмка: память + кейсы/API/код + unit + e2e (`scripts/accept.sh`) · `bash scripts/check-state.sh` — проверка состояния (быстро)
+- `npm run accept` — приёмка: память + кейсы/API/код + ESLint + unit + e2e (`scripts/accept.sh`) · `bash scripts/check-state.sh` — проверка состояния (быстро)
 
 ## Структура
 `src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/architecture.md`.
@@ -31,7 +31,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 ## Неснимаемые правила (детали — в файлах выше)
 1. **Память:** после ЛЮБЫХ изменений, до ответа пользователю, актуализируй `tasks.md` (+ `state.md`, штамп) и запусти `bash scripts/check-memory.sh`. Протокол — `.ai/rules/memory-protocol.md`.
 2. **Новые технологии/подходы** — только после опроса пользователя (`AskUserQuestion`); сразу после его выбора решение (что, почему, альтернативы) записывается в `decisions.md` — для вариантов от `solution-architect` это делает он; агенты читают `decisions.md`, а не изобретают заново. См. `.ai/rules/tech-approval.md`.
-3. **Приёмка:** «Сделано» только при `npm run accept` = 0 **и** APPROVE от `react-reviewer`, а для задач с изменением `src/`/`mock-bff/` ещё и свежем отчёте `qa-tester` с PASS; агентов запускает основная сессия. См. `.ai/rules/acceptance.md`.
+3. **Приёмка:** «Сделано» только при `npm run accept` = 0 **и** APPROVE от `react-reviewer`, а для задач с изменением кода `src/`/`mock-bff/` (не только тестов) ещё и свежем отчёте `qa-tester` с PASS; агентов запускает основная сессия. См. `.ai/rules/acceptance.md`.
 4. **Контракт задачи** (цель, кейсы, проверка задачи, скоуп, вне скоупа, открытые вопросы) — в «В работе» `tasks.md` до тестов и кода; проверяет `scripts/check-contract.sh`. Ревью/QA по одной причине дважды или >2 раундов — стоп, запись в `failures.md`, вопрос пользователю. См. `.ai/rules/task-contract.md`, `.ai/rules/acceptance.md`.
 5. Для нового поведения — unit и/или e2e-тест в рамках той же задачи, тесты пишутся до реализации. См. `.ai/rules/testing.md`.
 6. **Git:** перед любой git-операцией читай `.ai/rules/git-flow.md`. Автоматически: старт/продолжение задачи → `bash scripts/git-task.sh start …` (сначала проверка состояния, потом ветка; ошибку не обходить), успешное закрытие по п. 3 → `bash scripts/git-task.sh commit …`, затем push ветки и `gh pr create` (без строки «Generated with Claude Code»). Слияние, теги — только по просьбе.

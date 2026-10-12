@@ -22,10 +22,16 @@ describe("Login", () => {
     });
 
     test("иконки провайдеров скрыты от скринридеров", () => {
-        const { container } = render(<Login />);
-        const icons = container.querySelectorAll("svg");
-        expect(icons).toHaveLength(2);
-        icons.forEach((icon) => expect(icon).toHaveAttribute("aria-hidden", "true"));
+        render(<Login />);
+        const links = [
+            screen.getByRole("link", { name: "Войти через Google" }),
+            screen.getByRole("link", { name: "Войти через GitHub" }),
+        ];
+        // У инлайн-svg нет роли, поэтому разметка иконки проверяется строкой: ровно одна svg и она aria-hidden
+        links.forEach((link) => {
+            expect(link.innerHTML.match(/<svg\b/g)).toHaveLength(1);
+            expect(link.innerHTML).toMatch(/<svg\b[^>]*aria-hidden="true"/);
+        });
     });
 
     test("без ошибки нет блока alert", () => {

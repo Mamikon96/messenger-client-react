@@ -26,6 +26,52 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "e2e/**/*.js"
+        ],
+        "rules": {
+          "jest/no-conditional-expect": "off",
+          "jest/no-identical-title": "off",
+          "jest/no-interpolation-in-snapshots": "off",
+          "jest/no-jasmine-globals": "off",
+          "jest/no-jest-import": "off",
+          "jest/no-mocks-import": "off",
+          "jest/valid-describe-callback": "off",
+          "jest/valid-expect": "off",
+          "jest/valid-expect-in-promise": "off",
+          "jest/valid-title": "off",
+          "testing-library/await-async-query": "off",
+          "testing-library/await-async-utils": "off",
+          "testing-library/no-await-sync-query": "off",
+          "testing-library/no-container": "off",
+          "testing-library/no-debugging-utils": "off",
+          "testing-library/no-dom-import": "off",
+          "testing-library/no-node-access": "off",
+          "testing-library/no-promise-in-fire-event": "off",
+          "testing-library/no-render-in-setup": "off",
+          "testing-library/no-unnecessary-act": "off",
+          "testing-library/no-wait-for-empty-callback": "off",
+          "testing-library/no-wait-for-multiple-assertions": "off",
+          "testing-library/no-wait-for-side-effects": "off",
+          "testing-library/no-wait-for-snapshot": "off",
+          "testing-library/prefer-find-by": "off",
+          "testing-library/prefer-presence-queries": "off",
+          "testing-library/prefer-query-by-disappearance": "off",
+          "testing-library/prefer-screen-queries": "off",
+          "testing-library/render-result-naming-convention": "off"
+        }
+      },
+      {
+        "files": [
+          "scripts/**/*.test.js"
+        ],
+        "rules": {
+          "no-template-curly-in-string": "off"
+        }
+      }
     ]
   },
   "browserslist": {

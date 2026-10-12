@@ -8,7 +8,8 @@ describe("IconButton", () => {
         const button = screen.getByRole("button", { name: "Закрыть" });
         expect(button).toHaveAttribute("type", "button");
         expect(button).toHaveClass("icon-button");
-        expect(screen.getByTestId("icon").parentElement).toHaveAttribute("aria-hidden", "true");
+        // Обёртка иконки скрыта от читалок; у svg нет роли, поэтому разметка проверяется строкой
+        expect(button.innerHTML).toMatch(/<span[^>]*aria-hidden="true"[^>]*><svg data-testid="icon"/);
     });
 
     test("клик и disabled", () => {

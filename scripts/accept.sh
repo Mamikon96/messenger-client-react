@@ -6,11 +6,15 @@ cd "$(dirname "$0")/.."
 # Память и статика — первыми (fail-fast до долгих unit/e2e); в --behavior они не повторяются
 bash scripts/check-state.sh
 
+# Статика: ESLint (FE-D24); предупреждения тоже валят приёмку
+echo "==> ESLint (src, e2e, scripts, mock-bff)"
+npx eslint src e2e scripts mock-bff --max-warnings=0
+
 echo "==> Unit-тесты (Jest)"
 CI=true npx react-scripts test --watchAll=false
 
 echo "==> Тесты чекеров состояния и контракта (node --test)"
-node --test scripts/check-state.test.js scripts/check-contract.test.js
+node --test scripts/check-state.test.js scripts/check-contract.test.js scripts/qa-required.test.js
 
 # Прогон e2e + матрица «кейс → результат»: упавший тест = нарушенный user-кейс (docs/user-cases.md)
 bash scripts/check-state.sh --behavior --no-precheck

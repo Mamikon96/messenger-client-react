@@ -2,9 +2,9 @@
 Читать: когда задача реализована и нужно решить, можно ли её закрыть.
 
 В «Сделано» — только при **обоих** условиях:
-1. `npm run accept` → код 0 (`scripts/accept.sh`: `scripts/check-state.sh` — память, кейсы ↔ API ↔ код, тесты чекера + unit + e2e с матрицей «кейс → результат»).
+1. `npm run accept` → код 0 (`scripts/accept.sh`: `scripts/check-state.sh` — память, кейсы ↔ API ↔ код, ESLint `src`/`e2e`/`scripts`/`mock-bff` без предупреждений (FE-D24), тесты чекера + unit + e2e с матрицей «кейс → результат»).
 2. Ревьюер `react-reviewer` вынес **APPROVE** по текущему коду (ревью — после зелёной приёмки).
-3. Если задача меняет поведение приложения (`src/`, `mock-bff/`): агент `qa-tester` (FE-D17) прошёл в браузере все `active`-кейсы `docs/user-cases.md` и оставил свежий отчёт `.qa/report.md` с `Вердикт: PASS` (нет открытых BLOCKER/MAJOR). Проверка — `bash scripts/check-state.sh --require-qa`; её автоматически делает `scripts/git-task.sh commit`.
+3. Если задача меняет поведение приложения (код или стили в `src/`, `mock-bff/`; только `*.test.js`/`setupTests.js` — не считается, FE-D29; правило — `scripts/qa-required.sh`): агент `qa-tester` (FE-D17) прошёл в браузере все `active`-кейсы `docs/user-cases.md` и оставил свежий отчёт `.qa/report.md` с `Вердикт: PASS` (нет открытых BLOCKER/MAJOR). Проверка — `bash scripts/check-state.sh --require-qa`; её автоматически делает `scripts/git-task.sh commit`.
 
 Порядок: реализация → `npm run accept` → проход `qa-tester` (если п. 3 применим; параллельно с ревью) → ревью → при `REJECT`/`APPROVE WITH FIXES` исправить все BLOCKER и MAJOR, повторить приёмку и **повторное** ревью → запись в «Сделано» с пометкой `ревью: react-reviewer APPROVE`.
 Ревьюер и `qa-tester` получают в промпте контракт задачи (`task-contract.md`) и судят по нему: невыполненная «Проверка задачи» или изменения вне скоупа — замечание.

@@ -9,8 +9,8 @@ bash scripts/check-state.sh
 echo "==> Unit-тесты (Jest)"
 CI=true npx react-scripts test --watchAll=false
 
-echo "==> Тесты чекера состояния (node --test)"
-node --test scripts/check-state.test.js
+echo "==> Тесты чекеров состояния и контракта (node --test)"
+node --test scripts/check-state.test.js scripts/check-contract.test.js
 
 # Прогон e2e + матрица «кейс → результат»: упавший тест = нарушенный user-кейс (docs/user-cases.md)
 bash scripts/check-state.sh --behavior --no-precheck

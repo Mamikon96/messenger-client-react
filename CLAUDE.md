@@ -13,20 +13,22 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 `src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/architecture.md`.
 
 ## Контекст для AI: читай только нужное
-Правила и память разложены по файлам в `.ai/`. **Не читай всё подряд** — открывай файлы по маршрутизатору `.ai/README.md`:
+Правила и память разложены по файлам в `.ai/` (структура — `.ai/README.md`). **Не читай всё подряд** — открывай файлы по этой таблице (единственный маршрутизатор):
 
 | Задача | Файлы |
 |---|---|
 | Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/tasks.md`, `.ai/rules/task-contract.md` |
 | Компоненты, слайсы, стили | `.ai/rules/code-style.md` |
-| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` |
-| Тесты / новое поведение | `.ai/rules/testing.md` |
+| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` (+ скилл `react-patterns`, `.ai/memory/architecture.md`, заголовки `decisions.md`) |
+| Тесты / новое поведение, user-кейсы | `.ai/rules/testing.md` |
 | Баги, текущее состояние | `.ai/memory/state.md` |
-| Новая библиотека/подход | `.ai/rules/tech-approval.md` |
-| Закрытие задачи (приёмка, ревью, проход qa-tester) | `.ai/rules/acceptance.md` |
+| Новая библиотека/подход | `.ai/rules/tech-approval.md`, заголовки `.ai/memory/decisions.md` |
+| Закрытие задачи (приёмка, ревью, проход qa-tester) | `.ai/rules/acceptance.md` (+ `.ai/memory/failures.md` при REJECT/FAIL) |
 | Любая git-операция (коммит, ветка, слияние, push, PR) | `.ai/rules/git-flow.md` |
 | Финальный отчёт | `.ai/rules/report-format.md` |
 | Сомнение / не хватает данных (любая задача) | `.ai/rules/ask-user.md` |
+| История закрытых задач | `.ai/memory/done.md` (поиском по ID) |
+| Правка структуры памяти | `.ai/memory/README.md`, `scripts/check-memory.sh` |
 
 ## Неснимаемые правила (детали — в файлах выше)
 1. **Память:** после ЛЮБЫХ изменений, до ответа пользователю, актуализируй `tasks.md` (+ `state.md`, штамп) и запусти `bash scripts/check-memory.sh`. Протокол — `.ai/rules/memory-protocol.md`.

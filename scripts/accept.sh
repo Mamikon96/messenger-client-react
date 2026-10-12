@@ -13,10 +13,11 @@ npx eslint src e2e scripts mock-bff --max-warnings=0
 echo "==> Unit-тесты (Jest)"
 CI=true npx react-scripts test --watchAll=false
 
-echo "==> Тесты чекеров состояния, контракта, QA-гейта и правил ESLint (node --test)"
-node --test scripts/check-state.test.js scripts/check-contract.test.js scripts/qa-required.test.js scripts/eslint-rules.test.js
+echo "==> Тесты чекеров, правил ESLint и hook-скриптов (node --test)"
+node --test scripts/check-state.test.js scripts/check-contract.test.js scripts/qa-required.test.js scripts/eslint-rules.test.js scripts/check-memory.test.js scripts/accept-stamp.test.js scripts/hooks.test.js
 
 # Прогон e2e + матрица «кейс → результат»: упавший тест = нарушенный user-кейс (docs/user-cases.md)
 bash scripts/check-state.sh --behavior --no-precheck
 
 echo "==> Все тесты зелёные"
+bash scripts/accept-stamp.sh write

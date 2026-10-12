@@ -15,8 +15,6 @@ function JoinForm() {
     });
 
     const handleAction = () => {
-        console.log("form:", formState);
-        
         dispatch(addChat(formState));
     }
 

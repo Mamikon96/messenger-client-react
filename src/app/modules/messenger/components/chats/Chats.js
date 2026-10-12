@@ -7,11 +7,7 @@ function Chats() {
     const chats = useSelector((state) => state.chats);
     const dispatch = useDispatch();
 
-    console.log("chats:", chats);
-    
     const handleClick = (chat) => {
-        console.log("Click:", chat);
-        
         dispatch(setActiveChat(chat));
     }
 

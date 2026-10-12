@@ -26,8 +26,9 @@ yarn-error.log*
 /test-results
 /playwright-report
 
-# документ интеграции от бэкенда (локальная копия, не коммитится)
+# документы интеграции от бэкенда (локальные копии, не коммитятся)
 /docs/client-integration.md
+/docs/client-passkeys-guide.md
 
 # отчёт и скриншоты агента qa-tester (локальные артефакты)
 /.qa

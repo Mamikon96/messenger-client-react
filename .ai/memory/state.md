@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ 2b06e6d+dirty
+> Проверено: 2026-10-13 @ 925f180+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58).
@@ -37,7 +37,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓ 160, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью REJECT → APPROVE (2 раунда) · QA не требуется · chore qa-runs · 2026-10-13
+`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓ 160, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE WITH FIXES → APPROVE (3 раунда) · контрольный QA PASS (0 ошибок инструментов) · FE-84 · 2026-10-13
 
 ## Фокус сейчас
 Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа) → экран входа FE-61, FE-63, FE-78 → FE-62, FE-79, затем FE-64…FE-77; интеграция с API — FE-33, FE-35 → FE-37 → …

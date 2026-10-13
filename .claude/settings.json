@@ -26,10 +26,7 @@
       "Edit(scripts/check-state.*)",
       "Write(scripts/check-state.*)",
       "Edit(.claude/settings.json)",
-      "Write(.claude/settings.json)",
-      "Bash(*user-cases.sha256*)",
-      "Bash(*docs/user-cases.md*)",
-      "Bash(*.claude/settings.json*)"
+      "Write(.claude/settings.json)"
     ],
     "deny": [
       "Bash(scripts/approve-usecases.sh*)",

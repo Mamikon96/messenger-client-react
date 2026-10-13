@@ -569,6 +569,13 @@ test.describe('задача ветки', () => {
     assert.equal(S.taskIdFromBranch(null), null);
   });
 
+  test('qaReportPath: отчёт qa-tester — файл задачи в .qa/runs/, для ветки без ID — имя ветки (FE-D36)', () => {
+    assert.equal(S.qaReportPath('feature/FE-81-mock-bff-port'), '.qa/runs/FE-81.md');
+    assert.equal(S.qaReportPath('bugfix/FE-7-x'), '.qa/runs/FE-7.md');
+    assert.equal(S.qaReportPath('chore/qa-runs'), '.qa/runs/chore-qa-runs.md');
+    assert.doesNotMatch(S.qaReportPath(null), /report\.md$/);
+  });
+
   test('contractCaseIds с ID — только блок этой задачи; задачи нет в «В работе» — null', () => {
     const md = '## В работе\n- **FE-1 (P1)** a\n  - Кейсы: UC-A-01\n- **FE-2 (P1)** b\n  - Кейсы: UC-B-01\n## Бэклог\n';
     assert.deepEqual(S.contractCaseIds(md, 'FE-2'), ['UC-B-01']);
@@ -711,9 +718,11 @@ test.describe('CLI на фикстурном репозитории', () => {
     const runQa = (root) => run(root, ['--require-qa']);
 
     const treeOf = (root) => run(root, ['--tree-hash']).stdout.trim();
+    const reportPathOf = (root) => run(root, ['--qa-report-path']).stdout.trim();
     const writeReport = (root, ...a) => {
-      fs.mkdirSync(path.join(root, '.qa'), { recursive: true });
-      fs.writeFileSync(path.join(root, '.qa/report.md'), qaReport(treeOf(root), S.hashText(qaCases), ...a));
+      const file = path.join(root, reportPathOf(root));
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, qaReport(treeOf(root), S.hashText(qaCases), ...a));
     };
     const makeGitRoot = (verdict = 'PASS', over = {}, branch = null) => {
       const root = makeRoot({
@@ -825,6 +834,25 @@ test.describe('CLI на фикстурном репозитории', () => {
       const r = run(root, ['--qa-scope']);
       assert.equal(r.status, 0, r.stderr);
       assert.equal(r.stdout.trim(), [...S.QA_SMOKE, 'UC-AUTH-02'].join(', '));
+    });
+
+    test('--qa-report-path печатает путь отчёта задачи ветки', () => {
+      const root = makeGitRoot('PASS', { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: нет\n') }, 'feature/FE-1-a');
+      const r = run(root, ['--qa-report-path']);
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout.trim(), '.qa/runs/FE-1.md');
+    });
+
+    test('отчёт другой задачи или старый .qa/report.md не засчитываются — код 1', () => {
+      const root = makeGitRoot('PASS', { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: нет\n') }, 'feature/FE-1-a');
+      const own = path.join(root, '.qa/runs/FE-1.md');
+      const text = fs.readFileSync(own, 'utf8');
+      fs.rmSync(own);
+      fs.writeFileSync(path.join(root, '.qa/runs/FE-2.md'), text);
+      fs.writeFileSync(path.join(root, '.qa/report.md'), text);
+      const r = runQa(root);
+      assert.equal(r.status, 1);
+      assert.match(r.stdout + r.stderr, /\.qa\/runs\/FE-1\.md/);
     });
 
     test('отчёта нет — код 1; без флага отчёт не требуется', () => {

@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ a798fa2+dirty
+> Проверено: 2026-10-13 @ 121f036+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58).
@@ -33,11 +33,11 @@
     - `src/app/reducers/chats.js`, `messages.js`, `users.js`, `activeChat.js`: модель стора не совпадает с API (`nanoid`, `authorId`/`text`/`ts` вместо `senderId`/`body`/`createdAt`/`seq`, `activeChat` — копия чата).
     - `mock-bff/server.js`: ошибки с пустым телом, cookie всегда `Secure`, только auth; остальные `/api/*` — 404.
     - `src/app/services/authError.js`: нет текстов для `not_allowed`, `login_taken`.
-    - `src/setupProxy.js`: `/api` и `/mock-provider` проксируются на `BACKEND_URL` (по умолчанию `http://localhost:3333`), `/ws` нет; путь `/ws` бэкенда совпадает с HMR-сокетом CRA (гипотеза, проверить запуском — FE-33, FE-D14). Порт реального бэкенда — всегда 3333 (решено пользователем 2026-10-09); e2e и qa-tester задают `BACKEND_URL` на mock-BFF (3333); `/ws` и `.env.example` — FE-33.
+    - `src/setupProxy.js`: `/api` и `/mock-provider` проксируются на `BACKEND_URL` (по умолчанию `http://localhost:3333`), `/ws` нет; путь `/ws` бэкенда совпадает с HMR-сокетом CRA (гипотеза, проверить запуском — FE-33, FE-D14). Порт реального бэкенда — всегда 3333 (решено пользователем 2026-10-09); e2e и qa-tester задают `BACKEND_URL` на mock-BFF (3334, `DEFAULT_PORT` в `mock-bff/server.js`, FE-81); `/ws` и `.env.example` — FE-33.
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19; MOCK_BFF_PORT=3334) · ревью APPROVE · QA не требуется · FE-80 · 2026-10-13
+`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19; mock-BFF на 3334 по умолчанию, реальный бэкенд на 3333 запущен) · ревью APPROVE (2 раунда) · QA PASS (UC-SESSION-01, UC-CHAT-02, UC-MSG-01) · FE-81 · 2026-10-13
 
 ## Фокус сейчас
 Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа) → экран входа FE-61, FE-63, FE-78 → FE-62, FE-79, затем FE-64…FE-77; интеграция с API — FE-33, FE-35 → FE-37 → …

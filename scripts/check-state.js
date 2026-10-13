@@ -10,7 +10,7 @@ const CASES_FILE = 'docs/user-cases.md';
 const LOCK_FILE = '.ai/user-cases.sha256';
 const CONTRACT_FILE = 'docs/client-integration.md';
 const MOCK_FILE = 'mock-bff/server.js';
-const QA_REPORT = '.qa/report.md';
+const QA_RUNS_DIR = '.qa/runs';
 const TASKS_FILE = '.ai/memory/tasks.md';
 const DONE_FILE = '.ai/memory/done.md';
 // Smoke-кейсы, которые qa-tester проходит в каждой задаче вдобавок к кейсам контракта (FE-D35).
@@ -275,6 +275,13 @@ function taskIdFromBranch(branch) {
   return m ? m[1] : null;
 }
 
+// Отчёт qa-tester — файл задачи ветки (FE-D36): feature/FE-81-x → .qa/runs/FE-81.md, chore/x → .qa/runs/chore-x.md.
+// Имя report.md не годится: Claude Code запрещает субагенту записывать такой файл.
+function qaReportPath(branch) {
+  const name = taskIdFromBranch(branch) || (branch || 'no-branch').replace(/[^\w.-]+/g, '-');
+  return `${QA_RUNS_DIR}/${name}.md`;
+}
+
 // Кейсы из поля «Кейсы» контрактов раздела «В работе» (.ai/rules/task-contract.md). ID перечисляются явно: диапазоны не раскрываются.
 // С taskId — только блок этой задачи; задачи нет в разделе — null. Без taskId — все задачи раздела.
 function contractCaseIds(tasksMd, taskId = null) {
@@ -319,9 +326,9 @@ function qaScope({ smoke, contractIds, activeIds }) {
   return { ids, errors };
 }
 
-function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash }) {
+function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, reportPath = `${QA_RUNS_DIR}/<задача>.md` }) {
   if (text === null || text === undefined) {
-    return [`нет QA-отчёта ${QA_REPORT} — основная сессия запускает агента qa-tester (он проходит в браузере объём --qa-scope)`];
+    return [`нет QA-отчёта ${reportPath} — основная сессия запускает агента qa-tester (он проходит в браузере объём --qa-scope)`];
   }
   const errors = [];
   const header = (name) => (text.match(new RegExp(`^${name}:[ \\t]*(\\S+)`, 'm')) || [])[1];
@@ -394,7 +401,7 @@ function walk(dir, filter, base = dir, out = {}) {
 const readIf = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
 
 function main(argv) {
-  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false };
+  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false, qaReportPath: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--root') args.root = path.resolve(argv[++i]);
     else if (argv[i] === '--require-contract') args.requireContract = true;
@@ -402,10 +409,17 @@ function main(argv) {
     else if (argv[i] === '--require-qa') args.requireQa = true;
     else if (argv[i] === '--tree-hash') args.treeHash = true;
     else if (argv[i] === '--qa-scope') args.qaScope = true;
+    else if (argv[i] === '--qa-report-path') args.qaReportPath = true;
   }
   const at = (rel) => path.join(args.root, rel);
   if (args.treeHash) {
     console.log(codeTreeHash(args.root));
+    return 0;
+  }
+  const reportPath = qaReportPath(currentBranch(args.root));
+  if (args.qaReportPath) {
+    // Куда qa-tester пишет отчёт и откуда его читает --require-qa
+    console.log(reportPath);
     return 0;
   }
   const errors = [];
@@ -478,11 +492,12 @@ function main(argv) {
     }
     errors.push(
       ...scope.errors,
-      ...checkQaReport(readIf(at(QA_REPORT)), {
+      ...checkQaReport(readIf(at(reportPath)), {
         casesHash: hashText(casesText),
         activeIds,
         requiredIds: scope.ids,
         treeHash,
+        reportPath,
       })
     );
   }
@@ -514,6 +529,7 @@ module.exports = {
   QA_SMOKE,
   currentBranch,
   taskIdFromBranch,
+  qaReportPath,
   contractCaseIds,
   doneCaseIds,
   taskCaseIds,

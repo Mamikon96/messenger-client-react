@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ 925f180+dirty
+> Проверено: 2026-10-13 @ e1947fb+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58).
@@ -29,7 +29,7 @@
 7. `README.md` пустой (одна строка). → FE-08
 8. Промежуточно, до FE-24…FE-29: фоны компонентов захардкожены (`Chat.css`, `Actions.css`, `Dialog.css`), поэтому в тёмной теме светлый текст стоит на светло-сером фоне и контраст нарушен; сама тема работает, переключателя в UI нет (FE-28). → FE-26…FE-29
 9. Расхождение с `docs/client-integration.md` (FE-D12; план — FE-33…FE-45):
-    - `src/app/services/apiClient.js`: хук 401 (`setUnauthorizedHandler`) нигде не зарегистрирован — истёкшая сессия не ведёт на экран входа; в `ApiError` нет `error.code` и `Retry-After`; нет повтора на `403 csrf_invalid`.
+    - `src/app/services/apiClient.js`: хук 401 (`setUnauthorizedHandler`, вызывается только при `401 unauthorized` — FE-56) нигде не зарегистрирован — закрытая сессия не ведёт на экран входа (FE-35); нет повтора на `403 csrf_invalid` (FE-96).
     - `src/app/reducers/chats.js`, `messages.js`, `users.js`, `activeChat.js`: модель стора не совпадает с API (`nanoid`, `authorId`/`text`/`ts` вместо `senderId`/`body`/`createdAt`/`seq`, `activeChat` — копия чата).
     - `mock-bff/server.js`: ошибки с пустым телом, cookie всегда `Secure`, только auth; остальные `/api/*` — 404.
     - `src/app/services/authError.js`: нет текстов для `not_allowed`, `login_taken`.
@@ -37,7 +37,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓ 160, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE WITH FIXES → APPROVE (3 раунда) · контрольный QA PASS (0 ошибок инструментов) · FE-84 · 2026-10-13
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-13 23:45:46; 244 unit ✓, 56 e2e ✓) · ревью APPROVE WITH FIXES → APPROVE (2 раунда) · QA PASS (smoke, `.qa/runs/FE-56.md`) · FE-56 · 2026-10-13
 
 ## Фокус сейчас
-Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа) → экран входа FE-61, FE-63, FE-78 → FE-62, FE-79, затем FE-64…FE-77; интеграция с API — FE-33, FE-35 → FE-37 → …
+Задача не взята. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56 закрыта; дальше FE-87 (правки user-cases — с разрешения пользователя), FE-88 (mock-BFF) → FE-89 → FE-91, FE-92 → FE-35 → FE-37 → …; копию `docs/auth-password-spec.md` синхронизировать с бэкендом после BE-31 (§4.3, BE-D36).

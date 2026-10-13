@@ -1,12 +1,13 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ 161b502+dirty
+> Проверено: 2026-10-13 @ 30651f3+dirty
 
 ## Общее
-Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53).
+Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53).
 
 ## Что работает
 - Redux store с пятью слайсами: `chats`, `activeChat`, `messages` (`addMessage`), `users` (только `addChat`, `setActiveChat`, `addUser`) и `auth` (`status`: loading/anonymous/authenticated/error + `user`, thunks `checkSession`, `logout`); `rootReducer` сбрасывает весь store на `logout.fulfilled`
 - `src/app/services/apiClient.js` и `authApi.js` (`fetchSession`, `logout`); csrfToken хранится только в apiClient
+- `src/app/services/webauthn.js`: сериализация опций и ответов WebAuthn для входа по passkey, пока не подключена к UI (FE-57)
 - Хедер с кнопкой «Join» → popover с формой `JoinForm`, создающей чат (`addChat`), и кнопкой с именем пользователя → popover `UserMenu` с «Выйти» (FE-15)
 - Список чатов, выбор активного чата, подсветка `_active`
 - Окно диалога: сообщения активного чата, отправка по Send/Enter (Shift+Enter — перенос), свои сообщения справа (`_own`)
@@ -36,7 +37,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, 105 тестов чекеров ✓, 208 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE · QA не проводился (FE-50, пропущен по решению пользователя) · FE-50 · 2026-10-13
+`npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE · QA формальный FAIL (3 кейса пропущены по указанию пользователя, дефектов нет; коммит по решению пользователя) · FE-57 · 2026-10-13
 
 ## Фокус сейчас
-Задача не взята. Интеграция с реальным API: порядок и зависимости — в `tasks.md` (FE-33, FE-34 → FE-35, FE-36 → FE-37 → …); UI-задачи FE-26, FE-27 ждут нормализованный стор.
+Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа), затем FE-61…FE-76; интеграция с API — FE-33, FE-35 → FE-37 → …

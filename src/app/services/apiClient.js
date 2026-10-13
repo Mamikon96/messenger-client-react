@@ -5,11 +5,16 @@ let csrfToken = null;
 let unauthorizedHandler = null;
 
 export class ApiError extends Error {
-    constructor(status, data) {
+    constructor(status, data, { retryAfter = null } = {}) {
         super(`API error ${status}`);
+        const errorBody = data?.error;
+        const hasErrorBody = typeof errorBody === "object" && errorBody !== null;
         this.name = "ApiError";
         this.status = status;
         this.data = data;
+        this.code = hasErrorBody && typeof errorBody.code === "string" ? errorBody.code : null;
+        this.details = hasErrorBody && Array.isArray(errorBody.details) ? errorBody.details : null;
+        this.retryAfter = retryAfter;
     }
 }
 
@@ -33,6 +38,14 @@ async function parseBody(response) {
     }
 }
 
+function parseRetryAfter(response) {
+    if (response.status !== 429) {
+        return null;
+    }
+    const value = response.headers.get("Retry-After");
+    return value !== null && /^\d+$/.test(value.trim()) ? Number(value.trim()) : null;
+}
+
 export async function apiRequest(path, { method = "GET", body, signal, skipUnauthorizedHandler = false } = {}) {
     const httpMethod = method.toUpperCase();
     const headers = {};
@@ -53,14 +66,15 @@ export async function apiRequest(path, { method = "GET", body, signal, skipUnaut
     const data = await parseBody(response);
 
     if (!response.ok) {
+        const error = new ApiError(response.status, data, { retryAfter: parseRetryAfter(response) });
         try {
-            if (response.status === 401 && !skipUnauthorizedHandler && unauthorizedHandler) {
+            if (response.status === 401 && error.code === "unauthorized" && !skipUnauthorizedHandler && unauthorizedHandler) {
                 unauthorizedHandler();
             }
         } catch {
             // сбой хука не должен подменять ошибку запроса
         }
-        throw new ApiError(response.status, data);
+        throw error;
     }
     return data;
 }

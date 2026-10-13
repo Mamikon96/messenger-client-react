@@ -1,31 +1,26 @@
 const { test, expect } = require('@playwright/test');
-
-const login = async (page) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Войти через Google' }).click();
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
-};
+const { login, signIn, signInControl, userMenuButton } = require('./helpers/auth');
 
 test('[UC-SESSION-03] выход через меню пользователя: экран входа, сессия на сервере закрыта', async ({ page }) => {
   await login(page);
 
-  await page.getByRole('button', { name: 'Mock google user' }).click();
+  await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
 
-  await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toHaveCount(0);
+  await expect(signInControl(page)).toBeVisible();
+  await expect(userMenuButton(page)).toHaveCount(0);
   expect((await page.request.get('/api/auth/session')).status()).toBe(401);
 });
 
 test('[UC-SESSION-03] после выхода перезагрузка показывает экран входа', async ({ page }) => {
   await login(page);
-  await page.getByRole('button', { name: 'Mock google user' }).click();
+  await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
-  await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
+  await expect(signInControl(page)).toBeVisible();
 
   await page.reload();
 
-  await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
+  await expect(signInControl(page)).toBeVisible();
 });
 
 test('[UC-SESSION-05] после выхода чаты предыдущего пользователя не видны', async ({ page }) => {
@@ -38,11 +33,11 @@ test('[UC-SESSION-05] после выхода чаты предыдущего п
   await page.locator('.overlay').click({ position: { x: 5, y: 5 } });
   await expect(page.getByText('Secret room')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Mock google user' }).click();
+  await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
-  await page.getByRole('link', { name: 'Войти через Google' }).click();
+  await signIn(page);
 
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
+  await expect(userMenuButton(page)).toBeVisible();
   await expect(page.getByText('Secret room')).toHaveCount(0);
 });
 
@@ -50,9 +45,9 @@ test('[UC-SESSION-04] сбой выхода: сообщение, остаёмс�
   await login(page);
   await page.route('**/api/auth/logout', (route) => route.abort());
 
-  await page.getByRole('button', { name: 'Mock google user' }).click();
+  await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
 
   await expect(page.getByRole('alert')).toHaveText('Не удалось выйти. Попробуйте снова.');
-  await expect(page.getByRole('link', { name: 'Войти через Google' })).toHaveCount(0);
+  await expect(signInControl(page)).toHaveCount(0);
 });

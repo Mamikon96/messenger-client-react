@@ -1,10 +1,5 @@
 const { test, expect } = require('@playwright/test');
-
-const login = async (page) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Войти через Google' }).click();
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
-};
+const { login } = require('./helpers/auth');
 
 // popover после Join не закрывается сам (FE-03) — закрываем кликом по оверлею
 const createChat = async (page, title) => {

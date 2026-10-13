@@ -1,10 +1,5 @@
 const { test, expect } = require('@playwright/test');
-
-const login = async (page) => {
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Войти через Google' }).click();
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
-};
+const { login, signIn, userMenuButton } = require('./helpers/auth');
 
 const createChat = async (page, title) => {
   await page.getByRole('button', { name: 'Join', exact: true }).click();
@@ -50,11 +45,11 @@ test('[UC-SESSION-05] после выхода сообщения предыду�
   await page.locator('.dialog__footer-input').press('Enter');
   await expect(page.getByText('Секрет')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Mock google user' }).click();
+  await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
-  await page.getByRole('link', { name: 'Войти через Google' }).click();
+  await signIn(page);
 
-  await expect(page.getByRole('button', { name: 'Mock google user' })).toBeVisible();
+  await expect(userMenuButton(page)).toBeVisible();
   await expect(page.getByText('Секрет')).toHaveCount(0);
 });
 

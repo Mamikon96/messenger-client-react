@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { login, signInControl } = require('./helpers/auth');
 
 // Вход полной навигацией через mock-BFF (фейковый провайдер подтверждает сразу).
 const providers = [
@@ -22,10 +23,10 @@ for (const { provider, button } of providers) {
 }
 
 test('[UC-SESSION-01] после перезагрузки сессия сохраняется и вход не показывается', async ({ page }) => {
-  await page.goto('/api/auth/github/start');
-  await page.goto('/');
+  await login(page);
+  await page.reload();
   await expect(page.getByText('Join').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Войти через GitHub' })).toHaveCount(0);
+  await expect(signInControl(page)).toHaveCount(0);
 });
 
 test('[UC-SESSION-02] сбой проверки сессии: сообщение и «Повторить» восстанавливает работу', async ({ page }) => {
@@ -38,7 +39,7 @@ test('[UC-SESSION-02] сбой проверки сессии: сообщение
 
   fail = false;
   await page.getByRole('button', { name: 'Повторить' }).click();
-  await expect(page.getByRole('link', { name: 'Войти через Google' })).toBeVisible();
+  await expect(signInControl(page)).toBeVisible();
 });
 
 const errors = [

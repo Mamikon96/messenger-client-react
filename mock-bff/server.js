@@ -124,9 +124,12 @@ function createServer() {
   }
 }
 
+// Порт по умолчанию — 3334: на 3333 работает реальный бэкенд, e2e и QA не должны с ним конфликтовать (FE-81).
+const DEFAULT_PORT = 3334;
+
 if (require.main === module) {
-  const port = process.env.MOCK_BFF_PORT || 3333;
+  const port = process.env.MOCK_BFF_PORT || DEFAULT_PORT;
   createServer().listen(port, () => console.log(`mock-bff: http://localhost:${port}`));
 }
 
-module.exports = { createServer };
+module.exports = { createServer, DEFAULT_PORT };

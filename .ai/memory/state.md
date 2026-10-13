@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-13 @ 30651f3+dirty
+> Проверено: 2026-10-13 @ e3c0f79+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53).
@@ -40,4 +40,4 @@
 `npm run accept` → код выхода 0 (память ✓, состояние ✓, ESLint ✓, тесты чекеров ✓, 223 unit ✓, 56 e2e ✓, матрица кейсов 19/19) · ревью APPROVE · QA формальный FAIL (3 кейса пропущены по указанию пользователя, дефектов нет; коммит по решению пользователя) · FE-57 · 2026-10-13
 
 ## Фокус сейчас
-Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа), затем FE-61…FE-76; интеграция с API — FE-33, FE-35 → FE-37 → …
+Задача не взята. Эпик passkey: FE-58 → FE-60 (ядро входа) → экран входа FE-61, FE-63, FE-78 → FE-62, FE-79, затем FE-64…FE-77; интеграция с API — FE-33, FE-35 → FE-37 → …

@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-09 @ 8b57504+dirty
+> Проверено: 2026-10-13 @ 30651f3+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
@@ -36,6 +36,7 @@
 
 ## Сервисы
 - `src/app/services/authError.js` (FE-25): `readAuthError(search)` → текст ошибки OAuth или `null`, `clearAuthErrorFromUrl()` (`history.replaceState`); `App` читает параметр один раз при старте (`useState`-инициализатор) и передаёт в `Login`.
+- `src/app/services/webauthn.js` (FE-57, FE-D30): `creationOptionsFromJSON`/`requestOptionsFromJSON` (JSON сервера → `navigator.credentials`), `credentialToJSON` (ответ аутентификатора → JSON сервера), `isPasskeySupported`; нативные `parse*FromJSON`/`toJSON()` браузера, иначе base64url вручную. Пока не используется — подключается во входе (FE-60).
 - `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `logout`); `loginService` и ключ localStorage `user` удалены (FE-14).
 
 ## Внешние данные

@@ -11,6 +11,11 @@ const LOCK_FILE = '.ai/user-cases.sha256';
 const CONTRACT_FILE = 'docs/client-integration.md';
 const MOCK_FILE = 'mock-bff/server.js';
 const QA_REPORT = '.qa/report.md';
+const TASKS_FILE = '.ai/memory/tasks.md';
+const DONE_FILE = '.ai/memory/done.md';
+// Smoke-кейсы, которые qa-tester проходит в каждой задаче вдобавок к кейсам контракта (FE-D35).
+// Без явного входа: вход меняется эпиком passkey, а эти кейсы проходят через него неявно.
+const QA_SMOKE = ['UC-SESSION-01', 'UC-CHAT-02', 'UC-MSG-01'];
 // Пути, изменение которых делает QA-отчёт устаревшим (код и тесты приложения, не память и не документы).
 const CODE_PATHS = ['src', 'e2e', 'mock-bff', 'package.json', 'playwright.config.js'];
 
@@ -261,27 +266,87 @@ function formatMatrix(rows) {
 
 // ---------- отчёт агента qa-tester ----------
 
-function checkQaReport(text, { casesHash, activeIds, treeHash }) {
+const UC_ANY_RE = /UC-[A-Z]+-\d+/g;
+const uniq = (ids) => [...new Set(ids)];
+
+// ID задачи из имени ветки (feature/FE-80-slug → FE-80); ветка без ID (chore/…) — null.
+function taskIdFromBranch(branch) {
+  const m = /(?:^|\/)([A-Z]+-\d+)(?:-|$)/.exec(branch || '');
+  return m ? m[1] : null;
+}
+
+// Кейсы из поля «Кейсы» контрактов раздела «В работе» (.ai/rules/task-contract.md). ID перечисляются явно: диапазоны не раскрываются.
+// С taskId — только блок этой задачи; задачи нет в разделе — null. Без taskId — все задачи раздела.
+function contractCaseIds(tasksMd, taskId = null) {
+  const section = (('\n' + (tasksMd || '')).split('\n## В работе')[1] || '').split(/\n## /)[0];
+  let blocks = section.split(/\n(?=- \*\*)/);
+  if (taskId) {
+    blocks = blocks.filter((b) => new RegExp(`^- \\*\\*${taskId}\\b`).test(b.trim()));
+    if (blocks.length === 0) return null;
+  }
+  const ids = [];
+  for (const b of blocks) for (const m of b.matchAll(/^\s+- (?:\*\*)?Кейсы:(?:\*\*)?(.*)$/gm)) ids.push(...(m[1].match(UC_ANY_RE) || []));
+  return uniq(ids);
+}
+
+// Поле «Кейсы: …» записи задачи в done.md (до следующего « · » или конца строки): к моменту git-task.sh commit контракт из tasks.md уже удалён.
+function doneCaseIds(doneMd, taskId) {
+  const line = (doneMd || '').split('\n').find((l) => new RegExp(`^- \\d{4}-\\d{2}-\\d{2} — ${taskId}\\b(?!-)`).test(l));
+  if (!line) return { found: false, ids: [], hasField: false };
+  const field = /Кейсы:([^·]*)/.exec(line);
+  return { found: true, ids: field ? uniq(field[1].match(UC_ANY_RE) || []) : [], hasField: Boolean(field) };
+}
+
+// Кейсы контракта задачи ветки: «В работе», а после закрытия — запись в done.md (FE-D35).
+function taskCaseIds({ tasksMd, doneMd, taskId }) {
+  if (!taskId) return { ids: contractCaseIds(tasksMd), errors: [] };
+  const wip = contractCaseIds(tasksMd, taskId);
+  if (wip) return { ids: wip, errors: [] };
+  const done = doneCaseIds(doneMd, taskId);
+  if (!done.found) return { ids: [], errors: [`задача ${taskId} (из имени ветки) не найдена ни в «В работе» ${TASKS_FILE}, ни в ${DONE_FILE}`] };
+  if (!done.hasField) {
+    return { ids: [], errors: [`в записи ${taskId} в ${DONE_FILE} нет поля «Кейсы: … | нет» — без него объём QA не восстановить (memory-protocol.md)`] };
+  }
+  return { ids: done.ids, errors: [] };
+}
+
+// Обязательный объём прохода qa-tester: smoke + active-кейсы контракта (FE-D35). Кейсы контракта не из active (удаляемые, planned) не требуются.
+function qaScope({ smoke, contractIds, activeIds }) {
+  const errors = smoke
+    .filter((id) => !activeIds.includes(id))
+    .map((id) => `smoke-кейс ${id} не active в docs/user-cases.md — обнови QA_SMOKE в scripts/check-state.js`);
+  const ids = uniq([...smoke, ...contractIds.filter((id) => activeIds.includes(id))]);
+  return { ids, errors };
+}
+
+function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash }) {
   if (text === null || text === undefined) {
-    return [`нет QA-отчёта ${QA_REPORT} — основная сессия запускает агента qa-tester (он проходит active-кейсы в браузере)`];
+    return [`нет QA-отчёта ${QA_REPORT} — основная сессия запускает агента qa-tester (он проходит в браузере объём --qa-scope)`];
   }
   const errors = [];
   const header = (name) => (text.match(new RegExp(`^${name}:[ \\t]*(\\S+)`, 'm')) || [])[1];
   const tree = header('Дерево');
   const cases = header('Кейсы');
   const verdict = header('Вердикт');
+  const scopeLine = (text.match(/^Объём:[ \t]*(.*)$/m) || [])[1];
   if (!tree) errors.push('QA-отчёт: нет строки «Дерево: <хэш>» (его печатает check-state.js --tree-hash)');
   if (!cases) errors.push('QA-отчёт: нет строки «Кейсы: <sha256>»');
   if (!verdict) errors.push('QA-отчёт: нет строки «Вердикт: PASS|FAIL»');
-  if (!tree || !cases || !verdict) return errors;
+  if (scopeLine === undefined) errors.push('QA-отчёт: нет строки «Объём: UC-…» (её печатает node scripts/check-state.js --qa-scope)');
+  if (!tree || !cases || !verdict || scopeLine === undefined) return errors;
+  const scope = uniq(scopeLine.match(UC_ANY_RE) || []);
 
   if (cases !== casesHash) errors.push('QA-отчёт устарел: документ кейсов изменился после прохода тестировщика');
   if (tree !== treeHash) errors.push('QA-отчёт устарел: код или тесты изменились после прохода тестировщика — запусти qa-tester заново');
   if (verdict !== 'PASS') errors.push(`QA-отчёт: Вердикт ${verdict} — проблемы нужно исправить и повторить проход`);
 
   const rows = new Map([...text.matchAll(/^\|\s*(UC-[A-Z]+-\d+)\s*\|\s*(\w+)\s*\|/gm)].map((m) => [m[1], m[2]]));
-  for (const id of activeIds) {
-    if (!rows.has(id)) errors.push(`QA-отчёт: кейс ${id} не пройден (нет в матрице)`);
+  for (const id of requiredIds) {
+    if (!scope.includes(id)) errors.push(`QA-отчёт: кейс ${id} обязателен (контракт или smoke), но не вошёл в «Объём»`);
+  }
+  for (const id of scope) {
+    if (!activeIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} из «Объёма» не active в docs/user-cases.md`);
+    else if (!rows.has(id)) errors.push(`QA-отчёт: кейс ${id} не пройден (нет в матрице)`);
     else if (rows.get(id) !== 'pass') errors.push(`QA-отчёт: кейс ${id} — ${rows.get(id)}`);
   }
   for (const m of text.matchAll(/^### (QA-\d+) \[(BLOCKER|MAJOR)\]\s*(.*)$/gm)) {
@@ -306,6 +371,16 @@ function codeTreeHash(root) {
 
 // ---------- CLI ----------
 
+function currentBranch(root) {
+  try {
+    return require('node:child_process')
+      .execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .trim();
+  } catch {
+    return null; // не git-репозиторий
+  }
+}
+
 function walk(dir, filter, base = dir, out = {}) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -319,13 +394,14 @@ function walk(dir, filter, base = dir, out = {}) {
 const readIf = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
 
 function main(argv) {
-  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false };
+  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--root') args.root = path.resolve(argv[++i]);
     else if (argv[i] === '--require-contract') args.requireContract = true;
     else if (argv[i] === '--behavior-report') args.behaviorReport = path.resolve(argv[++i]);
     else if (argv[i] === '--require-qa') args.requireQa = true;
     else if (argv[i] === '--tree-hash') args.treeHash = true;
+    else if (argv[i] === '--qa-scope') args.qaScope = true;
   }
   const at = (rel) => path.join(args.root, rel);
   if (args.treeHash) {
@@ -335,7 +411,7 @@ function main(argv) {
   const errors = [];
   const warnings = [];
 
-  console.log('==> Проверка состояния: кейсы ↔ API ↔ код ↔ поведение');
+  if (!args.qaScope) console.log('==> Проверка состояния: кейсы ↔ API ↔ код ↔ поведение');
 
   const casesText = readIf(at(CASES_FILE));
   if (casesText === null) {
@@ -346,6 +422,16 @@ function main(argv) {
   const parsed = parseCases(casesText);
   errors.push(...parsed.errors);
   const { cases } = parsed;
+  const activeIds = cases.filter((c) => c.status === 'active').map((c) => c.id);
+  const contract = taskCaseIds({ tasksMd: readIf(at(TASKS_FILE)), doneMd: readIf(at(DONE_FILE)), taskId: taskIdFromBranch(currentBranch(args.root)) });
+  const scope = qaScope({ smoke: QA_SMOKE, contractIds: contract.ids, activeIds });
+  scope.errors.unshift(...contract.errors);
+  if (args.qaScope) {
+    // Объём прохода qa-tester: строка «Объём:» его отчёта
+    for (const e of scope.errors) console.error(`  ✗ ${e}`);
+    console.log(scope.ids.join(', '));
+    return scope.errors.length ? 1 : 0;
+  }
 
   const isSpec = (n) => /\.spec\.js$/.test(n);
   const e2eFiles = Object.fromEntries(Object.entries(walk(at('e2e'), isSpec, args.root)));
@@ -391,9 +477,11 @@ function main(argv) {
       errors.push(`не удалось посчитать хэш дерева кода (нужен git-репозиторий): ${e.message.split('\n')[0]}`);
     }
     errors.push(
+      ...scope.errors,
       ...checkQaReport(readIf(at(QA_REPORT)), {
         casesHash: hashText(casesText),
-        activeIds: cases.filter((c) => c.status === 'active').map((c) => c.id),
+        activeIds,
+        requiredIds: scope.ids,
         treeHash,
       })
     );
@@ -423,6 +511,13 @@ module.exports = {
   checkApi,
   behaviorMatrix,
   formatMatrix,
+  QA_SMOKE,
+  currentBranch,
+  taskIdFromBranch,
+  contractCaseIds,
+  doneCaseIds,
+  taskCaseIds,
+  qaScope,
   checkQaReport,
   codeTreeHash,
 };

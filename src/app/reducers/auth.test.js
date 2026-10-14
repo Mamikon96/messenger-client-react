@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession, logout, selectAuthStatus, selectAuthUser } from './auth';
+import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser } from './auth';
 import * as authApi from '../services/authApi';
 
 jest.mock('../services/authApi');
@@ -108,6 +108,41 @@ describe('auth slice', () => {
 
       expect(logout.rejected.match(result)).toBe(true);
       expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+    });
+  });
+
+  describe.each([
+    ['login', login, 'login'],
+    ['register', register, 'register'],
+  ])('%s (вход/регистрация по паролю)', (_, thunk, apiName) => {
+    const credentials = { login: 'alice', password: 'correct-horse-1' };
+    const anonymousStore = async () => {
+      authApi.fetchSession.mockResolvedValue(null);
+      const store = makeStore();
+      await store.dispatch(checkSession());
+      return store;
+    };
+
+    it('успех → authenticated с user из ответа, без повторной проверки сессии', async () => {
+      const store = await anonymousStore();
+      authApi[apiName].mockResolvedValue(user);
+
+      await store.dispatch(thunk(credentials));
+
+      expect(authApi[apiName]).toHaveBeenCalledWith(credentials);
+      expect(authApi.fetchSession).toHaveBeenCalledTimes(1);
+      expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+    });
+
+    it('ошибка → остаёмся anonymous, thunk отклонён', async () => {
+      const store = await anonymousStore();
+      const error = Object.assign(new Error('API error 401'), { status: 401, code: 'auth_failed' });
+      authApi[apiName].mockRejectedValue(error);
+
+      const result = await store.dispatch(thunk(credentials));
+
+      expect(thunk.rejected.match(result)).toBe(true);
+      expect(store.getState().auth).toEqual({ status: 'anonymous', user: null });
     });
   });
 

@@ -167,13 +167,29 @@ const register = (data) => api.post('/api/auth/register', { data });
 const login = (data) => api.post('/api/auth/login', { data });
 const sidOf = (res) => /mock_session=([^;]+)/.exec(res.headers()['set-cookie'])[1];
 
-async function expectError(res, status, code, details) {
-  expect(res.status()).toBe(status);
-  const { error } = await res.json();
-  expect(error.code).toBe(code);
-  expect(typeof error.message).toBe('string');
-  if (details) expect(error.details).toEqual(details);
-  else expect(error.details).toBeUndefined();
+// Тело ошибки читается как текст и проверяется до разбора: пустое тело, не-JSON
+// или ответ без объекта error падают подписанной проверкой. label — какой случай упал.
+async function expectError(res, status, code, details, label = '') {
+  expect(res.status(), label).toBe(status);
+  expect(res.headers()['content-type'] ?? '', `${label} Content-Type`).toMatch(/^application\/json/);
+  const text = await res.text();
+  expect(text, `${label} тело ошибки пустое`).not.toBe('');
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`${label} тело ошибки не JSON: ${text}`);
+  }
+  const { error, ...rest } = body ?? {};
+  expect(rest, label).toEqual({});
+  const isObject = error !== null && typeof error === 'object' && !Array.isArray(error);
+  expect(isObject, `${label} нет объекта error`).toBe(true);
+  expect(Object.keys(error).sort(), label).toEqual(
+    details ? ['code', 'details', 'message'] : ['code', 'message'],
+  );
+  expect(error.code, label).toBe(code);
+  expect(typeof error.message, label).toBe('string');
+  if (details) expect(error.details, label).toEqual(details);
 }
 
 test('register: 201, SessionUser из шести полей, csrfToken и cookie сессии', async () => {
@@ -238,10 +254,15 @@ test('register: 400 validation_failed с details по полям', async () => {
 });
 
 test('register и login: битый JSON — 400 validation_failed без details', async () => {
+  // Тело уходит байтами: строковое data с JSON-заголовком Playwright сам прогоняет через
+  // JSON.stringify, и битый JSON превращается в валидную строку. Последний случай — обрезанное
+  // тело засеянной alice: если сервер его «дочинит», login войдёт, а register получит 409.
+  const bodies = ['{"login":', '[1]', '"text"', '42', 'null', `{"login":"alice","password":"${PASSWORD}"`];
   for (const path of ['/api/auth/register', '/api/auth/login']) {
-    for (const data of ['{"login":', '[1]', '"text"']) {
-      const res = await api.post(path, { data, headers: { 'Content-Type': 'application/json' } });
-      await expectError(res, 400, 'validation_failed');
+    for (const data of bodies) {
+      const res = await api.post(path, { data: Buffer.from(data), headers: { 'Content-Type': 'application/json' } });
+      await expectError(res, 400, 'validation_failed', undefined, `${path} ${data}`);
+      expect(res.headers()['set-cookie'], `${path} ${data}`).toBeUndefined();
     }
   }
   expect((await api.get('/api/auth/session')).status()).toBe(401);

@@ -38,8 +38,10 @@ test('start: редирект на провайдера со state', async () =>
   }
 });
 
-test('session: без сессии — 401', async () => {
-  expect((await api.get('/api/auth/session')).status()).toBe(401);
+test('session: без сессии — 401 unauthorized в формате ошибки', async () => {
+  const res = await api.get('/api/auth/session');
+  expect(res.status()).toBe(401);
+  await expectError(res, 401, 'unauthorized');
 });
 
 test('callback: успех — 302 на / и cookie сессии HttpOnly; Secure; SameSite=Lax', async () => {
@@ -80,8 +82,10 @@ test('callback: ошибка провайдера — /?auth_error=provider_erro
   expect(res.headers().location).toBe('/?auth_error=provider_error');
 });
 
-test('logout: без сессии — 401', async () => {
-  expect((await api.post('/api/auth/logout')).status()).toBe(401);
+test('logout: без сессии — 401 unauthorized', async () => {
+  const res = await api.post('/api/auth/logout');
+  expect(res.status()).toBe(401);
+  await expectError(res, 401, 'unauthorized');
 });
 
 test('logout: без CSRF-заголовка или с неверным — 403, сессия жива', async () => {
@@ -100,8 +104,10 @@ test('logout: с верным CSRF — 2xx, затем session отвечает 
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });
 
-test('прочие /api/*: без сессии — 401', async () => {
-  expect((await api.get('/api/chats')).status()).toBe(401);
+test('прочие /api/*: без сессии — 401 unauthorized', async () => {
+  const res = await api.get('/api/chats');
+  expect(res.status()).toBe(401);
+  await expectError(res, 401, 'unauthorized');
 });
 
 test('callback: state одноразовый', async () => {
@@ -186,14 +192,15 @@ test('register: 201, SessionUser из шести полей, csrfToken и cookie
   expect(session).toEqual(body);
 });
 
-test('register: имена выдаются по кругу из фиксированного списка, детерминированно', async () => {
+test('register: имя берётся из фиксированного списка, пять регистраций подряд — разные имена', async () => {
+  const known = ['Сонный Енот', 'Дерзкая Выдра', 'Весёлый Барсук', 'Хитрая Лиса', 'Смелый Ёж'];
   const names = [];
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < 5; i += 1) {
     const res = await register({ login: uniqueLogin(), password: PASSWORD });
     names.push((await res.json()).user.name);
   }
-  expect(new Set(names.slice(0, 5)).size).toBe(5);
-  expect(names.slice(5)).toEqual(names.slice(0, 5));
+  names.forEach((name) => expect(known).toContain(name));
+  expect(new Set(names).size).toBe(5);
 });
 
 test('register: логин нормализуется (trim + нижний регистр), занятость — после нормализации', async () => {
@@ -215,6 +222,8 @@ test('register: 400 validation_failed с details по полям', async () => {
     [{ login: 'ab', password: PASSWORD }, [{ field: 'login', code: 'invalid_format' }]],
     [{ login: 'bad login!', password: PASSWORD }, [{ field: 'login', code: 'invalid_format' }]],
     [{ login: long, password: PASSWORD }, [{ field: 'login', code: 'too_long' }]],
+    [{ login: `!${long}`, password: PASSWORD }, [{ field: 'login', code: 'too_long' }]],
+    [{ login: '', password: PASSWORD }, [{ field: 'login', code: 'required' }]],
     [{ login: uniqueLogin(), password: 'short' }, [{ field: 'password', code: 'too_short' }]],
     [{ login: uniqueLogin(), password: 'абвгдa' }, [{ field: 'password', code: 'too_short' }]],
     [{ login: uniqueLogin(), password: 'x'.repeat(257) }, [{ field: 'password', code: 'too_long' }]],
@@ -224,6 +233,16 @@ test('register: 400 validation_failed с details по полям', async () => {
   ];
   for (const [data, details] of cases) {
     await expectError(await register(data), 400, 'validation_failed', details);
+  }
+  expect((await api.get('/api/auth/session')).status()).toBe(401);
+});
+
+test('register и login: битый JSON — 400 validation_failed без details', async () => {
+  for (const path of ['/api/auth/register', '/api/auth/login']) {
+    for (const data of ['{"login":', '[1]', '"text"']) {
+      const res = await api.post(path, { data, headers: { 'Content-Type': 'application/json' } });
+      await expectError(res, 400, 'validation_failed');
+    }
   }
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });
@@ -321,5 +340,7 @@ test('logout после входа по паролю: csrfToken из login по�
   const { csrfToken } = await (await login({ login: 'alice', password: PASSWORD })).json();
   const res = await api.post('/api/auth/logout', { headers: { 'X-CSRF-Token': csrfToken } });
   expect(res.status()).toBe(204);
+  expect(res.headers()['set-cookie']).toMatch(/Max-Age=0/);
+  expect(res.headers()['set-cookie']).not.toMatch(/Secure/i);
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });

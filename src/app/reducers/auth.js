@@ -5,6 +5,7 @@ import {
     logout as logoutRequest,
     register as registerRequest,
 } from '../services/authApi'
+import { toFormError } from '../services/authFormError'
 
 // loading — идёт проверка сессии (начальное), anonymous — сессии нет,
 // authenticated — вошли, error — проверить сессию не удалось (сеть, 5xx, битый ответ).
@@ -14,9 +15,18 @@ export const checkSession = createAsyncThunk(
 )
 
 // Вход и регистрация по паролю: user приходит в ответе. При ошибке статус не меняется (anonymous),
-// а thunk отклоняется (rejected) — форма входа показывает сообщение об ошибке.
-export const login = createAsyncThunk('auth/login', (credentials) => loginRequest(credentials))
-export const register = createAsyncThunk('auth/register', (credentials) => registerRequest(credentials))
+// а thunk отклоняется с payload — моделью ошибки формы (toFormError), по которой Login выбирает текст.
+const submitCredentials = (type, request) =>
+    createAsyncThunk(type, async (credentials, { rejectWithValue }) => {
+        try {
+            return await request(credentials)
+        } catch (error) {
+            return rejectWithValue(toFormError(error))
+        }
+    })
+
+export const login = submitCredentials('auth/login', loginRequest)
+export const register = submitCredentials('auth/register', registerRequest)
 
 const setAuthenticated = (state, action) => {
     state.user = action.payload

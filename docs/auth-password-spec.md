@@ -133,6 +133,11 @@
 
 `details` есть только у ошибок полей auth/профиля; у остальных `400` поля нет. Клиент не должен зависеть от `message`.
 
+Уточнения для `POST /api/auth/register` и `POST /api/auth/login` (BE-D37, FE-D40):
+- Поле неверного типа (число, массив, `null` и т. п. вместо строки) — как отсутствующее: `details: [{field, code: "required"}]`.
+- Битый JSON или тело, которое не является объектом (массив, строка, число, `null`), — `400 validation_failed` без `details`. Пустое тело считается `{}` (ошибки `required` по полям).
+- Одно поле — не больше одного кода. Приоритет для `login`: `required` > `too_long` > `invalid_format`. Для `password` коды взаимоисключающие (`too_short` и `too_long` не совпадают, `too_common` проверяется только для 12..256 байт).
+
 Изменения в таблице кодов `docs/client-integration.md` §1.3:
 | `error.code` | HTTP | Когда |
 |---|---|---|
@@ -170,8 +175,8 @@
 - `package.json`: `engines.node` `>=24.7` (встроенный `crypto.argon2`).
 
 ## 9. Схема БД
-Одна миграция без переноса данных (реальных пользователей нет):
-- `users`: добавить `login text NOT NULL UNIQUE` (CHECK: равен `lower(login)` и соответствует формату §4.1), `password_hash text NOT NULL`, `first_name text NOT NULL`, `last_name text NOT NULL DEFAULT ''`; удалить `webauthn_user_id`; `name` остаётся колонкой и хранится производным значением `trim(first_name || ' ' || last_name)`: сервер обновляет его при регистрации и `PATCH /api/me`, поэтому чтение чатов, участников и WS-событий не меняется.
+Две миграции без переноса данных (реальных пользователей нет; разрез — BE-D38): первая удаляет таблицы passkeys и инвайтов и `users.webauthn_user_id`, вторая добавляет колонки входа по паролю и начинается с проверки, что `users` пуста (иначе ошибка с подсказкой сбросить dev-БД):
+- `users`: добавить `login text NOT NULL UNIQUE` (CHECK: равен `lower(login)` и соответствует формату §4.1), `password_hash text NOT NULL`, `first_name text NOT NULL`, `last_name text NOT NULL DEFAULT ''`; удалить `webauthn_user_id`; `name` остаётся колонкой и хранится производным значением `trim(first_name || ' ' || last_name)`: сервер обновляет его при регистрации и `PATCH /api/me`, поэтому чтение чатов, участников и WS-событий не меняется; CHECK `name = btrim(first_name || ' ' || last_name)` страхует согласованность.
 - Удалить таблицы `passkeys`, `webauthn_challenges`, `invites` и enum `InviteKind`.
 - `sessions` — без изменений схемы.
 

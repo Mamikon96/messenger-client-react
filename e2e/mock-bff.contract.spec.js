@@ -184,6 +184,54 @@ test('register и login: битый JSON — 400 validation_failed без detail
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });
 
+test('register и login: пустое тело — как {}, required по обоим полям (спека §5)', async () => {
+  const both = [{ field: 'login', code: 'required' }, { field: 'password', code: 'required' }];
+  for (const path of ['/api/auth/register', '/api/auth/login']) {
+    await expectError(await api.post(path), 400, 'validation_failed', both, path);
+    await expectError(
+      await api.post(path, { data: Buffer.from(''), headers: { 'Content-Type': 'application/json' } }),
+      400,
+      'validation_failed',
+      both,
+      `${path} пустое тело с Content-Type`,
+    );
+  }
+  expect((await api.get('/api/auth/session')).status()).toBe(401);
+});
+
+test('register и login: поле неверного типа — как отсутствующее (required), для обоих полей', async () => {
+  const wrongTypes = [123, true, null, ['x'], { a: 1 }];
+  for (const [path, valid] of [
+    ['/api/auth/register', uniqueLogin()],
+    ['/api/auth/login', 'alice'],
+  ]) {
+    for (const value of wrongTypes) {
+      const label = `${path} ${JSON.stringify(value)}`;
+      await expectError(await api.post(path, { data: { login: value, password: PASSWORD } }), 400, 'validation_failed', [{ field: 'login', code: 'required' }], `login ${label}`);
+      await expectError(await api.post(path, { data: { login: valid, password: value } }), 400, 'validation_failed', [{ field: 'password', code: 'required' }], `password ${label}`);
+    }
+  }
+  expect((await api.get('/api/auth/session')).status()).toBe(401);
+});
+
+test('register: одно поле — один код; приоритет login: required > too_long > invalid_format', async () => {
+  const long = 'a'.repeat(33);
+  // Длинный логин с недопустимыми знаками — только too_long, без invalid_format.
+  await expectError(await register({ login: `bad login!${long}`, password: PASSWORD }), 400, 'validation_failed', [{ field: 'login', code: 'too_long' }]);
+  // Пароль короче 12 байт и из списка частых не бывает: too_common только для 12..256 байт.
+  await expectError(await register({ login: uniqueLogin(), password: 'qwerty' }), 400, 'validation_failed', [{ field: 'password', code: 'too_short' }]);
+  // Пароль длиннее 256 байт — только too_long, даже если начинается с частого.
+  await expectError(await register({ login: uniqueLogin(), password: `password1234${'x'.repeat(250)}` }), 400, 'validation_failed', [{ field: 'password', code: 'too_long' }]);
+  // Каждое поле даёт ровно одну запись details.
+  await expectError(
+    await register({ login: `x!${long}`, password: 'y' }),
+    400,
+    'validation_failed',
+    [{ field: 'login', code: 'too_long' }, { field: 'password', code: 'too_short' }],
+  );
+  expect((await api.get('/api/auth/session')).status()).toBe(401);
+});
+
 test('register: длина пароля считается в байтах UTF-8, без trim', async () => {
   expect((await register({ login: uniqueLogin(), password: 'парольпароль' })).status()).toBe(201);
   expect((await register({ login: uniqueLogin(), password: ' '.repeat(12) })).status()).toBe(201);

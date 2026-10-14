@@ -4,6 +4,7 @@ import "./Login.css";
 import { Button } from "../ui/button/Button";
 import { Input } from "../ui/input/Input";
 import { login, register } from "../../reducers/auth";
+import { describeFormError, NO_ERRORS } from "./loginErrors";
 
 const MODES = {
     login: { tab: "Вход", submit: "Войти", passwordAutoComplete: "current-password", action: login },
@@ -12,15 +13,12 @@ const MODES = {
 
 const MODE_IDS = Object.keys(MODES);
 
-// Общее сообщение для любой ошибки входа и регистрации; тексты по кодам ошибок — FE-91.
-const SUBMIT_ERROR = "Не удалось войти. Попробуйте ещё раз.";
-
 // Форма логина и пароля (FE-D38).
 export default function Login() {
     const dispatch = useDispatch();
     const [mode, setMode] = useState("login");
     const [credentials, setCredentials] = useState({ login: "", password: "" });
-    const [submitError, setSubmitError] = useState(null);
+    const [errors, setErrors] = useState(NO_ERRORS);
     const tabRefs = useRef({});
     const idPrefix = useId();
     const current = MODES[mode];
@@ -29,7 +27,7 @@ export default function Login() {
 
     const handleModeChange = (nextMode) => {
         setMode(nextMode);
-        setSubmitError(null);
+        setErrors(NO_ERRORS);
     };
 
     // Вкладки по паттерну WAI-ARIA Tabs: стрелки и Home/End выбирают режим и переводят фокус на его вкладку.
@@ -51,16 +49,22 @@ export default function Login() {
     const handleChange = (event) => {
         const { name, value } = event.target;
         setCredentials((prev) => ({ ...prev, [name]: value }));
+        // Ошибка поля относится к отправленному значению: правка поля её снимает.
+        setErrors((prev) => {
+            if (!(name in prev.fields)) return prev;
+            const { [name]: _removed, ...fields } = prev.fields;
+            return { ...prev, fields };
+        });
     };
 
     // При успехе store переходит в authenticated и App показывает мессенджер вместо этого экрана.
     const handleSubmit = async (event) => {
         event.preventDefault();
-        setSubmitError(null);
+        setErrors(NO_ERRORS);
         try {
             await dispatch(current.action(credentials)).unwrap();
-        } catch {
-            setSubmitError(SUBMIT_ERROR);
+        } catch (model) {
+            setErrors(describeFormError(model));
         }
     };
 
@@ -90,7 +94,7 @@ export default function Login() {
                         </button>
                     ))}
                 </div>
-                {submitError && <p className="login__error" role="alert">{submitError}</p>}
+                {errors.message && <p className="login__error" role="alert">{errors.message}</p>}
                 <form
                     className="login__form"
                     role="tabpanel"
@@ -103,6 +107,7 @@ export default function Login() {
                         name="login"
                         autoComplete="username"
                         value={credentials.login}
+                        error={errors.fields.login}
                         onChange={handleChange}
                     />
                     <Input
@@ -111,6 +116,7 @@ export default function Login() {
                         type="password"
                         autoComplete={current.passwordAutoComplete}
                         value={credentials.password}
+                        error={errors.fields.password}
                         onChange={handleChange}
                     />
                     <Button type="submit" className="login__submit">{current.submit}</Button>

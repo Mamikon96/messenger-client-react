@@ -1,9 +1,10 @@
 import { fetchSession, login, logout, register } from "./authApi";
 import { apiRequest, setCsrfToken, setUnauthorizedHandler } from "./apiClient";
 
-const reply = (status, body) => ({
+const reply = (status, body, headers = {}) => ({
     ok: status >= 200 && status < 300,
     status,
+    headers: { get: (name) => headers[name] ?? null },
     text: () => Promise.resolve(body === undefined ? "" : typeof body === "string" ? body : JSON.stringify(body)),
 });
 
@@ -145,6 +146,32 @@ describe("authApi", () => {
             fetch.mockResolvedValue(reply(401, { error: { code: "unauthorized", message: "no" } }));
 
             await expect(request(credentials)).rejects.toMatchObject({ status: 401, code: "unauthorized" });
+            expect(handler).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            [400, { error: { code: "validation_failed", details: [{ field: "login", code: "required" }] } }, {}, { details: [{ field: "login", code: "required" }] }],
+            [401, { error: { code: "auth_failed" } }, {}, { code: "auth_failed" }],
+            [403, { error: { code: "user_disabled" } }, {}, { code: "user_disabled" }],
+            [403, { error: { code: "forbidden" } }, {}, { code: "forbidden" }],
+            [409, { error: { code: "login_taken" } }, {}, { code: "login_taken" }],
+            [429, { error: { code: "rate_limited" } }, { "Retry-After": "30" }, { retryAfter: 30 }],
+            [500, { error: { code: "internal_error" } }, {}, { code: "internal_error" }],
+        ])("%i: ApiError несёт code, details и retryAfter, хук выхода не вызывается", async (status, body, headers, expected) => {
+            const handler = jest.fn();
+            setUnauthorizedHandler(handler);
+            fetch.mockResolvedValue(reply(status, body, headers));
+
+            await expect(request(credentials)).rejects.toMatchObject({ status, ...expected });
+            expect(handler).not.toHaveBeenCalled();
+        });
+
+        it("сетевой сбой не вызывает хук выхода", async () => {
+            const handler = jest.fn();
+            setUnauthorizedHandler(handler);
+            fetch.mockRejectedValue(new TypeError("Failed to fetch"));
+
+            await expect(request(credentials)).rejects.toThrow(TypeError);
             expect(handler).not.toHaveBeenCalled();
         });
     });

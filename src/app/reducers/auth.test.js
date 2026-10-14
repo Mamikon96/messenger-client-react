@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser } from './auth';
 import * as authApi from '../services/authApi';
+import { ApiError } from '../services/apiClient';
 
 jest.mock('../services/authApi');
 
@@ -142,6 +143,26 @@ describe('auth slice', () => {
       const result = await store.dispatch(thunk(credentials));
 
       expect(thunk.rejected.match(result)).toBe(true);
+      expect(store.getState().auth).toEqual({ status: 'anonymous', user: null });
+    });
+
+    it.each([
+      ['401 auth_failed', new ApiError(401, { error: { code: 'auth_failed' } }), { kind: 'credentials' }],
+      [
+        '400 validation_failed с details',
+        new ApiError(400, { error: { code: 'validation_failed', details: [{ field: 'password', code: 'too_common' }] } }),
+        { kind: 'fields', fields: { password: 'too_common' } },
+      ],
+      ['429 с Retry-After', new ApiError(429, { error: { code: 'rate_limited' } }, { retryAfter: 30 }), { kind: 'rate_limited', retryAfter: 30 }],
+      ['сеть', new TypeError('Failed to fetch'), { kind: 'unavailable' }],
+    ])('ошибка %s → payload отклонённого thunk — модель ошибки формы', async (_, error, expected) => {
+      const store = await anonymousStore();
+      authApi[apiName].mockRejectedValue(error);
+
+      const result = await store.dispatch(thunk(credentials));
+
+      expect(thunk.rejected.match(result)).toBe(true);
+      expect(result.payload).toEqual(expected);
       expect(store.getState().auth).toEqual({ status: 'anonymous', user: null });
     });
   });

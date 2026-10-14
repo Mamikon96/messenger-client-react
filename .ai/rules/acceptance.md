@@ -26,7 +26,7 @@
 - Любой REJECT ревьюера и FAIL QA — строка в `failures.md`.
 
 ## Адрес бэкенда при приёмке
-- Реальный бэкенд (`messenger-server`) доступен на порту **3333**, если в переменных окружения адрес не задан (`BACKEND_URL` не установлен): `src/setupProxy.js` проксирует `/api` и `/mock-provider` на `http://localhost:3333`.
+- Реальный бэкенд (`messenger-server`) доступен на порту **3333**, если в переменных окружения адрес не задан (`BACKEND_URL` не установлен): `src/setupProxy.js` проксирует `/api` на `http://localhost:3333`.
 - Mock-BFF по умолчанию слушает порт **3334** (`MOCK_BFF_PORT`, `DEFAULT_PORT` в `mock-bff/server.js`, FE-81), поэтому `npm run accept` работает при запущенном реальном бэкенде. Если 3334 занят — ошибка запуска, а не молчаливый прогон на чужом сервере.
 - Playwright e2e из `npm run accept` идут на mock-BFF (`playwright.config.js`: `BACKEND_URL` задаётся для dev-сервера e2e).
 - Проход `qa-tester` — на mock-BFF `http://localhost:3334` (`.claude/agents/qa-tester.md`); ручная проверка с реальным бэкендом — `http://localhost:3333`, если `BACKEND_URL` не задан.

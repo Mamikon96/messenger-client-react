@@ -9,7 +9,7 @@ import * as authApi from '../../../../services/authApi';
 
 jest.mock('../../../../services/authApi');
 
-const user = { id: '1', name: 'Ann', avatarUrl: 'http://a/b.png', provider: 'google' };
+const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const renderMenu = () => {
   const store = configureStore({ reducer: rootReducer });

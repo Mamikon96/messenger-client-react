@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-14 @ fdf9dff+dirty
+> Проверено: 2026-10-14 @ 9aeaac2+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии и выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `authError`, `webauthn`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (вход через оба провайдера, сбой проверки сессии), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58).
@@ -37,7 +37,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-14 14:48:01; 244 unit ✓, 72 e2e ✓) · ревью APPROVE WITH FIXES → APPROVE WITH FIXES → APPROVE (3 раунда) · QA PASS (smoke, `.qa/runs/FE-88.md`) · FE-88 · 2026-10-14
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-14 16:44:25; 244 unit ✓, 72 e2e ✓) · ревью и QA не требуются (только документация) · FE-87 · 2026-10-14
 
 ## Фокус сейчас
-Задача не взята. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56, FE-88 закрыты; дальше FE-87 (правки user-cases — с разрешения пользователя) → FE-89 → FE-91, FE-92 → FE-35 → FE-37 → …; копию `docs/auth-password-spec.md` синхронизировать с бэкендом после правки §5 (решения FE-D40 о `details`).
+Задача не взята. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56, FE-88, FE-87 закрыты; дальше FE-89 → FE-91, FE-92 → FE-35 → FE-37 → …; копию `docs/auth-password-spec.md` синхронизировать с бэкендом после правки §5 (решения FE-D40 о `details`).

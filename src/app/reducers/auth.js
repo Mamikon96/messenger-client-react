@@ -1,5 +1,10 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
-import { fetchSession, logout as logoutRequest } from '../services/authApi'
+import {
+    fetchSession,
+    login as loginRequest,
+    logout as logoutRequest,
+    register as registerRequest,
+} from '../services/authApi'
 
 // loading — идёт проверка сессии (начальное), anonymous — сессии нет,
 // authenticated — вошли, error — проверить сессию не удалось (сеть, 5xx, битый ответ).
@@ -7,6 +12,16 @@ export const checkSession = createAsyncThunk(
     'auth/checkSession',
     (_, { signal }) => fetchSession({ signal })
 )
+
+// Вход и регистрация по паролю: user приходит в ответе. При ошибке статус не меняется (anonymous),
+// а thunk отклоняется (rejected) — форма входа показывает сообщение об ошибке.
+export const login = createAsyncThunk('auth/login', (credentials) => loginRequest(credentials))
+export const register = createAsyncThunk('auth/register', (credentials) => registerRequest(credentials))
+
+const setAuthenticated = (state, action) => {
+    state.user = action.payload
+    state.status = 'authenticated'
+}
 
 // Выход: после успешного запроса корневой редьюсер (store.js) сбрасывает весь store,
 // а auth переходит в anonymous. При ошибке состояние не меняется.
@@ -32,6 +47,8 @@ export const authSlice = createSlice({
                 state.user = null
                 state.status = 'error'
             })
+            .addCase(login.fulfilled, setAuthenticated)
+            .addCase(register.fulfilled, setAuthenticated)
             .addCase(logout.fulfilled, (state) => {
                 state.user = null
                 state.status = 'anonymous'

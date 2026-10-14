@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-13 @ 30651f3+dirty
+> Проверено: 2026-10-14 @ de76ab1+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
@@ -21,7 +21,7 @@
 - `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат); вторая `Action` с именем пользователя → `UserMenu` («Выйти», ошибка выхода — `role=alert`)
 - `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
 - `Messenger` = `Chats` (список `Chat`) + `Dialog` (заголовок, сообщения активного чата, ввод; автор = `auth.user.id`)
-- `Login` (FE-25) — карточка по центру: заголовок, ошибка OAuth (`role=alert`, проп `error` — готовый текст), провайдеры из данных `providers.js` (`id`, `name`) кнопками-ссылками (`Button` с `href`) на `/api/auth/{id}/start` с инлайн-SVG `ProviderIcon`; клик → «Переход…» + `aria-busy`, остальные `aria-disabled`; `pageshow` с `persisted` сбрасывает состояние. Диспатча нет
+- `Login` (FE-25, FE-89) — карточка по центру: заголовок, вкладки «Вход» / «Регистрация» (WAI-ARIA Tabs: `tablist`/`tab`/`aria-selected`, стрелки и Home/End, форма — `tabpanel`), форма «Логин» + «Пароль» (`Input`, `useState`) — submit диспатчит thunk `login`/`register` и через `unwrap()` показывает общее сообщение об ошибке в `role=alert`; ниже до FE-90 — ошибка OAuth (`role=alert`, проп `error` — готовый текст), провайдеры из данных `providers.js` (`id`, `name`) кнопками-ссылками (`Button` с `href`) на `/api/auth/{id}/start` с инлайн-SVG `ProviderIcon`; клик → «Переход…» + `aria-busy`, остальные `aria-disabled`; `pageshow` с `persisted` сбрасывает состояние
 
 ## Стили и темы
 - Дизайн-токены (FE-D07) — `src/styles/tokens.css` (CSS custom properties: цвета, типографика, отступы, радиусы, тени, анимации), подключены первым импортом в `src/index.js`. Светлая тема в `:root`, тёмная в `[data-theme="dark"]` (атрибут на `<html>`, переключение — `src/app/modules/theme/`). Компоненты пока используют старые литеральные цвета; миграция на токены — FE-24…FE-29.
@@ -37,7 +37,7 @@
 ## Сервисы
 - `src/app/services/authError.js` (FE-25): `readAuthError(search)` → текст ошибки OAuth или `null`, `clearAuthErrorFromUrl()` (`history.replaceState`); `App` читает параметр один раз при старте (`useState`-инициализатор) и передаёт в `Login`.
 - `src/app/services/webauthn.js` (FE-57, FE-D30): `creationOptionsFromJSON`/`requestOptionsFromJSON` (JSON сервера → `navigator.credentials`), `credentialToJSON` (ответ аутентификатора → JSON сервера), `isPasskeySupported`; нативные `parse*FromJSON`/`toJSON()` браузера, иначе base64url вручную. Пока не используется — подключается во входе (FE-60).
-- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `logout`); `loginService` и ключ localStorage `user` удалены (FE-14).
+- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `login`, `register` — `user` и `csrfToken` из ответа без повторного `GET /api/auth/session`, хук 401 не вызывают; `logout`); `loginService` и ключ localStorage `user` удалены (FE-14).
 
 ## Внешние данные
 Бэкенд `messenger-server` — отдельный проект (SH-D04); контракт — `docs/client-integration.md` (FE-D12), REST под `/api`, WebSocket `/ws`. Сейчас в клиенте подключён только auth; чаты и сообщения пока локально в Redux, нормализованный стор и сетевой слой — FE-35…FE-42 (`tasks.md`). Состояние в памяти браузера, персистентности нет (FE-D04, FE-D15).

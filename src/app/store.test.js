@@ -5,7 +5,7 @@ import { addUser } from './reducers/users';
 import { addMessage } from './reducers/messages';
 import { checkSession, logout } from './reducers/auth';
 
-const user = { id: '1', name: 'Ann', avatarUrl: 'http://a/b.png', provider: 'google' };
+const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const filledState = () => {
   let state = rootReducer(undefined, { type: '@@init' });

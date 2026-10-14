@@ -10,7 +10,7 @@ import { addMessage } from '../../../../reducers/messages';
 
 jest.mock('../../../../services/authApi');
 
-const user = { id: 'u1', name: 'Ann', avatarUrl: 'http://a/b.png', provider: 'google' };
+const user = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const renderDialog = ({ activeChat = { id: 'c1', title: 'Room' }, authorized = true } = {}) => {
   const store = configureStore({ reducer: rootReducer });

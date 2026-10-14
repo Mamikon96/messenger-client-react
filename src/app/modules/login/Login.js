@@ -1,11 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import "./Login.css";
 import { Button } from "../ui/button/Button";
 import { Input } from "../ui/input/Input";
 import { login, register } from "../../reducers/auth";
-import { ProviderIcon } from "./ProviderIcon";
-import { PROVIDERS } from "./providers";
 
 const MODES = {
     login: { tab: "Вход", submit: "Войти", passwordAutoComplete: "current-password", action: login },
@@ -17,32 +15,17 @@ const MODE_IDS = Object.keys(MODES);
 // Общее сообщение для любой ошибки входа и регистрации; тексты по кодам ошибок — FE-91.
 const SUBMIT_ERROR = "Не удалось войти. Попробуйте ещё раз.";
 
-// Клик, который не уводит текущую вкладку (новая вкладка/окно по модификатору или средней кнопке).
-const isPlainClick = (event) =>
-    !event.defaultPrevented && event.button === 0 && !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
-
-// Форма логина и пароля (FE-D38). Ссылки OAuth остаются до FE-90: вход по ним — полная навигация браузера на BFF,
-// error — готовый текст ошибки OAuth (FE-D11).
-export default function Login({ error }) {
+// Форма логина и пароля (FE-D38).
+export default function Login() {
     const dispatch = useDispatch();
     const [mode, setMode] = useState("login");
     const [credentials, setCredentials] = useState({ login: "", password: "" });
     const [submitError, setSubmitError] = useState(null);
-    const [pendingId, setPendingId] = useState(null);
     const tabRefs = useRef({});
     const idPrefix = useId();
     const current = MODES[mode];
     const tabId = (id) => `${idPrefix}-tab-${id}`;
     const panelId = `${idPrefix}-panel`;
-
-    // Возврат кнопкой «назад» из bfcache показывает страницу с прежним состоянием — сбрасываем «Переход…».
-    useEffect(() => {
-        const handlePageShow = (event) => {
-            if (event.persisted) setPendingId(null);
-        };
-        window.addEventListener("pageshow", handlePageShow);
-        return () => window.removeEventListener("pageshow", handlePageShow);
-    }, []);
 
     const handleModeChange = (nextMode) => {
         setMode(nextMode);
@@ -81,8 +64,6 @@ export default function Login({ error }) {
         }
     };
 
-    const message = submitError || (!pendingId && error);
-
     return (
         <div className="login">
             <div className="login__card">
@@ -109,7 +90,7 @@ export default function Login({ error }) {
                         </button>
                     ))}
                 </div>
-                {message && <p className="login__error" role="alert">{message}</p>}
+                {submitError && <p className="login__error" role="alert">{submitError}</p>}
                 <form
                     className="login__form"
                     role="tabpanel"
@@ -134,29 +115,6 @@ export default function Login({ error }) {
                     />
                     <Button type="submit" className="login__submit">{current.submit}</Button>
                 </form>
-                <div className="login__providers">
-                    {PROVIDERS.map(({ id, name }) => (
-                        <Button
-                            key={id}
-                            href={`/api/auth/${id}/start`}
-                            variant="secondary"
-                            className="login__provider"
-                            loading={pendingId === id}
-                            disabled={pendingId !== null && pendingId !== id}
-                            aria-label={pendingId === id ? `Переход… (${name})` : undefined}
-                            onClick={(event) => {
-                                if (isPlainClick(event)) setPendingId(id);
-                            }}
-                        >
-                            {pendingId === id ? "Переход…" : (
-                                <>
-                                    <ProviderIcon id={id} />
-                                    {`Войти через ${name}`}
-                                </>
-                            )}
-                        </Button>
-                    ))}
-                </div>
             </div>
         </div>
     );

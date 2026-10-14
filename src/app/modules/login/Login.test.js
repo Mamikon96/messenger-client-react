@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import Login from "./Login";
@@ -11,12 +11,12 @@ jest.mock("../../services/authApi");
 const user = { id: "1", login: "alice", firstName: "Alice", lastName: "Tester", name: "Alice Tester", avatarUrl: "" };
 
 // Экран входа показывается без сессии: store в состоянии anonymous.
-const renderLogin = (props = {}) => {
+const renderLogin = () => {
     const store = configureStore({ reducer: rootReducer });
     store.dispatch(checkSession.fulfilled(null, "req"));
     render(
         <Provider store={store}>
-            <Login {...props} />
+            <Login />
         </Provider>
     );
     return { store };
@@ -28,21 +28,7 @@ const fillAndSubmit = (login, password, submitName) => {
     fireEvent.click(screen.getByRole("button", { name: submitName }));
 };
 
-// jsdom не умеет навигацию: гасим переход по ссылке, но запоминаем, был ли клик уже отменён обработчиком Login.
-// Клики не по ссылкам не трогаем, иначе отменится и отправка формы.
-let seen;
-const onDocumentClick = (event) => {
-    if (!(event.target instanceof HTMLAnchorElement)) return;
-    seen.push(event.defaultPrevented);
-    event.preventDefault();
-};
-
-beforeEach(() => {
-    seen = [];
-    document.addEventListener("click", onDocumentClick);
-});
 afterEach(() => {
-    document.removeEventListener("click", onDocumentClick);
     jest.resetAllMocks();
 });
 
@@ -147,96 +133,11 @@ describe("Login: форма логина и пароля", () => {
     });
 });
 
-describe("Login: ссылки OAuth (до FE-90)", () => {
-    test("показывает провайдеров ссылками на /api/auth/{id}/start", () => {
+describe("Login: без OAuth", () => {
+    test("на экране входа нет ссылок провайдеров и блока ошибки", () => {
         renderLogin();
-        expect(screen.getByRole("link", { name: "Войти через Google" })).toHaveAttribute("href", "/api/auth/google/start");
-        expect(screen.getByRole("link", { name: "Войти через GitHub" })).toHaveAttribute("href", "/api/auth/github/start");
-    });
-
-    test("иконки провайдеров скрыты от скринридеров", () => {
-        renderLogin();
-        const links = [
-            screen.getByRole("link", { name: "Войти через Google" }),
-            screen.getByRole("link", { name: "Войти через GitHub" }),
-        ];
-        // У инлайн-svg нет роли, поэтому разметка иконки проверяется строкой: ровно одна svg и она aria-hidden
-        links.forEach((link) => {
-            expect(link.innerHTML.match(/<svg\b/g)).toHaveLength(1);
-            expect(link.innerHTML).toMatch(/<svg\b[^>]*aria-hidden="true"/);
-        });
-    });
-
-    test("без ошибки нет блока alert", () => {
-        renderLogin();
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
+        expect(screen.queryByText(/Google|GitHub/)).not.toBeInTheDocument();
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
-
-    test("ошибка показывается в role=alert", () => {
-        renderLogin({ error: "Вход отменён" });
-        expect(screen.getByRole("alert")).toHaveTextContent("Вход отменён");
-    });
-
-    test("клик по провайдеру: «Переход…», aria-busy, переход не отменяется", () => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }));
-        const google = screen.getByRole("link", { name: /Переход…/ });
-        expect(google).toHaveAttribute("aria-busy", "true");
-        expect(google).toHaveAttribute("href", "/api/auth/google/start");
-        expect(seen).toEqual([false]);
-    });
-
-    test("после клика другой провайдер неактивен: aria-disabled и клик отменяется", () => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }));
-        const github = screen.getByRole("link", { name: "Войти через GitHub" });
-        expect(github).toHaveAttribute("aria-disabled", "true");
-        fireEvent.click(github);
-        expect(seen).toEqual([false, true]);
-        expect(screen.getByRole("link", { name: /Переход…/ })).toBeInTheDocument();
-    });
-
-    test("ошибка скрывается, когда пользователь начал новый вход", () => {
-        renderLogin({ error: "Вход отменён" });
-        fireEvent.click(screen.getByRole("link", { name: "Войти через GitHub" }));
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
-
-    test.each([
-        ["Ctrl", { ctrlKey: true }],
-        ["Cmd", { metaKey: true }],
-        ["Shift", { shiftKey: true }],
-        ["Alt", { altKey: true }],
-        ["средняя кнопка", { button: 1 }],
-    ])("клик с модификатором (%s) открывает ссылку отдельно и не включает «Переход…»", (_, init) => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }), init);
-        expect(screen.getByRole("link", { name: "Войти через Google" })).not.toHaveAttribute("aria-busy");
-        expect(screen.getByRole("link", { name: "Войти через GitHub" })).not.toHaveAttribute("aria-disabled");
-    });
-
-    test("в состоянии «Переход…» доступное имя сохраняет провайдера", () => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }));
-        expect(screen.getByRole("link", { name: "Переход… (Google)" })).toBeInTheDocument();
-    });
-
-    test("pageshow без persisted состояние не сбрасывает", () => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }));
-        act(() => {
-            window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: false }));
-        });
-        expect(screen.getByRole("link", { name: /Переход…/ })).toHaveAttribute("aria-busy", "true");
-    });
-
-    test("возврат из bfcache (pageshow persisted) сбрасывает «Переход…»", () => {
-        renderLogin();
-        fireEvent.click(screen.getByRole("link", { name: "Войти через Google" }));
-        act(() => {
-            window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
-        });
-        expect(screen.getByRole("link", { name: "Войти через Google" })).not.toHaveAttribute("aria-busy");
-        expect(screen.getByRole("link", { name: "Войти через GitHub" })).not.toHaveAttribute("aria-disabled");
     });
 });

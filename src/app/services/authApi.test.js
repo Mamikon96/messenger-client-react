@@ -7,7 +7,7 @@ const reply = (status, body) => ({
     text: () => Promise.resolve(body === undefined ? "" : typeof body === "string" ? body : JSON.stringify(body)),
 });
 
-const user = { id: "1", name: "Ann", avatarUrl: "http://a/b.png", provider: "github" };
+const user = { id: "1", login: "ann", firstName: "Ann", lastName: "", name: "Ann", avatarUrl: "http://a/b.png" };
 
 describe("authApi", () => {
     beforeEach(() => {

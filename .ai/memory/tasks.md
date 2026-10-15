@@ -21,9 +21,8 @@
 - **FE-27 (P1)** `Dialog`: пузыри, статусы `sending`/`failed` и «Повторить», Enter/Shift+Enter, автопрокрутка, пустые состояния, селекторы. Подробности: `.ai/memory/backlog/FE-27.md`
 - **FE-28 (P1)** Header и `UserMenu`: аватар с инициалами, переключатель темы, выход, закрытие по Esc/клику снаружи; правки по аудиту FE-46. Подробности: `.ai/memory/backlog/FE-28.md`
 - **FE-33 (P1)** Dev-окружение с реальным бэкендом: прокси `/api` (`BACKEND_URL`), WS через `REACT_APP_WS_URL`, `.env.example`, README. Подробности: `.ai/memory/backlog/FE-33.md`
-- **FE-35 (P1)** apiClient: 401-хук `setUnauthorizedHandler` (сброс store, экран входа) и строгая модель `SessionUser` из `authApi`. Подробности: `.ai/memory/backlog/FE-35.md`
 - **FE-37 (P1)** Нормализованный стор: слайсы `chats`/`messages`/`users`, `activeChatId`, мемоизированные селекторы, убрать `nanoid`. Подробности: `.ai/memory/backlog/FE-37.md`
-- **FE-38 (P1)** Список чатов с сервера (`GET /api/chats`): сортировка, `unreadCount`, `peer`, состояния загрузки/ошибки/пусто. Подробности: `.ai/memory/backlog/FE-38.md`
+- **FE-38 (P1)** Список чатов с сервера (`GET /api/chats`): сортировка, `unreadCount`, `peer`, состояния; перенести e2e UC-SESSION-06 (FE-35). Подробности: `.ai/memory/backlog/FE-38.md`
 - **FE-39 (P1)** Открытие чата: `GET /api/chats/:id` и история сообщений (последние 50, подкачка `before`), имена отправителей. Подробности: `.ai/memory/backlog/FE-39.md`
 - **FE-40 (P1)** Оптимистичная отправка сообщений: `clientId`, статусы `sending`/`sent`/`failed`, ретраи, `429`, лимит 4000 символов. Подробности: `.ai/memory/backlog/FE-40.md`
 - **FE-41 (P1)** WS-сервис: подключение, события `message.new`/`chat.*` в store, дедуп по `seq`, коды закрытия, backoff, баннер при `4008`. Подробности: `.ai/memory/backlog/FE-41.md`

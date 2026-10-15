@@ -3,7 +3,7 @@ import chatsSlice from './reducers/chats'
 import activeChatSlice from './reducers/activeChat'
 import messagesSlice from './reducers/messages'
 import usersSlice from './reducers/users'
-import authSlice, { logout } from './reducers/auth'
+import authSlice, { logout, selectAuthStatus, sessionClosed } from './reducers/auth'
 
 const appReducer = combineReducers({
   chats: chatsSlice,
@@ -14,8 +14,16 @@ const appReducer = combineReducers({
 })
 
 // Выход сбрасывает весь store одним действием: все слайсы возвращаются к начальному состоянию.
-export const rootReducer = (state, action) =>
-  appReducer(logout.fulfilled.match(action) ? undefined : state, action)
+// Закрытая вне вкладки сессия сбрасывает store так же, но только у вошедшего: запоздавший 401
+// после обычного выхода или на экране входа не должен показывать сообщение о закрытой сессии.
+// Слайс auth сам решает, принять ли событие, поэтому его новое состояние берётся из редьюсера, а остальные слайсы — начальные.
+export const rootReducer = (state, action) => {
+  if (sessionClosed.match(action)) {
+    if (!state || selectAuthStatus(state) !== 'authenticated') return state
+    return { ...appReducer(undefined, action), auth: appReducer(state, action).auth }
+  }
+  return appReducer(logout.fulfilled.match(action) ? undefined : state, action)
+}
 
 export default configureStore({
   reducer: rootReducer,

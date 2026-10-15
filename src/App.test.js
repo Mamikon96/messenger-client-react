@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import App from './App';
-import authReducer from './app/reducers/auth';
+import authReducer, { sessionClosed } from './app/reducers/auth';
 import * as authApi from './app/services/authApi';
 
 jest.mock('./app/services/authApi');
@@ -16,13 +16,14 @@ const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann
 const renderApp = (wrapper = ({ children }) => children) => {
   const store = configureStore({ reducer: { auth: authReducer } });
   const Wrapper = wrapper;
-  return render(
+  const view = render(
     <Provider store={store}>
       <Wrapper>
         <App />
       </Wrapper>
     </Provider>
   );
+  return { ...view, store };
 };
 
 describe('App: гейт входа', () => {
@@ -45,6 +46,20 @@ describe('App: гейт входа', () => {
     expect(await screen.findByRole('button', { name: 'Войти' })).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('messenger')).not.toBeInTheDocument();
+  });
+
+  it('sessionClosed: вместо мессенджера экран входа с сообщением о закрытой сессии', async () => {
+    authApi.fetchSession.mockResolvedValue(user);
+    const { store } = renderApp();
+    expect(await screen.findByText('messenger')).toBeInTheDocument();
+
+    act(() => {
+      store.dispatch(sessionClosed());
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Сессия завершена. Войдите снова.');
+    expect(screen.getByRole('button', { name: 'Войти' })).toBeInTheDocument();
     expect(screen.queryByText('messenger')).not.toBeInTheDocument();
   });
 

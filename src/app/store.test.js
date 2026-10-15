@@ -3,7 +3,7 @@ import { addChat } from './reducers/chats';
 import { setActiveChat } from './reducers/activeChat';
 import { addUser } from './reducers/users';
 import { addMessage } from './reducers/messages';
-import { checkSession, logout } from './reducers/auth';
+import { checkSession, logout, sessionClosed } from './reducers/auth';
 
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
@@ -44,5 +44,29 @@ describe('rootReducer: сброс store при выходе', () => {
     const after = rootReducer(before, logout.rejected(new Error('x'), 'req'));
 
     expect(after).toEqual(before);
+  });
+});
+
+describe('rootReducer: сессия закрыта вне этой вкладки', () => {
+  it('sessionClosed одним действием сбрасывает все слайсы, auth → sessionClosed', () => {
+    const state = rootReducer(filledState(), sessionClosed());
+
+    expect(state).toEqual({
+      chats: [],
+      messages: [],
+      users: [],
+      activeChat: {},
+      auth: { status: 'sessionClosed', user: null },
+    });
+  });
+
+  it.each([
+    ['anonymous', () => rootReducer(undefined, checkSession.fulfilled(null, 'req'))],
+    ['после выхода', () => rootReducer(filledState(), logout.fulfilled(undefined, 'req'))],
+    ['loading', () => rootReducer(undefined, { type: '@@init' })],
+  ])('запоздавший 401 при статусе %s ничего не меняет (сообщения после обычного выхода нет)', (_, makeState) => {
+    const before = makeState();
+
+    expect(rootReducer(before, sessionClosed())).toBe(before);
   });
 });

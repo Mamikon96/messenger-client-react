@@ -28,14 +28,16 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 | Финальный отчёт | `.ai/rules/report-format.md` |
 | Сомнение / не хватает данных (любая задача) | `.ai/rules/ask-user.md` |
 | История закрытых задач | `.ai/memory/done.md` (поиском по ID) |
+| Взять задачу из бэклога / заменённые решения | .ai/memory/backlog/FE-NN.md · `.ai/memory/decisions-archive.md` (поиском по ID) |
 | Правка структуры памяти | `.ai/memory/README.md`, `scripts/check-memory.sh` |
 
-## Неснимаемые правила (детали — в файлах выше)
-1. **Память:** после ЛЮБЫХ изменений, до ответа пользователю, актуализируй `tasks.md` (+ `state.md`, штамп) и запусти `bash scripts/check-memory.sh`. Протокол — `.ai/rules/memory-protocol.md`.
-2. **Новые технологии/подходы** — только после опроса пользователя (`AskUserQuestion`); сразу после его выбора решение (что, почему, альтернативы) записывается в `decisions.md` — для вариантов от `solution-architect` это делает он; агенты читают `decisions.md`, а не изобретают заново. См. `.ai/rules/tech-approval.md`.
-3. **Приёмка:** гейты от дешёвого к дорогому, следующий — только после зелёного предыдущего: `check-fast.sh` в цикле → `npm run accept` = 0 → APPROVE от `react-reviewer` (тестов не запускает, судит по штампу) → для задач с изменением кода `src/`/`mock-bff/` (не только тестов) свежий отчёт `qa-tester` с PASS по кейсам контракта и smoke; агентов запускает основная сессия. См. `.ai/rules/acceptance.md`.
-4. **Контракт задачи** (цель, кейсы, проверка задачи, скоуп, вне скоупа, открытые вопросы) — в «В работе» `tasks.md` до тестов и кода; проверяет `scripts/check-contract.sh`. Ревью/QA по одной причине дважды или >2 раундов — стоп, запись в `failures.md`, вопрос пользователю. См. `.ai/rules/task-contract.md`, `.ai/rules/acceptance.md`.
-5. Для нового поведения — unit и/или e2e-тест в рамках той же задачи, тесты пишутся до реализации. См. `.ai/rules/testing.md`.
-6. **Git:** перед любой git-операцией читай `.ai/rules/git-flow.md`. Автоматически: старт/продолжение задачи → `bash scripts/git-task.sh start …` (сначала проверка состояния, потом ветка; ошибку не обходить), успешное закрытие по п. 3 → `bash scripts/git-task.sh commit …`, затем push ветки и `gh pr create` (без строки «Generated with Claude Code»). Слияние, теги — только по просьбе.
-7. **Не придумывать — спрашивать:** любой агент при сомнении или нехватке данных спрашивает пользователя (`AskUserQuestion`); догадки и собственные допущения запрещены. Агент без возможности спросить возвращает вопросы вызывающему, а тот переадресует их пользователю. См. `.ai/rules/ask-user.md`.
-8. **User-кейсы:** `docs/user-cases.md` — источник истины о поведении; **менять только с явного разрешения пользователя**, утверждает его он сам (`! bash scripts/approve-usecases.sh`); агент этот скрипт не запускает и хэш в файле user-cases.sha256 (каталог .ai) не правит. Каждый `active`-кейс покрыт e2e с тегом `[UC-…]`; проверка — `bash scripts/check-state.sh`. См. `.ai/rules/testing.md`.
+## Неснимаемые правила (детали — в файлах по ссылкам)
+1. **Память:** после ЛЮБЫХ изменений, до ответа пользователю: `tasks.md` (+ `state.md`, штамп) и `bash scripts/check-memory.sh` = 0. `.ai/rules/memory-protocol.md`.
+2. **Новые технологии/подходы** — только после опроса пользователя (`AskUserQuestion`); выбор сразу пишется в `decisions.md`. `.ai/rules/tech-approval.md`.
+3. **Приёмка** (от дешёвого к дорогому): `check-fast.sh` в цикле → `npm run accept` = 0 → APPROVE `react-reviewer` → при изменении `src/`/`mock-bff/` PASS `qa-tester`; агентов запускает основная сессия. `.ai/rules/acceptance.md`.
+4. **Контракт задачи** — в «В работе» `tasks.md` до тестов и кода; проверяет `scripts/check-contract.sh`. Ревью/QA по одной причине дважды или >2 раундов — стоп, `failures.md`, вопрос пользователю. `.ai/rules/task-contract.md`.
+5. **Тесты вперёд:** новое поведение — unit и/или e2e в той же задаче, до реализации. `.ai/rules/testing.md`.
+6. **Git:** перед любой git-операцией — `.ai/rules/git-flow.md`; старт задачи — `bash scripts/git-task.sh start …`, закрытие — `git-task.sh commit …`, затем push и `gh pr create` (без «Generated with Claude Code»). Слияние, теги — по просьбе.
+7. **Не придумывать — спрашивать:** при сомнении агент спрашивает пользователя (`AskUserQuestion`); агент без такой возможности возвращает вопросы вызывающему. `.ai/rules/ask-user.md`.
+8. **User-кейсы:** `docs/user-cases.md` менять только с явного разрешения пользователя; утверждает он (`! bash scripts/approve-usecases.sh`), агент скрипт не запускает и `.ai/user-cases.sha256` не правит. Каждый `active`-кейс покрыт e2e с тегом `[UC-…]` (`bash scripts/check-state.sh`). `.ai/rules/testing.md`.
+9. **Сессия:** одна задача — одна сессия, `/clear` между задачами; при ≥90K (Sonnet/Haiku) / ≥150K (Opus) токенов контекста (hook `Stop`; в субагентах — `PostToolUse`) — сохранить «Осталось» и закрыть сессию; код задачи пишет `react-engineer`, основная сессия ведёт контракт, гейты и git. `.ai/rules/memory-protocol.md`, FE-D41.

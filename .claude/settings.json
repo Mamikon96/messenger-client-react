@@ -7,10 +7,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/context-guard.sh" }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/stop-memory-check.sh" }
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/stop-memory-check.sh" },
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/context-guard.sh" }
         ]
       }
     ]
@@ -65,7 +74,21 @@
       "Bash(source *approve-usecases.sh*)",
       "Bash(. *approve-usecases.sh*)",
       "Bash(bash -c *approve-usecases*)",
-      "Bash(sh -c *approve-usecases*)"
+      "Bash(sh -c *approve-usecases*)",
+      "Agent(angular-engineer)",
+      "Agent(angular-reviewer)",
+      "Agent(nestjs-engineer)",
+      "Agent(nestjs-reviewer)",
+      "Agent(nextjs-engineer)",
+      "Agent(nextjs-reviewer)",
+      "Agent(node-backend-engineer)",
+      "Agent(node-backend-reviewer)",
+      "Agent(sql-engineer)",
+      "Agent(sql-reviewer)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@anthropic-plugin-directory": false,
+    "code-review@anthropic-plugin-directory": false
   }
 }

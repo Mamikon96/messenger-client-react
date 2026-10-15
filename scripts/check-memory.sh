@@ -63,6 +63,34 @@ check_files() {
 
   fi
 
+  # Бэклог — индекс (FE-D41): строка задачи ≤200 символов, подробности — в $dir/backlog/FE-NN.md
+  if [ -f "$dir/tasks.md" ]; then
+    local long
+    # Длина — в символах (mawk считает байты, кириллица вдвое длиннее), поэтому через node
+    long=$(node -e '
+const lines = require("node:fs").readFileSync(process.argv[1], "utf8").split("\n");
+let inBacklog = false;
+for (const l of lines) {
+  if (/^## /.test(l)) inBacklog = l.startsWith("## Бэклог");
+  else if (inBacklog && l.startsWith("- **") && [...l].length > 200) console.log((l.match(/FE-[0-9]+/) || ["?"])[0]);
+}' "$dir/tasks.md")
+    for id in $long; do fail "$dir/tasks.md: строка бэклога $id длиннее 200 символов — подробности вынеси в $dir/backlog/$id.md"; done
+    if [ -d "$dir/backlog" ]; then
+      local bf name bid
+      for bf in "$dir"/backlog/*.md; do
+        [ -e "$bf" ] || continue
+        name=$(basename "$bf")
+        [ "$name" = README.md ] && continue
+        if ! [[ $name =~ ^FE-[0-9]+\.md$ ]]; then
+          fail "$bf: имя файла не вида FE-NN.md"
+          continue
+        fi
+        bid=${name%.md}
+        grep -qE "^- \*\*$bid\b" "$dir/tasks.md" || fail "$bf: в $dir/tasks.md нет строки задачи $bid"
+      done
+    fi
+  fi
+
   # Архив «Сделано»: раздел есть, каждая запись начинается с даты
   if [ ! -f "$dir/done.md" ]; then
     fail "нет файла $dir/done.md (архив «Сделано»)"
@@ -83,6 +111,12 @@ if [ -f "$MEM/decisions.md" ]; then
   [ -z "$d_dups" ] || fail "$MEM/decisions.md: повторяющиеся ID: $(echo $d_dups)"
   d_bad=$(echo "$d_ids" | grep -vE '^(SH|FE)-D[0-9]+$' || true)
   [ -z "$d_bad" ] || fail "$MEM/decisions.md: ID не вида SH-Dxx/FE-Dxx: $(echo $d_bad)"
+fi
+# Архив решений (FE-D41): записи «ЗАМЕНЕНО»; ID не повторяются ни внутри архива, ни с decisions.md
+if [ -f "$MEM/decisions-archive.md" ]; then
+  a_ids=$(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions-archive.md" | sed 's/^## //')
+  a_dups=$(printf '%s\n%s\n' "${d_ids:-}" "$a_ids" | grep -v '^$' | sort | uniq -d)
+  [ -z "$a_dups" ] || fail "$MEM/decisions-archive.md: ID повторяются (внутри архива или с decisions.md): $(echo $a_dups)"
 fi
 
 # Актуальность: изменённые (относительно HEAD) файлы кода не должны быть новее tasks.md — память обновляют после любых правок

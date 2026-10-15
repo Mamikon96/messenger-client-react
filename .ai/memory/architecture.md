@@ -1,5 +1,5 @@
 # Архитектура frontend
-> Проверено: 2026-10-15 @ 6f80695+dirty
+> Проверено: 2026-10-15 @ 2d55915+dirty
 
 ## Поток данных
 `src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
@@ -21,7 +21,7 @@
 - `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат); вторая `Action` с именем пользователя → `UserMenu` («Выйти», ошибка выхода — `role=alert`)
 - `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
 - `Messenger` = `Chats` (список `Chat`) + `Dialog` (заголовок, сообщения активного чата, ввод; автор = `auth.user.id`)
-- `Login` (FE-25, FE-89, FE-90) — карточка по центру: заголовок, вкладки «Вход» / «Регистрация» (WAI-ARIA Tabs: `tablist`/`tab`/`aria-selected`, стрелки и Home/End, форма — `tabpanel`), форма «Логин» + «Пароль» (`Input`, `useState`) — submit диспатчит thunk `login`/`register` и через `unwrap()` получает модель ошибки (payload отклонённого thunk) и показывает тексты из `loginErrors.js`: общее сообщение в `role=alert` над формой или ошибки у полей `Input` (`error`, снимается правкой поля); ссылок OAuth нет (FE-90)
+- `Login` (FE-25, FE-89, FE-90) — карточка по центру: заголовок, вкладки «Вход» / «Регистрация» (WAI-ARIA Tabs: `tablist`/`tab`/`aria-selected`, стрелки и Home/End, форма — `tabpanel`), форма «Логин» + «Пароль» (`Input`, `useState`) — submit диспатчит thunk `login`/`register` и через `unwrap()` получает модель ошибки (payload отклонённого thunk) и до отправки проверяет поля `validateCredentials` (FE-92; модель `fields` того же вида, что у `toFormError`, поэтому тексты общие), показывает тексты из `loginErrors.js`: общее сообщение в `role=alert` над формой или ошибки у полей `Input` (`error`, снимается правкой поля); одна отправка за раз: `Button loading`, ref-флаг в обработчике, вкладки `disabled` на время запроса, после ошибки фокус на первом поле с ошибкой или на кнопке (`useEffect` по `focusRequest`); ссылок OAuth нет (FE-90)
 
 ## Стили и темы
 - Дизайн-токены (FE-D07) — `src/styles/tokens.css` (CSS custom properties: цвета, типографика, отступы, радиусы, тени, анимации), подключены первым импортом в `src/index.js`. Светлая тема в `:root`, тёмная в `[data-theme="dark"]` (атрибут на `<html>`, переключение — `src/app/modules/theme/`). Компоненты пока используют старые литеральные цвета; миграция на токены — FE-24…FE-29.
@@ -35,7 +35,7 @@
 - UI переключателя — FE-28.
 
 ## Сервисы
-- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `login`, `register` — `user` и `csrfToken` из ответа без повторного `GET /api/auth/session`, хук 401 не вызывают; `logout`), `authFormError.js` (`toFormError` — `ApiError` → сериализуемая модель ошибки формы по `status`/`code`/`details`/`retryAfter`, не по `message`; thunks `login`/`register` отклоняются с ней через `rejectWithValue`); `loginService` и ключ localStorage `user` удалены (FE-14).
+- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `login`, `register` — `user` и `csrfToken` из ответа без повторного `GET /api/auth/session`, хук 401 не вызывают; `logout`), `authFormValidation.js` (`validateCredentials(mode, {login, password})` — проверка полей до отправки по спеке §4.1, §4.2, пароль в байтах UTF-8), `authFormError.js` (`toFormError` — `ApiError` → сериализуемая модель ошибки формы по `status`/`code`/`details`/`retryAfter`, не по `message`; thunks `login`/`register` отклоняются с ней через `rejectWithValue`); `loginService` и ключ localStorage `user` удалены (FE-14).
 
 ## Внешние данные
 Бэкенд `messenger-server` — отдельный проект (SH-D04); контракт — `docs/client-integration.md` (FE-D12), REST под `/api`, WebSocket `/ws`. Сейчас в клиенте подключён только auth; чаты и сообщения пока локально в Redux, нормализованный стор и сетевой слой — FE-35…FE-42 (`tasks.md`). Состояние в памяти браузера, персистентности нет (FE-D04, FE-D15).

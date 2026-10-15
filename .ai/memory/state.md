@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-15 @ 6f80695+dirty
+> Проверено: 2026-10-15 @ 2d55915+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — только auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход); чаты и сообщения живут только в Redux, без запросов к серверу и персистентности; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `logout`, mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -35,7 +35,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-15 00:51:54; unit ✓, e2e ✓) · ревью react-reviewer APPROVE (2 раунда) · QA PASS (`.qa/runs/FE-91.md`) · FE-91 · 2026-10-15
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-15 17:09:45; unit ✓, e2e ✓) · ревью react-reviewer APPROVE (2 раунда) · QA PASS (`.qa/runs/FE-92.md`) · FE-92 · 2026-10-15
 
 ## Фокус сейчас
-Задача не взята. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56, FE-88, FE-87, FE-89, FE-90, FE-91 закрыты; дальше FE-92 → FE-35 → FE-37 → …; копия `docs/auth-password-spec.md` (§1–11) синхронизирована с бэкендом в FE-91; при новых правках спеки бэкенда сверять снова.
+Задача не взята. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56, FE-88, FE-87, FE-89, FE-90, FE-91, FE-92 закрыты; дальше FE-35 → FE-37 → …; копия `docs/auth-password-spec.md` (§1–11) синхронизирована с бэкендом в FE-91; при новых правках спеки бэкенда сверять снова.

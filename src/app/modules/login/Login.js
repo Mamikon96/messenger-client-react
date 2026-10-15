@@ -1,9 +1,10 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import "./Login.css";
 import { Button } from "../ui/button/Button";
 import { Input } from "../ui/input/Input";
 import { login, register } from "../../reducers/auth";
+import { validateCredentials } from "../../services/authFormValidation";
 import { describeFormError, NO_ERRORS } from "./loginErrors";
 
 const MODES = {
@@ -12,6 +13,10 @@ const MODES = {
 };
 
 const MODE_IDS = Object.keys(MODES);
+const FIELD_ORDER = ["login", "password"];
+
+// Куда вернуть фокус после ошибки: первое поле с ошибкой, а при общей ошибке — кнопка отправки.
+const focusTargetFor = ({ fields }) => FIELD_ORDER.find((name) => name in fields) ?? "submit";
 
 // Форма логина и пароля (FE-D38).
 export default function Login() {
@@ -19,13 +24,29 @@ export default function Login() {
     const [mode, setMode] = useState("login");
     const [credentials, setCredentials] = useState({ login: "", password: "" });
     const [errors, setErrors] = useState(NO_ERRORS);
+    const [submitting, setSubmitting] = useState(false);
+    // Новый объект на каждую ошибку отправки: эффект ниже переводит фокус после перерисовки, когда кнопка снова доступна.
+    const [focusRequest, setFocusRequest] = useState(null);
+    const formRef = useRef(null);
+    // Флаг в ref закрывает окно между двумя событиями до перерисовки: state обновится только после неё.
+    const inFlight = useRef(false);
     const tabRefs = useRef({});
     const idPrefix = useId();
     const current = MODES[mode];
     const tabId = (id) => `${idPrefix}-tab-${id}`;
     const panelId = `${idPrefix}-panel`;
 
+    // Отключённая на время запроса кнопка роняет фокус на body; ошибка возвращает его на место (всегда, а не только при потере: так предсказуемее).
+    useEffect(() => {
+        if (!focusRequest) return;
+        const form = formRef.current;
+        const target = focusRequest.target === "submit" ? form.querySelector('[type="submit"]') : form.elements[focusRequest.target];
+        target?.focus();
+    }, [focusRequest]);
+
+    // Пока запрос идёт, режим не меняется: ответ всегда относится к видимому режиму.
     const handleModeChange = (nextMode) => {
+        if (inFlight.current) return;
         setMode(nextMode);
         setErrors(NO_ERRORS);
     };
@@ -57,14 +78,31 @@ export default function Login() {
         });
     };
 
-    // При успехе store переходит в authenticated и App показывает мессенджер вместо этого экрана.
+    const showError = (model) => {
+        const described = describeFormError(model);
+        setErrors(described);
+        setFocusRequest({ target: focusTargetFor(described) });
+    };
+
+    // Одна отправка за раз. При успехе store переходит в authenticated и App показывает мессенджер вместо этого экрана.
     const handleSubmit = async (event) => {
         event.preventDefault();
+        if (inFlight.current) return;
+        const invalid = validateCredentials(mode, credentials);
+        if (invalid) {
+            showError(invalid);
+            return;
+        }
+        inFlight.current = true;
+        setSubmitting(true);
         setErrors(NO_ERRORS);
         try {
             await dispatch(current.action(credentials)).unwrap();
         } catch (model) {
-            setErrors(describeFormError(model));
+            showError(model);
+        } finally {
+            inFlight.current = false;
+            setSubmitting(false);
         }
     };
 
@@ -87,6 +125,7 @@ export default function Login() {
                             aria-selected={id === mode}
                             aria-controls={panelId}
                             tabIndex={id === mode ? 0 : -1}
+                            disabled={submitting}
                             onClick={() => handleModeChange(id)}
                             onKeyDown={handleTabKeyDown}
                         >
@@ -99,6 +138,7 @@ export default function Login() {
                     className="login__form"
                     role="tabpanel"
                     id={panelId}
+                    ref={formRef}
                     aria-labelledby={tabId(mode)}
                     onSubmit={handleSubmit}
                 >
@@ -119,7 +159,7 @@ export default function Login() {
                         error={errors.fields.password}
                         onChange={handleChange}
                     />
-                    <Button type="submit" className="login__submit">{current.submit}</Button>
+                    <Button type="submit" className="login__submit" loading={submitting}>{current.submit}</Button>
                 </form>
             </div>
         </div>

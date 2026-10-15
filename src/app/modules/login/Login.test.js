@@ -176,7 +176,7 @@ describe("Login: ошибки сервера", () => {
         renderLogin();
         fireEvent.click(screen.getByRole("tab", { name: "Регистрация" }));
 
-        fillAndSubmit("a b", "short", "Зарегистрироваться");
+        fillAndSubmit("new-user", "correct-horse-1", "Зарегистрироваться");
 
         await waitFor(() => expect(screen.getByLabelText("Логин")).toHaveAttribute("aria-invalid", "true"));
         expect(screen.getByLabelText("Логин")).toHaveAccessibleDescription(/латинские буквы, цифры/);
@@ -225,7 +225,7 @@ describe("Login: ошибки сервера", () => {
         );
         renderLogin();
         fireEvent.click(screen.getByRole("tab", { name: "Регистрация" }));
-        fillAndSubmit("", "", "Зарегистрироваться");
+        fillAndSubmit("new-user", "correct-horse-1", "Зарегистрироваться");
         await screen.findByText("Введите логин");
 
         fireEvent.change(screen.getByLabelText("Логин"), { target: { value: "n" } });
@@ -318,6 +318,152 @@ describe("Login: ошибки сервера", () => {
         fireEvent.click(screen.getByRole("button", { name: "Войти" }));
 
         await waitFor(() => expect(store.getState().auth.status).toBe("authenticated"));
+    });
+});
+
+describe("Login: проверка полей до отправки [UC-AUTH-16]", () => {
+    const openRegister = () => {
+        const utils = renderLogin();
+        fireEvent.click(screen.getByRole("tab", { name: "Регистрация" }));
+        return utils;
+    };
+
+    test.each([
+        ["ab", "Логин: от 3 до 32 знаков — латинские буквы, цифры, точка, дефис и подчёркивание"],
+        ["a b", "Логин: от 3 до 32 знаков — латинские буквы, цифры, точка, дефис и подчёркивание"],
+        ["логин", "Логин: от 3 до 32 знаков — латинские буквы, цифры, точка, дефис и подчёркивание"],
+        ["a".repeat(33), "Логин не длиннее 32 знаков"],
+        ["", "Введите логин"],
+    ])("регистрация, логин %j: подсказка у поля, запрос не уходит", (value, text) => {
+        openRegister();
+
+        fillAndSubmit(value, "correct-horse-1", "Зарегистрироваться");
+
+        expect(screen.getByLabelText("Логин")).toHaveAccessibleDescription(text);
+        expect(screen.getByLabelText("Пароль")).not.toHaveAttribute("aria-invalid");
+        expect(authApi.register).not.toHaveBeenCalled();
+    });
+
+    test("регистрация, пароль из 11 символов: подсказка у поля пароля, запрос не уходит", () => {
+        openRegister();
+
+        fillAndSubmit("new-user", "a".repeat(11), "Зарегистрироваться");
+
+        expect(screen.getByLabelText("Пароль")).toHaveAccessibleDescription("Пароль не короче 12 символов");
+        expect(screen.getByLabelText("Логин")).not.toHaveAttribute("aria-invalid");
+        expect(authApi.register).not.toHaveBeenCalled();
+    });
+
+    test("регистрация, слишком длинный пароль (байты UTF-8): «Пароль слишком длинный», запрос не уходит", () => {
+        openRegister();
+
+        fillAndSubmit("new-user", "я".repeat(129), "Зарегистрироваться");
+
+        expect(screen.getByLabelText("Пароль")).toHaveAccessibleDescription("Пароль слишком длинный");
+        expect(authApi.register).not.toHaveBeenCalled();
+    });
+
+    test("регистрация: логин с заглавными и пробелами по краям проходит проверку и уходит на сервер", async () => {
+        authApi.register.mockResolvedValue(user);
+        const { store } = openRegister();
+
+        fillAndSubmit("  New-User ", "correct-horse-1", "Зарегистрироваться");
+
+        await waitFor(() => expect(store.getState().auth.status).toBe("authenticated"));
+        expect(authApi.register).toHaveBeenCalledTimes(1);
+    });
+
+    test("вход: пустое поле — «Введите логин» / «Введите пароль», запрос не уходит", () => {
+        renderLogin();
+
+        fillAndSubmit("", "correct-horse-1", "Войти");
+        expect(screen.getByLabelText("Логин")).toHaveAccessibleDescription("Введите логин");
+
+        fillAndSubmit("alice", "", "Войти");
+        expect(screen.getByLabelText("Пароль")).toHaveAccessibleDescription("Введите пароль");
+        expect(authApi.login).not.toHaveBeenCalled();
+    });
+
+    test("вход: формат логина и короткий пароль не проверяются, запрос уходит", async () => {
+        authApi.login.mockRejectedValue(apiError(401, "auth_failed"));
+        renderLogin();
+
+        fillAndSubmit("A b!", "1", "Войти");
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("Неверный логин или пароль");
+        expect(authApi.login).toHaveBeenCalledWith({ login: "A b!", password: "1" });
+    });
+
+    test("правка поля снимает его подсказку, после исправления запрос уходит", async () => {
+        authApi.register.mockResolvedValue(user);
+        const { store } = openRegister();
+        fillAndSubmit("ab", "correct-horse-1", "Зарегистрироваться");
+
+        fireEvent.change(screen.getByLabelText("Логин"), { target: { value: "abc" } });
+        expect(screen.getByLabelText("Логин")).not.toHaveAttribute("aria-invalid");
+        fireEvent.click(screen.getByRole("button", { name: "Зарегистрироваться" }));
+
+        await waitFor(() => expect(store.getState().auth.status).toBe("authenticated"));
+        expect(authApi.register).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("Login: одна отправка за раз [UC-AUTH-18]", () => {
+    // Запрос «висит», пока тест не вызовет resolve.
+    const pendingLogin = () => {
+        let resolve;
+        authApi.login.mockReturnValue(new Promise((r) => { resolve = r; }));
+        return () => resolve(user);
+    };
+
+    test("до ответа кнопка занята, повторный клик и Enter не шлют второй запрос", async () => {
+        const finish = pendingLogin();
+        const { store } = renderLogin();
+        fillAndSubmit("alice", "correct-horse-1", "Войти");
+
+        const button = screen.getByRole("button", { name: "Войти" });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute("aria-busy", "true");
+        fireEvent.click(button);
+        fireEvent.submit(screen.getByRole("tabpanel"));
+
+        expect(authApi.login).toHaveBeenCalledTimes(1);
+        finish();
+        await waitFor(() => expect(store.getState().auth.status).toBe("authenticated"));
+        expect(authApi.login).toHaveBeenCalledTimes(1);
+    });
+
+    test("после ответа с ошибкой кнопка снова доступна, повтор уходит", async () => {
+        authApi.login.mockRejectedValueOnce(apiError(401, "auth_failed")).mockResolvedValueOnce(user);
+        const { store } = renderLogin();
+        fillAndSubmit("alice", "wrong-password-1", "Войти");
+        await screen.findByRole("alert");
+
+        const button = screen.getByRole("button", { name: "Войти" });
+        expect(button).toBeEnabled();
+        expect(button).not.toHaveAttribute("aria-busy");
+        fireEvent.click(button);
+
+        await waitFor(() => expect(store.getState().auth.status).toBe("authenticated"));
+        expect(authApi.login).toHaveBeenCalledTimes(2);
+    });
+
+    test("пока запрос идёт, вкладки заблокированы: режим и ошибка чужого режима не появляются", async () => {
+        let reject;
+        authApi.login.mockReturnValue(new Promise((_, r) => { reject = r; }));
+        renderLogin();
+        fillAndSubmit("alice", "correct-horse-1", "Войти");
+
+        const register = screen.getByRole("tab", { name: "Регистрация" });
+        expect(register).toBeDisabled();
+        fireEvent.click(register);
+        fireEvent.keyDown(screen.getByRole("tab", { name: "Вход" }), { key: "ArrowRight" });
+        expect(screen.getByRole("tab", { name: "Вход" })).toHaveAttribute("aria-selected", "true");
+
+        reject(apiError(401, "auth_failed"));
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("Неверный логин или пароль");
+        expect(screen.getByRole("tab", { name: "Регистрация" })).toBeEnabled();
     });
 });
 

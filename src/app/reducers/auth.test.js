@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser, selectSessionClosed, sessionClosed } from './auth';
+import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser, selectAuthUserId, selectSessionClosed, sessionClosed } from './auth';
 import * as authApi from '../services/authApi';
 import { ApiError } from '../services/apiClient';
 
@@ -175,6 +175,13 @@ describe('auth slice', () => {
     it('selectAuthUser возвращает пользователя или null', () => {
       expect(selectAuthUser({ auth: { status: 'authenticated', user } })).toBe(user);
       expect(selectAuthUser({ auth: { status: 'anonymous', user: null } })).toBeNull();
+    });
+  });
+
+  describe('selectAuthUserId', () => {
+    it('возвращает id пользователя, без пользователя — undefined', () => {
+      expect(selectAuthUserId({ auth: { status: 'authenticated', user } })).toBe(user.id);
+      expect(selectAuthUserId({ auth: { status: 'anonymous', user: null } })).toBeUndefined();
     });
   });
 

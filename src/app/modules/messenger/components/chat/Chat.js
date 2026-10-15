@@ -1,11 +1,12 @@
 import { useSelector } from "react-redux";
+import { selectActiveChatId } from "../../../../reducers/activeChatId";
 import "./Chat.css";
 
 export const Chat = ({chat, onClick}) => {
-    const activeChat = useSelector((state) => state.activeChat);
+    const activeChatId = useSelector(selectActiveChatId);
 
     return (
-        <div className={`chat ${activeChat.id === chat.id ? "_active" : ""}`} onClick={onClick}>
+        <div className={`chat ${activeChatId === chat.id ? "_active" : ""}`} onClick={onClick}>
             <div className="chat__title">{chat.title}</div>
             <div className="chat__members">
                 <div className="chat__members-label">Members:</div>

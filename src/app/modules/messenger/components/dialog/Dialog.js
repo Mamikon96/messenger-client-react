@@ -1,24 +1,26 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { addMessage } from "../../../../reducers/messages";
+import { selectAuthUserId } from "../../../../reducers/auth";
+import { selectActiveChat } from "../../../../reducers/activeChatId";
+import { selectChatMessages, sendMessage } from "../../../../reducers/messages";
 import "./Dialog.css";
 import { Button } from "../../../ui/button/Button";
 import { Input } from "../../../ui/input/Input";
 
 function Dialog() {
-    const activeChat = useSelector((state) => state.activeChat);
-    const userId = useSelector((state) => state.auth.user?.id);
-    const messages = useSelector((state) => state.messages);
+    const activeChat = useSelector(selectActiveChat);
+    const userId = useSelector(selectAuthUserId);
+    const chatId = activeChat?.id;
+    const chatMessages = useSelector((state) => selectChatMessages(state, chatId));
     const dispatch = useDispatch();
     const [text, setText] = useState("");
 
-    const hasChat = Boolean(activeChat.id);
-    const chatMessages = messages.filter((message) => message.chatId === activeChat.id);
+    const hasChat = Boolean(chatId);
 
     const send = () => {
         const trimmed = text.trim();
         if (!hasChat || !trimmed || !userId) return;
-        dispatch(addMessage({ chatId: activeChat.id, authorId: userId, text: trimmed }));
+        dispatch(sendMessage({ chatId, senderId: userId, body: trimmed }));
         setText("");
     }
 
@@ -33,16 +35,16 @@ function Dialog() {
         <div className="dialog">
             <div className="dialog__header">
                 <div className="dialog__header-title">
-                    {activeChat.title}
+                    {activeChat?.title}
                 </div>
             </div>
             <div className="dialog__content">
                 {chatMessages.map((message) => (
                     <div
-                        key={message.id}
-                        className={`dialog__message${message.authorId === userId ? " _own" : ""}`}
+                        key={message.seq}
+                        className={`dialog__message${message.senderId === userId ? " _own" : ""}`}
                     >
-                        {message.text}
+                        {message.body}
                     </div>
                 ))}
             </div>

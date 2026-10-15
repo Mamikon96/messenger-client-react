@@ -2,6 +2,8 @@ const { test, expect } = require('@playwright/test');
 const { login, signIn, userMenuButton } = require('./helpers/auth');
 
 const createChat = async (page, title) => {
+  // пока идёт загрузка списка, ответ сервера заменил бы созданный чат
+  await expect(page.getByText('Загрузка чатов…')).toHaveCount(0);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="name"]').fill('Mock');
@@ -43,7 +45,7 @@ test('[UC-SESSION-05] после выхода сообщения предыду�
   await createChat(page, 'Room A');
   await page.locator('.dialog__footer-input').fill('Секрет');
   await page.locator('.dialog__footer-input').press('Enter');
-  await expect(page.getByText('Секрет')).toBeVisible();
+  await expect(page.locator('.dialog__content').getByText('Секрет')).toBeVisible();
 
   await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();

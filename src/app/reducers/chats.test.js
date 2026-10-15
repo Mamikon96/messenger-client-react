@@ -1,5 +1,10 @@
-import reducer, { chatCreated, selectChatById, selectChats } from './chats';
+import { configureStore } from '@reduxjs/toolkit';
+import reducer, { chatCreated, fetchChats, selectChatById, selectChatName, selectChats, selectChatsStatus } from './chats';
 import { messageAdded } from './messageEvents';
+import users from './users';
+import * as chatsApi from '../services/chatsApi';
+
+jest.mock('../services/chatsApi');
 
 jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
 const { createClientId } = require('../services/clientId');
@@ -12,7 +17,7 @@ describe('chats reducer', () => {
   });
 
   it('начальное состояние — пустая нормализованная коллекция', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {} });
+    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null });
   });
 
   it('chatCreated создаёт ChatListItemDto группы с клиентским UUID и без поля name', () => {
@@ -95,6 +100,160 @@ describe('chats reducer', () => {
       expect(selectChatById(state, 'c1')).toBe(chat);
       expect(selectChatById(state, 'nope')).toBeUndefined();
       expect(selectChatById(state, null)).toBeUndefined();
+    });
+  });
+
+  describe('fetchChats', () => {
+    const message = { chatId: 'd1', seq: 12, senderId: 'u1', clientId: 'k1', body: 'hi', createdAt: '2026-10-15T10:00:00.000Z' };
+    const peer = { id: 'u2', name: 'Bob', avatarUrl: '' };
+    const direct = { id: 'd1', type: 'direct', title: null, lastSeq: 12, lastMessage: message, unreadCount: 3, peer };
+    const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+
+    const makeStore = () => configureStore({ reducer: { chats: reducer, users } });
+
+    afterEach(() => {
+      jest.resetAllMocks();
+    });
+
+    it('статус: idle → loading → succeeded', async () => {
+      chatsApi.fetchChats.mockResolvedValue([]);
+      const store = makeStore();
+      expect(selectChatsStatus(store.getState())).toBe('idle');
+
+      const promise = store.dispatch(fetchChats());
+      expect(selectChatsStatus(store.getState())).toBe('loading');
+      await promise;
+
+      expect(selectChatsStatus(store.getState())).toBe('succeeded');
+    });
+
+    it('передаёт signal в сервис', async () => {
+      chatsApi.fetchChats.mockResolvedValue([]);
+
+      await makeStore().dispatch(fetchChats());
+
+      expect(chatsApi.fetchChats).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+    });
+
+    it('сохраняет чаты в порядке сервера, без вложенного peer, у direct — peerId', async () => {
+      chatsApi.fetchChats.mockResolvedValue([group, direct]);
+      const store = makeStore();
+
+      await store.dispatch(fetchChats());
+
+      expect(selectChats(store.getState())).toEqual([
+        group,
+        { id: 'd1', type: 'direct', title: null, lastSeq: 12, lastMessage: message, unreadCount: 3, peerId: 'u2' },
+      ]);
+    });
+
+    it('peer кладётся в users', async () => {
+      chatsApi.fetchChats.mockResolvedValue([group, direct]);
+      const store = makeStore();
+
+      await store.dispatch(fetchChats());
+
+      expect(store.getState().users.entities).toEqual({ u2: peer });
+    });
+
+    it('ответ заменяет список целиком, включая локальные Join-чаты', async () => {
+      createClientId.mockReturnValue('local-1');
+      const store = makeStore();
+      store.dispatch(chatCreated({ title: 'Local' }));
+      chatsApi.fetchChats.mockResolvedValue([group]);
+
+      await store.dispatch(fetchChats());
+
+      expect(selectChats(store.getState()).map((chat) => chat.id)).toEqual(['g1']);
+    });
+
+    it('повторная загрузка обновляет список', async () => {
+      chatsApi.fetchChats.mockResolvedValueOnce([group]).mockResolvedValueOnce([direct]);
+      const store = makeStore();
+
+      await store.dispatch(fetchChats());
+      await store.dispatch(fetchChats());
+
+      expect(selectChats(store.getState()).map((chat) => chat.id)).toEqual(['d1']);
+    });
+
+    it('ошибка → failed, список не меняется; повтор → succeeded', async () => {
+      chatsApi.fetchChats.mockResolvedValueOnce([group]).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce([]);
+      const store = makeStore();
+      await store.dispatch(fetchChats());
+
+      await store.dispatch(fetchChats());
+      expect(selectChatsStatus(store.getState())).toBe('failed');
+      expect(selectChats(store.getState())).toHaveLength(1);
+
+      await store.dispatch(fetchChats());
+      expect(selectChatsStatus(store.getState())).toBe('succeeded');
+      expect(selectChats(store.getState())).toEqual([]);
+    });
+
+    it('отмена запроса не переводит в failed', async () => {
+      chatsApi.fetchChats.mockImplementation(() => new Promise(() => {}));
+      const store = makeStore();
+
+      const promise = store.dispatch(fetchChats());
+      promise.abort();
+      await promise;
+
+      expect(selectChatsStatus(store.getState())).toBe('loading');
+    });
+  });
+
+  describe('fetchChats: ответы устаревших запросов', () => {
+    const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+
+    it('pending запоминает requestId, завершение его сбрасывает', () => {
+      let state = reducer(undefined, fetchChats.pending('r1'));
+      expect(state).toMatchObject({ status: 'loading', requestId: 'r1' });
+
+      state = reducer(state, fetchChats.fulfilled([group], 'r1'));
+      expect(state).toMatchObject({ status: 'succeeded', requestId: null });
+    });
+
+    it('rejected чужого запроса игнорируется', () => {
+      const idle = reducer(undefined, { type: '@@init' });
+
+      expect(reducer(idle, fetchChats.rejected(new Error('x'), 'old'))).toEqual(idle);
+      const loading = reducer(idle, fetchChats.pending('r2'));
+      expect(reducer(loading, fetchChats.rejected(new Error('x'), 'old'))).toEqual(loading);
+    });
+
+    it('fulfilled чужого запроса игнорируется', () => {
+      const loading = reducer(undefined, fetchChats.pending('r2'));
+
+      expect(reducer(loading, fetchChats.fulfilled([group], 'old'))).toEqual(loading);
+    });
+  });
+
+  describe('selectChatName', () => {
+    const state = {
+      chats: {
+        ids: ['d1', 'g1', 'd2'],
+        entities: {
+          d1: { id: 'd1', type: 'direct', title: null, peerId: 'u2' },
+          g1: { id: 'g1', type: 'group', title: 'Team' },
+          d2: { id: 'd2', type: 'direct', title: null, peerId: 'unknown' },
+        },
+        status: 'succeeded',
+      },
+      users: { ids: ['u2'], entities: { u2: { id: 'u2', name: 'Bob', avatarUrl: '' } } },
+    };
+
+    it('у группы — title', () => {
+      expect(selectChatName(state, 'g1')).toBe('Team');
+    });
+
+    it('у direct — имя собеседника из users', () => {
+      expect(selectChatName(state, 'd1')).toBe('Bob');
+    });
+
+    it('нет собеседника или чата — пустая строка', () => {
+      expect(selectChatName(state, 'd2')).toBe('');
+      expect(selectChatName(state, 'nope')).toBe('');
     });
   });
 });

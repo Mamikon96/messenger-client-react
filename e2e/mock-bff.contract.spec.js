@@ -65,6 +65,13 @@ test('прочие /api/*: без сессии — 401 unauthorized', async () =
   await expectError(res, 401, 'unauthorized');
 });
 
+test('GET /api/chats: с сессией — 200 и пустой список', async () => {
+  await signIn();
+  const res = await api.get('/api/chats');
+  expect(res.status()).toBe(200);
+  expect(await res.json()).toEqual([]);
+});
+
 test('прочие изменяющие /api/*: с сессией без CSRF — 403', async () => {
   await signIn();
   for (const method of ['post', 'put', 'patch', 'delete']) {

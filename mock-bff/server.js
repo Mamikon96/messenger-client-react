@@ -199,6 +199,8 @@ function createServer() {
     const session = getSession(req);
     if (!session) return error(res, 401, 'unauthorized', 'Требуется вход');
     if (MUTATING.includes(req.method) && req.headers['x-csrf-token'] !== session.csrfToken) return empty(res, 403);
+    // GET /api/chats (пока всегда пустой список)
+    if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
     return empty(res, 404);
   }
 }

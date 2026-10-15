@@ -1,4 +1,5 @@
 import reducer, { selectUserById, selectUsers, usersReceived } from './users';
+import { fetchChats } from './chats';
 
 const ann = { id: 'u1', name: 'Ann', avatarUrl: '' };
 const bob = { id: 'u2', name: 'Bob', avatarUrl: 'http://a/b.png' };
@@ -23,5 +24,16 @@ describe('users reducer', () => {
     expect(selectUsers(state)).toEqual([ann, bob]);
     expect(selectUserById(state, 'u2')).toEqual(bob);
     expect(selectUserById(state, 'nope')).toBeUndefined();
+  });
+
+  it('fetchChats.fulfilled кладёт peer из direct-чатов в users, чаты без peer пропускает', () => {
+    const chats = [
+      { id: 'g1', type: 'group', title: 'Team' },
+      { id: 'd1', type: 'direct', title: null, peer: bob },
+    ];
+
+    const state = reducer(reducer(undefined, usersReceived([ann])), fetchChats.fulfilled(chats, 'req'));
+
+    expect(selectUsers({ users: state })).toEqual([ann, bob]);
   });
 });

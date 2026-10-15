@@ -1,4 +1,7 @@
+import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './store';
+import { fetchChats } from './reducers/chats';
+import * as chatsApi from './services/chatsApi';
 import { chatCreated, selectChats } from './reducers/chats';
 import { selectActiveChatId, chatSelected } from './reducers/activeChatId';
 import { selectUsers, usersReceived } from './reducers/users';
@@ -6,10 +9,12 @@ import { selectChatMessages } from './reducers/messages';
 import { messageAdded } from './reducers/messageEvents';
 import { checkSession, logout, sessionClosed } from './reducers/auth';
 
+jest.mock('./services/chatsApi');
+
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const emptyState = {
-  chats: { ids: [], entities: {} },
+  chats: { ids: [], entities: {}, status: 'idle', requestId: null },
   messages: {},
   users: { ids: [], entities: {} },
   activeChatId: null,
@@ -75,5 +80,47 @@ describe('rootReducer: сессия закрыта вне этой вкладк�
     const before = makeState();
 
     expect(rootReducer(before, sessionClosed())).toBe(before);
+  });
+});
+
+describe('rootReducer: запоздавшие ответы fetchChats после сброса store', () => {
+  const peer = { id: 'u2', name: 'Bob', avatarUrl: '' };
+  const direct = { id: 'd1', type: 'direct', title: null, lastSeq: 0, lastMessage: null, unreadCount: 0, peer };
+
+  const makeAuthenticatedStore = () => {
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    return store;
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('ошибка запроса после sessionClosed не переводит сброшенный store в failed', async () => {
+    let rejectRequest;
+    chatsApi.fetchChats.mockImplementation(() => new Promise((_, reject) => { rejectRequest = reject; }));
+    const store = makeAuthenticatedStore();
+    const request = store.dispatch(fetchChats());
+
+    store.dispatch(sessionClosed());
+    rejectRequest(new Error('unauthorized'));
+    await request;
+
+    expect(store.getState().chats.status).toBe('idle');
+  });
+
+  it('ответ после выхода не кладёт чаты и собеседников прежнего пользователя', async () => {
+    let resolveRequest;
+    chatsApi.fetchChats.mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    const store = makeAuthenticatedStore();
+    const request = store.dispatch(fetchChats());
+
+    store.dispatch(logout.fulfilled(undefined, 'req'));
+    resolveRequest([direct]);
+    await request;
+
+    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null });
+    expect(store.getState().users).toEqual({ ids: [], entities: {} });
   });
 });

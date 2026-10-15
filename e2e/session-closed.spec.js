@@ -3,6 +3,8 @@ const { login, signIn, signInControl, userMenuButton } = require('./helpers/auth
 
 // popover после Join не закрывается сам (FE-03) — закрываем кликом по оверлею
 const createChat = async (page, title) => {
+  // пока идёт загрузка списка, ответ сервера заменил бы созданный чат
+  await expect(page.getByText('Загрузка чатов…')).toHaveCount(0);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="name"]').fill('Mock');
@@ -61,4 +63,24 @@ test('[UC-SESSION-06] после нового входа сообщения о �
   await page.getByRole('button', { name: 'Выйти' }).click();
   await expect(signInControl(page)).toBeVisible();
   await expect(page.getByText(SESSION_CLOSED)).toHaveCount(0);
+});
+
+test('[UC-SESSION-06] сессию закрыли, загрузка чатов не удалась: «Повторить» возвращает на экран входа с сообщением', async ({ page, browser, context, baseURL }) => {
+  await page.route('**/api/chats', (route) => route.fulfill({ status: 500, json: { error: { code: 'internal' } } }));
+  await login(page);
+  await expect(page.getByText('Не удалось загрузить чаты.')).toBeVisible();
+  await closeSessionElsewhere({ browser, context, baseURL });
+  await page.unroute('**/api/chats');
+
+  await page.getByRole('button', { name: 'Повторить' }).click();
+
+  await expect(signInControl(page)).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText(SESSION_CLOSED);
+  await expect(page.getByRole('status')).toBeFocused();
+  await expect(userMenuButton(page)).toHaveCount(0);
+
+  // после нового входа ответ прерванной загрузки не оставляет в списке ошибку
+  await signIn(page);
+  await expect(page.getByText('Чатов пока нет')).toBeVisible();
+  await expect(page.getByText('Не удалось загрузить чаты.')).toHaveCount(0);
 });

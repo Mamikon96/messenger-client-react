@@ -5,3 +5,8 @@
     /* background-color: #062d06; */
     padding: 4px 3px;
 }
+
+.chats .chats__status {
+    margin: 8px 0;
+    text-align: center;
+}

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser } from './auth';
+import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser, selectSessionClosed, sessionClosed } from './auth';
 import * as authApi from '../services/authApi';
 import { ApiError } from '../services/apiClient';
 
@@ -175,6 +175,48 @@ describe('auth slice', () => {
     it('selectAuthUser возвращает пользователя или null', () => {
       expect(selectAuthUser({ auth: { status: 'authenticated', user } })).toBe(user);
       expect(selectAuthUser({ auth: { status: 'anonymous', user: null } })).toBeNull();
+    });
+  });
+
+  describe('sessionClosed (сессию закрыли вне этой вкладки)', () => {
+    it('authenticated → sessionClosed без пользователя', () => {
+      const state = reducer({ status: 'authenticated', user }, sessionClosed());
+
+      expect(state).toEqual({ status: 'sessionClosed', user: null });
+    });
+
+    it.each(['loading', 'anonymous', 'error'])('при статусе %s событие игнорируется', (status) => {
+      const before = { status, user: null };
+
+      expect(reducer(before, sessionClosed())).toBe(before);
+    });
+
+    it('селектор selectSessionClosed истинен только в этом статусе', () => {
+      expect(selectSessionClosed({ auth: { status: 'sessionClosed', user: null } })).toBe(true);
+      expect(selectSessionClosed({ auth: { status: 'anonymous', user: null } })).toBe(false);
+      expect(selectSessionClosed({ auth: { status: 'authenticated', user } })).toBe(false);
+    });
+
+    it('новый вход после закрытой сессии → authenticated', async () => {
+      authApi.login.mockResolvedValue(user);
+      const store = makeStore();
+      store.dispatch(checkSession.fulfilled(user, 'req'));
+      store.dispatch(sessionClosed());
+
+      await store.dispatch(login({ login: 'ann', password: 'correct-horse-1' }));
+
+      expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+    });
+
+    it('неудачный вход не снимает сообщение о закрытой сессии', async () => {
+      authApi.login.mockRejectedValue(Object.assign(new Error('x'), { status: 401, code: 'auth_failed' }));
+      const store = makeStore();
+      store.dispatch(checkSession.fulfilled(user, 'req'));
+      store.dispatch(sessionClosed());
+
+      await store.dispatch(login({ login: 'ann', password: 'wrong' }));
+
+      expect(store.getState().auth.status).toBe('sessionClosed');
     });
   });
 });

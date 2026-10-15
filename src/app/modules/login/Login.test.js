@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import Login from "./Login";
 import { rootReducer } from "../../store";
-import { checkSession } from "../../reducers/auth";
+import { checkSession, sessionClosed } from "../../reducers/auth";
 import * as authApi from "../../services/authApi";
 import { ApiError } from "../../services/apiClient";
 
@@ -473,5 +473,33 @@ describe("Login: без OAuth", () => {
         expect(screen.queryByRole("link")).not.toBeInTheDocument();
         expect(screen.queryByText(/Google|GitHub/)).not.toBeInTheDocument();
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+});
+
+describe("Login: сессия закрыта вне этой вкладки [UC-SESSION-06]", () => {
+    test("обычный экран входа без сообщения о закрытой сессии", () => {
+        renderLogin();
+        expect(screen.queryByText("Сессия завершена. Войдите снова.")).toBeNull();
+    });
+
+    test("после закрытия сессии над формой — «Сессия завершена. Войдите снова.», форма доступна", () => {
+        const { store } = renderLogin();
+        act(() => {
+            store.dispatch(checkSession.fulfilled(user, "req"));
+            store.dispatch(sessionClosed());
+        });
+
+        expect(screen.getByRole("status")).toHaveTextContent("Сессия завершена. Войдите снова.");
+        expect(screen.getByLabelText("Логин")).toBeEnabled();
+    });
+
+    test("сообщение получает фокус при появлении экрана", () => {
+        const { store } = renderLogin();
+        act(() => {
+            store.dispatch(checkSession.fulfilled(user, "req"));
+            store.dispatch(sessionClosed());
+        });
+
+        expect(screen.getByRole("status")).toHaveFocus();
     });
 });

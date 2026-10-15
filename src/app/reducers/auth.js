@@ -8,7 +8,8 @@ import {
 import { toFormError } from '../services/authFormError'
 
 // loading — идёт проверка сессии (начальное), anonymous — сессии нет,
-// authenticated — вошли, error — проверить сессию не удалось (сеть, 5xx, битый ответ).
+// authenticated — вошли, error — проверить сессию не удалось (сеть, 5xx, битый ответ),
+// sessionClosed — сессию закрыли вне этой вкладки (401 unauthorized): как anonymous, но экран входа объясняет причину.
 export const checkSession = createAsyncThunk(
     'auth/checkSession',
     (_, { signal }) => fetchSession({ signal })
@@ -40,7 +41,15 @@ export const logout = createAsyncThunk('auth/logout', () => logoutRequest())
 export const authSlice = createSlice({
     name: 'auth',
     initialState: { status: 'loading', user: null },
-    reducers: {},
+    reducers: {
+        // Событие, а не сеттер: сервер ответил 401 unauthorized на запрос уже открытой сессии. Регистрирует хук src/index.js.
+        // Имеет смысл только у вошедшего: в остальных статусах (выход, экран входа, загрузка) запоздавший 401 игнорируется.
+        sessionClosed: (state) => {
+            if (state.status !== 'authenticated') return
+            state.user = null
+            state.status = 'sessionClosed'
+        }
+    },
     extraReducers: (builder) => {
         builder
             .addCase(checkSession.pending, (state) => {
@@ -67,6 +76,9 @@ export const authSlice = createSlice({
 })
 
 export const selectAuthStatus = (state) => state.auth.status
+export const selectSessionClosed = (state) => state.auth.status === 'sessionClosed'
 export const selectAuthUser = (state) => state.auth.user
+
+export const { sessionClosed } = authSlice.actions
 
 export default authSlice.reducer

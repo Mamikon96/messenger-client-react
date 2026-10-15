@@ -2,13 +2,26 @@ import { apiRequest, setCsrfToken, ApiError } from "./apiClient";
 
 const isNonEmptyString = (value) => typeof value === "string" && value !== "";
 
-// Тело как у GET /api/auth/session: { user, csrfToken }. Токен отдаётся apiClient, наружу — user.
+// Сырой user ответа → клиентская модель SessionUser (спека docs/auth-password-spec.md §3).
+// Обязательны все шесть полей; lastName и avatarUrl могут быть "". Лишние поля сервера отбрасываются. Некорректный user — null.
+function toSessionUser(raw) {
+    if (typeof raw !== "object" || raw === null) {
+        return null;
+    }
+    const { id, login, firstName, lastName, name, avatarUrl } = raw;
+    const valid =
+        [id, login, firstName, name].every(isNonEmptyString) && [lastName, avatarUrl].every((value) => typeof value === "string");
+    return valid ? { id, login, firstName, lastName, name, avatarUrl } : null;
+}
+
+// Тело как у GET /api/auth/session: { user, csrfToken }. Токен отдаётся apiClient, наружу — SessionUser.
 function acceptSession(data, endpoint) {
-    if (!data || typeof data.user !== "object" || data.user === null || !isNonEmptyString(data.csrfToken)) {
+    const user = toSessionUser(data?.user);
+    if (!user || !isNonEmptyString(data.csrfToken)) {
         throw new Error(`Некорректный ответ ${endpoint}`);
     }
     setCsrfToken(data.csrfToken);
-    return data.user;
+    return user;
 }
 
 // Возвращает user, либо null, если сессии нет (401). Остальные сбои — исключение.

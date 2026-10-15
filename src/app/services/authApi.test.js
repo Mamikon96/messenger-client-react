@@ -10,6 +10,23 @@ const reply = (status, body, headers = {}) => ({
 
 const user = { id: "1", login: "ann", firstName: "Ann", lastName: "", name: "Ann", avatarUrl: "http://a/b.png" };
 
+// Каждое поле SessionUser обязательно: id, login, firstName, name — непустые строки, lastName и avatarUrl — строки (могут быть "").
+const INVALID_USERS = [
+    ["id отсутствует", { id: undefined }],
+    ["id пустой", { id: "" }],
+    ["id число", { id: 7 }],
+    ["login отсутствует", { login: undefined }],
+    ["login пустой", { login: "" }],
+    ["firstName отсутствует", { firstName: undefined }],
+    ["firstName пустой", { firstName: "" }],
+    ["lastName отсутствует", { lastName: undefined }],
+    ["lastName не строка", { lastName: null }],
+    ["name отсутствует", { name: undefined }],
+    ["name пустой", { name: "" }],
+    ["avatarUrl отсутствует", { avatarUrl: undefined }],
+    ["avatarUrl не строка", { avatarUrl: null }],
+];
+
 describe("authApi", () => {
     beforeEach(() => {
         global.fetch = jest.fn();
@@ -60,6 +77,23 @@ describe("authApi", () => {
             fetch.mockResolvedValue(reply(200, body));
 
             await expect(fetchSession()).rejects.toThrow();
+        });
+
+        it("приводит user к модели SessionUser: лишние поля отбрасываются, пустые lastName и avatarUrl допустимы", async () => {
+            const raw = { ...user, lastName: "", avatarUrl: "", isAdmin: true, provider: "github" };
+            fetch.mockResolvedValue(reply(200, { user: raw, csrfToken: "t" }));
+
+            await expect(fetchSession()).resolves.toEqual({ ...user, lastName: "", avatarUrl: "" });
+        });
+
+        it.each(INVALID_USERS)("user с некорректным полем (%s) — ошибка, токен не запоминается", async (_, patch) => {
+            fetch.mockResolvedValueOnce(reply(200, { user: { ...user, ...patch }, csrfToken: "tok" }));
+
+            await expect(fetchSession()).rejects.toThrow("Некорректный ответ");
+
+            fetch.mockResolvedValueOnce(reply(204));
+            await apiRequest("/api/x", { method: "POST" });
+            expect(fetch.mock.calls[1][1].headers["X-CSRF-Token"]).toBeUndefined();
         });
 
         it("пробрасывает прочие HTTP-ошибки и сетевые сбои", async () => {
@@ -138,6 +172,18 @@ describe("authApi", () => {
             fetch.mockResolvedValue(reply(okStatus, body));
 
             await expect(request(credentials)).rejects.toThrow();
+        });
+
+        it("приводит user к модели SessionUser: лишние поля отбрасываются", async () => {
+            fetch.mockResolvedValueOnce(reply(okStatus, { user: { ...user, isAdmin: true, provider: "github" }, csrfToken: "tok" }));
+
+            await expect(request(credentials)).resolves.toEqual(user);
+        });
+
+        it.each(INVALID_USERS)("user с некорректным полем (%s) — ошибка", async (_, patch) => {
+            fetch.mockResolvedValueOnce(reply(okStatus, { user: { ...user, ...patch }, csrfToken: "tok" }));
+
+            await expect(request(credentials)).rejects.toThrow("Некорректный ответ");
         });
 
         it("ошибка сервера пробрасывается как ApiError с кодом и не вызывает хук выхода", async () => {

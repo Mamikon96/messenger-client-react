@@ -29,6 +29,7 @@ function App() {
           </>
         );
       case 'anonymous':
+      case 'sessionClosed':
         return <Login/>;
       case 'error':
         return (

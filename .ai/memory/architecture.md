@@ -1,8 +1,8 @@
 # Архитектура frontend
-> Проверено: 2026-10-15 @ 2d55915+dirty
+> Проверено: 2026-10-15 @ dce097d+dirty
 
 ## Поток данных
-`src/index.js` → `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` — `Login`, `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
+`src/index.js` регистрирует `setUnauthorizedHandler(() => store.dispatch(sessionClosed()))` и рендерит `<Provider store>` → `App`: при монтировании `useEffect` диспатчит `checkSession` (cleanup — `abort`, StrictMode зовёт эффект дважды), дальше гейт по `auth.status`: `loading` — «Загрузка…», `anonymous` и `sessionClosed` — `Login` (при `sessionClosed` над формой сообщение «Сессия завершена. Войдите снова.»), `authenticated` — `Header` + `Messenger`, `error` — сообщение и кнопка «Повторить» (повторный `checkSession`).
 
 ## Store (`src/app/store.js`)
 | Слайс | Состояние | Actions |
@@ -13,7 +13,7 @@
 | users | `[]` `{id, name}` | `addUser` |
 | auth | `{status, user}` | thunks `checkSession`, `logout` |
 
-`default` экспорт `store.js` построен на `rootReducer` (`combineReducers` + сброс): на `logout.fulfilled` состояние `undefined` → все слайсы в начальное, `auth` → `anonymous`.
+`default` экспорт `store.js` построен на `rootReducer` (`combineReducers` + сброс): на `logout.fulfilled` состояние `undefined` → все слайсы в начальное, `auth` → `anonymous`; на `sessionClosed` (401 `unauthorized` у вошедшего) — тот же сброс, `auth` → `sessionClosed`, у невошедшего действие игнорируется.
 
 Примечание: `activeChat` хранит копию чата, а не id; `Chat` сравнивает `activeChat.id === chat.id`.
 
@@ -35,7 +35,7 @@
 - UI переключателя — FE-28.
 
 ## Сервисы
-- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `login`, `register` — `user` и `csrfToken` из ответа без повторного `GET /api/auth/session`, хук 401 не вызывают; `logout`), `authFormValidation.js` (`validateCredentials(mode, {login, password})` — проверка полей до отправки по спеке §4.1, §4.2, пароль в байтах UTF-8), `authFormError.js` (`toFormError` — `ApiError` → сериализуемая модель ошибки формы по `status`/`code`/`details`/`retryAfter`, не по `message`; thunks `login`/`register` отклоняются с ней через `rejectWithValue`); `loginService` и ключ localStorage `user` удалены (FE-14).
+- `apiClient.js` (`apiRequest`, CSRF, хук 401), `authApi.js` (`fetchSession`, `login`, `register` — `user` приводится к `SessionUser` `{id, login, firstName, lastName, name, avatarUrl}` со строгой проверкой (некорректный ответ — ошибка, токен не запоминается), `csrfToken` из ответа, без повторного `GET /api/auth/session`, хук 401 не вызывают; `logout`), `authFormValidation.js` (`validateCredentials(mode, {login, password})` — проверка полей до отправки по спеке §4.1, §4.2, пароль в байтах UTF-8), `authFormError.js` (`toFormError` — `ApiError` → сериализуемая модель ошибки формы по `status`/`code`/`details`/`retryAfter`, не по `message`; thunks `login`/`register` отклоняются с ней через `rejectWithValue`); `loginService` и ключ localStorage `user` удалены (FE-14).
 
 ## Внешние данные
 Бэкенд `messenger-server` — отдельный проект (SH-D04); контракт — `docs/client-integration.md` (FE-D12), REST под `/api`, WebSocket `/ws`. Сейчас в клиенте подключён только auth; чаты и сообщения пока локально в Redux, нормализованный стор и сетевой слой — FE-35…FE-42 (`tasks.md`). Состояние в памяти браузера, персистентности нет (FE-D04, FE-D15).

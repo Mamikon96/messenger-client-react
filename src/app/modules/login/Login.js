@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import "./Login.css";
 import { Button } from "../ui/button/Button";
 import { Input } from "../ui/input/Input";
-import { login, register } from "../../reducers/auth";
+import { login, register, selectSessionClosed } from "../../reducers/auth";
 import { validateCredentials } from "../../services/authFormValidation";
 import { describeFormError, NO_ERRORS } from "./loginErrors";
 
@@ -21,6 +21,7 @@ const focusTargetFor = ({ fields }) => FIELD_ORDER.find((name) => name in fields
 // Форма логина и пароля (FE-D38).
 export default function Login() {
     const dispatch = useDispatch();
+    const sessionClosed = useSelector(selectSessionClosed);
     const [mode, setMode] = useState("login");
     const [credentials, setCredentials] = useState({ login: "", password: "" });
     const [errors, setErrors] = useState(NO_ERRORS);
@@ -28,6 +29,7 @@ export default function Login() {
     // Новый объект на каждую ошибку отправки: эффект ниже переводит фокус после перерисовки, когда кнопка снова доступна.
     const [focusRequest, setFocusRequest] = useState(null);
     const formRef = useRef(null);
+    const noticeRef = useRef(null);
     // Флаг в ref закрывает окно между двумя событиями до перерисовки: state обновится только после неё.
     const inFlight = useRef(false);
     const tabRefs = useRef({});
@@ -43,6 +45,11 @@ export default function Login() {
         const target = focusRequest.target === "submit" ? form.querySelector('[type="submit"]') : form.elements[focusRequest.target];
         target?.focus();
     }, [focusRequest]);
+
+    // Экран входа появляется целиком, поэтому role="status" не озвучивается; фокус на сообщении (после размонтирования меню он на body) его зачитывает.
+    useEffect(() => {
+        if (sessionClosed) noticeRef.current?.focus();
+    }, [sessionClosed]);
 
     // Пока запрос идёт, режим не меняется: ответ всегда относится к видимому режиму.
     const handleModeChange = (nextMode) => {
@@ -133,6 +140,7 @@ export default function Login() {
                         </button>
                     ))}
                 </div>
+                {sessionClosed && <p className="login__notice" role="status" tabIndex={-1} ref={noticeRef}>Сессия завершена. Войдите снова.</p>}
                 {errors.message && <p className="login__error" role="alert">{errors.message}</p>}
                 <form
                     className="login__form"

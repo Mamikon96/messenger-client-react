@@ -1,15 +1,19 @@
-import { createSlice, nanoid } from '@reduxjs/toolkit'
+import { createEntityAdapter, createSlice } from '@reduxjs/toolkit'
+
+// Пользователи по UserSummary (раздел 4 docs/client-integration.md); наполняет сервер (FE-38, FE-39, FE-41).
+const usersAdapter = createEntityAdapter()
 
 export const usersSlice = createSlice({
     name: "users",
-    initialState: [],
+    initialState: usersAdapter.getInitialState(),
     reducers: {
-        addUser: (state, action) => {
-            state.push({...action.payload, id: nanoid()})
-        },
+        usersReceived: usersAdapter.upsertMany,
     }
 })
 
-export const { addUser } = usersSlice.actions
+export const { usersReceived } = usersSlice.actions
+
+export const { selectAll: selectUsers, selectById: selectUserById } =
+    usersAdapter.getSelectors((state) => state.users)
 
 export default usersSlice.reducer

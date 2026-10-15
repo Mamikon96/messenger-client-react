@@ -1,14 +1,15 @@
 import { useDispatch, useSelector } from "react-redux";
 import { Chat } from "../chat/Chat";
 import "./Chats.css";
-import { setActiveChat } from "../../../../reducers/activeChat";
+import { selectChats } from "../../../../reducers/chats";
+import { chatSelected } from "../../../../reducers/activeChatId";
 
 function Chats() {
-    const chats = useSelector((state) => state.chats);
+    const chats = useSelector(selectChats);
     const dispatch = useDispatch();
 
     const handleClick = (chat) => {
-        dispatch(setActiveChat(chat));
+        dispatch(chatSelected(chat.id));
     }
 
     return (

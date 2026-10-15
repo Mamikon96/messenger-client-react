@@ -1,6 +1,6 @@
 import { useDispatch } from "react-redux";
 import "./JoinForm.css";
-import { addChat } from "../../../reducers/chats";
+import { chatCreated } from "../../../reducers/chats";
 import { useState } from "react";
 import { Button } from "../../ui/button/Button";
 import { Input } from "../../ui/input/Input";
@@ -15,7 +15,7 @@ function JoinForm() {
     });
 
     const handleAction = () => {
-        dispatch(addChat(formState));
+        dispatch(chatCreated({ title: formState.title }));
     }
 
     const handleChange = (event) => {

@@ -1,20 +1,48 @@
-import { createSlice, nanoid } from '@reduxjs/toolkit'
+import { createEntityAdapter, createSelector, createSlice } from '@reduxjs/toolkit'
+import { createClientId } from '../services/clientId'
+import { selectChatById } from './chats'
+import { messageAdded } from './messageEvents'
+
+// Сообщения лежат по chatId; внутри чата ключ — seq, порядок — по возрастанию seq. Форма — ChatMessageDto (раздел 4 docs/client-integration.md).
+const messagesAdapter = createEntityAdapter({
+    selectId: (message) => message.seq,
+    sortComparer: (a, b) => a.seq - b.seq,
+})
 
 export const messagesSlice = createSlice({
     name: "messages",
-    initialState: [],
-    reducers: {
-        addMessage: {
-            reducer: (state, action) => {
-                state.push(action.payload)
-            },
-            prepare: ({ chatId, authorId, text }) => ({
-                payload: { id: nanoid(), chatId, authorId, text, ts: Date.now() }
-            }),
-        },
-    }
+    initialState: {},
+    reducers: {},
+    extraReducers: (builder) => {
+        builder.addCase(messageAdded, (state, action) => {
+            const { chatId } = action.payload
+            state[chatId] = messagesAdapter.addOne(state[chatId] ?? messagesAdapter.getInitialState(), action.payload)
+        })
+    },
 })
 
-export const { addMessage } = messagesSlice.actions
+// Локальная отправка: seq = lastSeq чата + 1 (lastSeq хранит только chats, поэтому seq считает thunk по getState).
+// Чата нет — ничего не делает. Слайсы получают готовое событие messageAdded.
+export const sendMessage = ({ chatId, senderId, body }) => (dispatch, getState) => {
+    const chat = selectChatById(getState(), chatId)
+    if (!chat) return
+    dispatch(messageAdded({
+        chatId,
+        seq: chat.lastSeq + 1,
+        senderId,
+        clientId: createClientId(),
+        body,
+        createdAt: new Date().toISOString(),
+    }))
+}
+
+const { selectAll } = messagesAdapter.getSelectors()
+const noMessages = []
+
+// Сообщения чата по возрастанию seq. Ссылка стабильна, пока не изменились сообщения этого чата.
+export const selectChatMessages = createSelector(
+    [(state, chatId) => state.messages[chatId]],
+    (chatMessages) => (chatMessages ? selectAll(chatMessages) : noMessages)
+)
 
 export default messagesSlice.reducer

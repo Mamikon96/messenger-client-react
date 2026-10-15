@@ -78,6 +78,7 @@ export const authSlice = createSlice({
 export const selectAuthStatus = (state) => state.auth.status
 export const selectSessionClosed = (state) => state.auth.status === 'sessionClosed'
 export const selectAuthUser = (state) => state.auth.user
+export const selectAuthUserId = (state) => state.auth.user?.id
 
 export const { sessionClosed } = authSlice.actions
 

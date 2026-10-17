@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-17 @ d269832+dirty
+> Проверено: 2026-10-17 @ 98da734+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка и локальные чаты из Join — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).

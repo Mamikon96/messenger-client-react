@@ -59,6 +59,11 @@
       "Write(.claude/settings.json)"
     ],
     "deny": [
+      "Read(./node_modules/**)",
+      "Read(./build/**)",
+      "Read(./test-results/**)",
+      "Read(./.playwright-mcp/**)",
+      "Read(./package-lock.json)",
       "Bash(scripts/approve-usecases.sh*)",
       "Bash(./scripts/approve-usecases.sh*)",
       "Bash(./approve-usecases.sh*)",

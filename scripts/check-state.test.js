@@ -562,6 +562,36 @@ test.describe('checkQaReport', () => {
     assert.ok(errors.some((e) => e.includes('UC-A-02') && e.includes('fail')));
   });
 
+  test('pass (e2e) принимается, если у кейса есть e2e-тест с тегом', () => {
+    const errors = S.checkQaReport(
+      report({ rows: [['UC-A-01', 'pass'], ['UC-A-02', 'pass (e2e)']] }),
+      ctx({ taggedIds: ['UC-A-01', 'UC-A-02'] })
+    );
+    assert.deepEqual(errors, []);
+  });
+
+  test('pass (e2e) без e2e-теста с тегом кейса — ошибка', () => {
+    const errors = S.checkQaReport(
+      report({ rows: [['UC-A-01', 'pass'], ['UC-A-02', 'pass (e2e)']] }),
+      ctx({ taggedIds: ['UC-A-01'] })
+    );
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /UC-A-02.*e2e/);
+  });
+
+  test('pass (e2e) без списка тегов в контексте — ошибка', () => {
+    const errors = S.checkQaReport(report({ rows: [['UC-A-01', 'pass'], ['UC-A-02', 'pass (e2e)']] }), ctx());
+    assert.ok(errors.some((e) => e.includes('UC-A-02')));
+  });
+
+  test('отметка вне pass/pass (e2e) остаётся ошибкой', () => {
+    const errors = S.checkQaReport(
+      report({ rows: [['UC-A-01', 'pass'], ['UC-A-02', 'fail (e2e)']] }),
+      ctx({ taggedIds: ['UC-A-02'] })
+    );
+    assert.ok(errors.some((e) => e.includes('UC-A-02') && e.includes('fail')));
+  });
+
   test('открытые BLOCKER/MAJOR при вердикте PASS — ошибка', () => {
     const errors = S.checkQaReport(
       report({ problems: ['QA-1 [BLOCKER] UC-A-01 — сломано', 'QA-2 [MAJOR] UC-A-02 — криво'] }),

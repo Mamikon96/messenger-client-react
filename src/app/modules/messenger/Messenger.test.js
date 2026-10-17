@@ -6,6 +6,7 @@ import { rootReducer } from "../../store";
 import * as chatsApi from "../../services/chatsApi";
 
 jest.mock("../../services/chatsApi");
+jest.mock("../../services/wsService");
 jest.mock("./components/dialog/Dialog", () => () => <div>dialog</div>);
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
 import { createClientId } from '../services/clientId'
 import { fetchChats as fetchChatsRequest } from '../services/chatsApi'
-import { messageAdded } from './messageEvents'
+import { chatRemoved, messageAdded } from './messageEvents'
 import { fetchOlderMessages, loadChatHistory } from './chatHistory'
 
 // Элемент списка чатов по ChatListItemDto (docs/client-integration.md, раздел 4), но у direct вместо вложенного peer — peerId
@@ -23,6 +23,17 @@ export const fetchChats = createAsyncThunk(
 // ChatListItemDto → элемент списка: peer (только у direct) заменяется на peerId.
 export const toChat = ({ peer, ...chat }) => (peer ? { ...chat, peerId: peer.id } : chat)
 
+// ChatDto (GET /api/chats/{id}, chat.created) → элемент списка: lastMessage и непрочитанных у только что полученного чата нет.
+// У direct peerId — второй участник (в чате с собой — я сам).
+export const toChatFromDto = ({ id, type, title, lastSeq, members }, meId) => {
+    const chat = {
+        id, type, title, lastSeq, lastMessage: null, unreadCount: 0,
+        members: members.map(({ userId, role }) => ({ userId, role })),
+    }
+    if (type !== 'direct') return chat
+    return { ...chat, peerId: members.find(({ userId }) => userId !== meId)?.userId ?? meId }
+}
+
 export const chatsSlice = createSlice({
     name: "chats",
     // status: idle — ещё не грузили, loading — идёт загрузка, succeeded — список получен, failed — загрузить не удалось.
@@ -34,6 +45,15 @@ export const chatsSlice = createSlice({
             prepare: ({ title }) => ({
                 payload: { id: createClientId(), type: "group", title, lastSeq: 0, lastMessage: null, unreadCount: 0, local: true }
             }),
+        },
+        // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
+        chatReceived: chatsAdapter.addOne,
+        chatUpdated: (state, action) => {
+            const { chatId, title, members } = action.payload
+            const chat = state.entities[chatId]
+            if (!chat) return
+            if (title !== undefined) chat.title = title
+            if (members) chat.members = members.map(({ userId, role }) => ({ userId, role }))
         },
     },
     extraReducers: (builder) => {
@@ -96,14 +116,18 @@ export const chatsSlice = createSlice({
             })
         builder.addCase(messageAdded, (state, action) => {
             const chat = state.entities[action.payload.chatId]
-            if (!chat || action.payload.seq <= chat.lastSeq) return
-            chat.lastSeq = action.payload.seq
+            const { seq } = action.payload
+            // lastSeq мог быть известен заранее (карточка чата), а lastMessage — ещё нет: сверяем с последним сообщением.
+            if (!chat || (chat.lastMessage ? seq <= chat.lastMessage.seq : seq < chat.lastSeq)) return
+            chat.lastSeq = Math.max(chat.lastSeq, seq)
             chat.lastMessage = action.payload
+            if (action.meta?.unread) chat.unreadCount += 1
         })
+        builder.addCase(chatRemoved, chatsAdapter.removeOne)
     },
 })
 
-export const { chatCreated } = chatsSlice.actions
+export const { chatCreated, chatReceived, chatUpdated } = chatsSlice.actions
 
 export const { selectAll: selectChats, selectById: selectChatById } =
     chatsAdapter.getSelectors((state) => state.chats)

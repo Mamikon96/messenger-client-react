@@ -1,7 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { chatCreated, fetchChats, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
+import reducer, { chatCreated, chatReceived, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
-import { messageAdded } from './messageEvents';
+import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
 import users from './users';
 import * as chatsApi from '../services/chatsApi';
@@ -87,6 +87,99 @@ describe('chats reducer', () => {
       const before = reducer(undefined, { type: '@@init' });
 
       expect(reducer(before, messageAdded(message))).toEqual(before);
+    });
+
+    it('unread: true увеличивает unreadCount, без флага — нет', () => {
+      createClientId.mockReturnValueOnce('c1');
+      let state = reducer(undefined, chatCreated({ title: 'One' }));
+
+      state = reducer(state, messageAdded({ ...message, seq: 1 }));
+      expect(state.entities.c1.unreadCount).toBe(0);
+      state = reducer(state, messageAdded({ ...message, seq: 2 }, { unread: true }));
+      state = reducer(state, messageAdded({ ...message, seq: 3 }, { unread: true }));
+
+      expect(state.entities.c1.unreadCount).toBe(2);
+    });
+
+    it('дубль или более старое сообщение не увеличивает unreadCount', () => {
+      createClientId.mockReturnValueOnce('c1');
+      let state = reducer(undefined, chatCreated({ title: 'One' }));
+      state = reducer(state, messageAdded({ ...message, seq: 2 }, { unread: true }));
+
+      state = reducer(state, messageAdded({ ...message, seq: 2 }, { unread: true }));
+      state = reducer(state, messageAdded({ ...message, seq: 1 }, { unread: true }));
+
+      expect(state.entities.c1.unreadCount).toBe(1);
+    });
+
+    it('чат, у которого lastSeq уже известен, но lastMessage нет, принимает сообщение с seq = lastSeq', () => {
+      let state = reducer(undefined, chatReceived({ id: 'c9', type: 'group', title: 'T', lastSeq: 4, lastMessage: null, unreadCount: 0 }));
+
+      state = reducer(state, messageAdded({ ...message, chatId: 'c9', seq: 4 }, { unread: true }));
+
+      expect(state.entities.c9).toMatchObject({ lastSeq: 4, unreadCount: 1 });
+      expect(state.entities.c9.lastMessage.seq).toBe(4);
+    });
+  });
+
+  describe('toChatFromDto', () => {
+    const me = { userId: 'u1', name: 'Me', avatarUrl: '', role: 'member' };
+    const bob = { userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' };
+
+    it('группа: title, lastSeq и участники {userId, role}, без lastMessage и непрочитанных', () => {
+      const dto = { id: 'g1', type: 'group', title: 'Team', lastSeq: 3, members: [{ ...me, role: 'owner' }, bob] };
+
+      expect(toChatFromDto(dto, 'u1')).toEqual({
+        id: 'g1', type: 'group', title: 'Team', lastSeq: 3, lastMessage: null, unreadCount: 0,
+        members: [{ userId: 'u1', role: 'owner' }, { userId: 'u2', role: 'member' }],
+      });
+    });
+
+    it('direct: peerId — второй участник, в чате с собой — я сам', () => {
+      const direct = { id: 'd1', type: 'direct', title: null, lastSeq: 0, members: [me, bob] };
+      const self = { id: 'd2', type: 'direct', title: null, lastSeq: 0, members: [me] };
+
+      expect(toChatFromDto(direct, 'u1').peerId).toBe('u2');
+      expect(toChatFromDto(self, 'u1').peerId).toBe('u1');
+    });
+  });
+
+  describe('события чатов', () => {
+    const item = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+
+    it('chatReceived добавляет чат; повтор с тем же id ничего не меняет', () => {
+      let state = reducer(undefined, chatReceived(item));
+      expect(state.ids).toEqual(['g1']);
+
+      state = reducer(state, messageAdded({ chatId: 'g1', seq: 1, senderId: 'u2', clientId: 'k', body: 'hi', createdAt: 't' }, { unread: true }));
+      const again = reducer(state, chatReceived({ ...item, title: 'Другое' }));
+
+      expect(again).toEqual(state);
+    });
+
+    it('chatUpdated с title меняет название, с members — состав {userId, role}', () => {
+      let state = reducer(undefined, chatReceived(item));
+
+      state = reducer(state, chatUpdated({ chatId: 'g1', title: 'Новое' }));
+      expect(state.entities.g1.title).toBe('Новое');
+
+      state = reducer(state, chatUpdated({ chatId: 'g1', members: [{ userId: 'u1', name: 'Me', avatarUrl: '', role: 'owner' }] }));
+      expect(state.entities.g1.members).toEqual([{ userId: 'u1', role: 'owner' }]);
+      expect(state.entities.g1.title).toBe('Новое');
+    });
+
+    it('chatUpdated неизвестного чата игнорируется', () => {
+      const before = reducer(undefined, { type: '@@init' });
+
+      expect(reducer(before, chatUpdated({ chatId: 'nope', title: 'X' }))).toEqual(before);
+    });
+
+    it('chatRemoved убирает чат', () => {
+      let state = reducer(undefined, chatReceived(item));
+
+      state = reducer(state, chatRemoved('g1'));
+
+      expect(state.ids).toEqual([]);
     });
   });
 

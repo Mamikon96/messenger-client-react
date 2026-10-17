@@ -93,6 +93,14 @@ describe("chatsApi: открытие чата", () => {
         expect(fetch.mock.calls[0][0]).toBe("/api/chats/c1/messages?before=51&limit=50");
     });
 
+    it("fetchMessages передаёт since в query (догонка после пропуска seq)", async () => {
+        fetch.mockResolvedValueOnce(reply(200, []));
+
+        await fetchMessages("c1", { since: 7, limit: 100 });
+
+        expect(fetch.mock.calls[0][0]).toBe("/api/chats/c1/messages?since=7&limit=100");
+    });
+
     it("fetchChat и fetchMessages пробрасывают signal", async () => {
         fetch.mockResolvedValue(reply(200, []));
         const { signal } = new AbortController();

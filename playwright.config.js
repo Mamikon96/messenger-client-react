@@ -20,7 +20,7 @@ module.exports = defineConfig({
       timeout: 30000,
     },
     {
-      command: `BROWSER=none PORT=3100 BACKEND_URL=${bffUrl} npm start`, // e2e идут на mock-BFF (3334; реальный бэкенд на 3333 им не мешает)
+      command: `BROWSER=none PORT=3100 BACKEND_URL=${bffUrl} REACT_APP_WS_URL=ws://localhost:3100/ws npm start`, // e2e идут на mock-BFF (3334; реальный бэкенд на 3333 им не мешает); WebSocket — на тот же origin, realtime.spec подменяет его через routeWebSocket
       url: 'http://localhost:3100',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

@@ -1,5 +1,6 @@
 import reducer, { selectUserById, selectUsers, usersReceived } from './users';
 import { fetchChats } from './chats';
+import { loadChatHistory } from './chatHistory';
 
 const ann = { id: 'u1', name: 'Ann', avatarUrl: '' };
 const bob = { id: 'u2', name: 'Bob', avatarUrl: 'http://a/b.png' };
@@ -35,5 +36,17 @@ describe('users reducer', () => {
     const state = reducer(reducer(undefined, usersReceived([ann])), fetchChats.fulfilled(chats, 'req'));
 
     expect(selectUsers({ users: state })).toEqual([ann, bob]);
+  });
+
+  it('loadChatHistory.fulfilled кладёт участников чата в users как { id, name, avatarUrl } без роли', () => {
+    const payload = {
+      chat: { id: 'g1', type: 'group', title: 'T', lastSeq: 0, members: [{ userId: 'u1', name: 'Anna', avatarUrl: 'x', role: 'owner' }, { userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' }] },
+      messages: [],
+      hasMore: false,
+    };
+
+    const state = reducer(reducer(undefined, usersReceived([ann])), loadChatHistory.fulfilled(payload, 'req', 'g1'));
+
+    expect(selectUsers({ users: state })).toEqual([{ id: 'u1', name: 'Anna', avatarUrl: 'x' }, { id: 'u2', name: 'Bob', avatarUrl: '' }]);
   });
 });

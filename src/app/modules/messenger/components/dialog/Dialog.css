@@ -62,3 +62,16 @@
     background-color: #611fad;
     color: white;
 }
+
+.dialog__status {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dialog__message-author {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+}

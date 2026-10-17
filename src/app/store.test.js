@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './store';
-import { fetchChats } from './reducers/chats';
+import { fetchChats, selectChatById } from './reducers/chats';
+import { loadChatHistory, loadOlderMessages } from './reducers/chatHistory';
 import * as chatsApi from './services/chatsApi';
 import { chatCreated, selectChats } from './reducers/chats';
 import { selectActiveChatId, chatSelected } from './reducers/activeChatId';
@@ -122,5 +123,56 @@ describe('rootReducer: запоздавшие ответы fetchChats после
 
     expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null });
     expect(store.getState().users).toEqual({ ids: [], entities: {} });
+  });
+});
+
+describe('rootReducer: запоздавший ответ истории после сброса store', () => {
+  const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 120, lastMessage: null, unreadCount: 0 };
+  const chatDto = { id: 'g1', type: 'group', title: 'Team', lastSeq: 120, members: [{ userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' }] };
+  const page = (from, to) =>
+    Array.from({ length: to - from + 1 }, (_, i) => ({ chatId: 'g1', seq: from + i, senderId: 'u2', clientId: `k${from + i}`, body: `m${from + i}`, createdAt: '2026-10-15T10:00:00.000Z' }));
+
+  const storeWithChat = async () => {
+    chatsApi.fetchChats.mockResolvedValue([group]);
+    const store = configureStore({ reducer: rootReducer });
+    await store.dispatch(fetchChats());
+    return store;
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('loadChatHistory: ответ после выхода ничего не записывает', async () => {
+    const store = await storeWithChat();
+    let release;
+    chatsApi.fetchChat.mockImplementation(() => new Promise((resolve) => { release = () => resolve(chatDto); }));
+    chatsApi.fetchMessages.mockResolvedValue(page(1, 3));
+
+    const promise = store.dispatch(loadChatHistory('g1'));
+    store.dispatch(logout.fulfilled(undefined, 'req'));
+    release();
+    await promise;
+
+    expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
+    expect(store.getState().messages).toEqual({});
+    expect(store.getState().users.entities).toEqual({});
+  });
+
+  it('loadOlderMessages: ответ после выхода ничего не записывает', async () => {
+    const store = await storeWithChat();
+    chatsApi.fetchChat.mockResolvedValue(chatDto);
+    chatsApi.fetchMessages.mockResolvedValueOnce(page(71, 120));
+    await store.dispatch(loadChatHistory('g1'));
+    let release;
+    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(page(21, 70)); }));
+
+    const promise = store.dispatch(loadOlderMessages('g1'));
+    store.dispatch(logout.fulfilled(undefined, 'req'));
+    release();
+    await promise;
+
+    expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
+    expect(store.getState().messages).toEqual({});
   });
 });

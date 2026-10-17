@@ -157,6 +157,7 @@ cmd_commit() {
   local f
   for f in "$@"; do
     case $f in
+      .env.example|*/.env.example) ;;
       .env|.env.*|*/.env|*/.env.*|node_modules|node_modules/*|build|build/*|test-results|test-results/*|playwright-report|playwright-report/*)
         die "в коммит нельзя: $f";;
     esac

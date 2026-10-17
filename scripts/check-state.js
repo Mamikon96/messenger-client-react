@@ -348,7 +348,8 @@ function qaScope({ smoke, contractIds, activeIds }) {
   return { ids, errors };
 }
 
-function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, reportPath = `${QA_RUNS_DIR}/<задача>.md` }) {
+// taggedIds — кейсы с e2e-тестом с тегом [UC-…]: только им разрешена отметка `pass (e2e)` (FE-D48).
+function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, taggedIds = [], reportPath = `${QA_RUNS_DIR}/<задача>.md` }) {
   if (text === null || text === undefined) {
     return [`нет QA-отчёта ${reportPath} — основная сессия запускает агента qa-tester (он проходит в браузере объём --qa-scope)`];
   }
@@ -369,14 +370,16 @@ function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, repo
   if (tree !== treeHash) errors.push('QA-отчёт устарел: код или тесты изменились после прохода тестировщика — запусти qa-tester заново');
   if (verdict !== 'PASS') errors.push(`QA-отчёт: Вердикт ${verdict} — проблемы нужно исправить и повторить проход`);
 
-  const rows = new Map([...text.matchAll(/^\|\s*(UC-[A-Z]+-\d+)\s*\|\s*(\w+)\s*\|/gm)].map((m) => [m[1], m[2]]));
+  const rows = new Map([...text.matchAll(/^\|\s*(UC-[A-Z]+-\d+)\s*\|\s*(\w+(?:\s*\(e2e\))?)\s*\|/gm)].map((m) => [m[1], m[2].replace(/\s+/g, ' ')]));
   for (const id of requiredIds) {
     if (!scope.includes(id)) errors.push(`QA-отчёт: кейс ${id} обязателен (контракт или smoke), но не вошёл в «Объём»`);
   }
   for (const id of scope) {
     if (!activeIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} из «Объёма» не active в docs/user-cases.md`);
     else if (!rows.has(id)) errors.push(`QA-отчёт: кейс ${id} не пройден (нет в матрице)`);
-    else if (rows.get(id) !== 'pass') errors.push(`QA-отчёт: кейс ${id} — ${rows.get(id)}`);
+    else if (rows.get(id) === 'pass (e2e)') {
+      if (!taggedIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} отмечен «pass (e2e)», но e2e-теста с тегом [${id}] нет`);
+    } else if (rows.get(id) !== 'pass') errors.push(`QA-отчёт: кейс ${id} — ${rows.get(id)}`);
   }
   for (const m of text.matchAll(/^### (QA-\d+) \[(BLOCKER|MAJOR)\]\s*(.*)$/gm)) {
     errors.push(`QA-отчёт: открытая проблема ${m[1]} [${m[2]}] ${m[3]}`.trim());
@@ -519,6 +522,7 @@ function main(argv) {
         activeIds,
         requiredIds: scope.ids,
         treeHash,
+        taggedIds: scanned.tags.map((t) => t.id),
         reportPath,
       })
     );

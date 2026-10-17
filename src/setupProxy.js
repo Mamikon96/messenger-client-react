@@ -2,8 +2,10 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 
 // Dev: /api идёт на бэкенд — порт реального бэкенда всегда 3333 (SPA и API на одном origin, как в контракте).
 // Для e2e и ручной работы с mock-BFF: BACKEND_URL=http://localhost:3334 npm start.
-const target = process.env.BACKEND_URL || 'http://localhost:3333';
+const getProxyTarget = (env = process.env) => env.BACKEND_URL || 'http://localhost:3333';
 
 module.exports = function setupProxy(app) {
-  app.use('/api', createProxyMiddleware({ target }));
+  app.use('/api', createProxyMiddleware({ target: getProxyTarget() }));
 };
+
+module.exports.getProxyTarget = getProxyTarget;

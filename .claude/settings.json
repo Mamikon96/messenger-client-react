@@ -90,5 +90,12 @@
   "enabledPlugins": {
     "superpowers@anthropic-plugin-directory": false,
     "code-review@anthropic-plugin-directory": false
+  },
+  "skillOverrides": {
+    "angular-development": "off",
+    "nestjs-development": "off",
+    "nextjs-development": "off",
+    "nodejs-backend": "off",
+    "sql-development": "off"
   }
 }

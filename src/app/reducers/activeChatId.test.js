@@ -1,4 +1,5 @@
 import reducer, { selectActiveChat, selectActiveChatId, chatSelected } from './activeChatId';
+import { chatRemoved } from './messageEvents';
 
 const chat = { id: 'c1', type: 'group', title: 'One', lastSeq: 0, lastMessage: null, unreadCount: 0 };
 const chats = { ids: ['c1'], entities: { c1: chat } };
@@ -11,6 +12,11 @@ describe('activeChatId reducer', () => {
   it('chatSelected хранит только идентификатор', () => {
     expect(reducer(null, chatSelected('c1'))).toBe('c1');
     expect(reducer('c1', chatSelected('c2'))).toBe('c2');
+  });
+
+  it('chatRemoved снимает выбор только с удалённого чата', () => {
+    expect(reducer('c1', chatRemoved('c1'))).toBeNull();
+    expect(reducer('c2', chatRemoved('c1'))).toBe('c2');
   });
 
   it('селекторы: selectActiveChatId и selectActiveChat (чат берётся из chats по id)', () => {

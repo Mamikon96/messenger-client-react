@@ -1,0 +1,10 @@
+.realtime-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 14px;
+    background: var(--color-own-message);
+    color: var(--color-text);
+}

@@ -10,6 +10,7 @@ import { selectChatMessages, sendMessage } from './reducers/messages';
 import { messageAdded } from './reducers/messageEvents';
 import { outboxEnqueued, selectChatOutbox } from './reducers/outbox';
 import { checkSession, logout, sessionClosed } from './reducers/auth';
+import { realtimeStatusChanged, selectRealtimeStatus } from './reducers/realtime';
 
 jest.mock('./services/chatsApi');
 
@@ -21,6 +22,7 @@ const emptyState = {
   outbox: { ids: [], entities: {} },
   users: { ids: [], entities: {} },
   activeChatId: null,
+  realtime: { status: 'closed' },
 };
 
 const filledState = () => {
@@ -78,6 +80,12 @@ describe('rootReducer: сессия закрыта вне этой вкладк�
       ...emptyState,
       auth: { status: 'sessionClosed', user: null },
     });
+  });
+
+  it('sessionClosed сбрасывает статус realtime к начальному', () => {
+    const state = rootReducer(filledState(), realtimeStatusChanged('open'));
+
+    expect(selectRealtimeStatus(rootReducer(state, sessionClosed()))).toBe('closed');
   });
 
   it.each([

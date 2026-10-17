@@ -1,7 +1,7 @@
 import { createEntityAdapter, createSelector, createSlice } from '@reduxjs/toolkit'
 import { createClientId } from '../services/clientId'
 import { selectChatById } from './chats'
-import { messageAdded } from './messageEvents'
+import { chatRemoved, messageAdded } from './messageEvents'
 import { postMessage } from '../services/chatsApi'
 import { outboxEnqueued, outboxFailed, outboxSending, selectOutboxItem } from './outbox'
 import { fetchOlderMessages, loadChatHistory } from './chatHistory'
@@ -25,6 +25,9 @@ export const messagesSlice = createSlice({
         builder
             .addCase(loadChatHistory.fulfilled, (state, action) => upsertPage(state, action.meta.arg, action.payload.messages))
             .addCase(fetchOlderMessages.fulfilled, (state, action) => upsertPage(state, action.meta.arg.chatId, action.payload.messages))
+        builder.addCase(chatRemoved, (state, action) => {
+            delete state[action.payload]
+        })
         builder.addCase(messageAdded, (state, action) => {
             const { chatId } = action.payload
             state[chatId] = messagesAdapter.addOne(state[chatId] ?? messagesAdapter.getInitialState(), action.payload)

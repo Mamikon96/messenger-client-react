@@ -1,20 +1,25 @@
 import { useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import "./UserMenu.css";
 import { logout } from "../../../../reducers/auth";
+import { pauseRealtime, resumeRealtime, selectRealtimeStatus } from "../../../../reducers/realtime";
 import { Button } from "../../../ui/button/Button";
 
 export const UserMenu = () => {
     const dispatch = useDispatch();
     const [isPending, setIsPending] = useState(false);
     const [isError, setIsError] = useState(false);
+    const realtimeStatus = useSelector(selectRealtimeStatus);
 
     const handleLogout = async () => {
         setIsPending(true);
         setIsError(false);
+        dispatch(pauseRealtime());
         const result = await dispatch(logout());
         // при успехе store сброшен и меню размонтировано — состояние трогаем только при ошибке
         if (logout.rejected.match(result)) {
+            // вытесненный (4008) или уже закрытый сокет сам не оживает: подключение остаётся ручным
+            if (realtimeStatus !== 'displaced' && realtimeStatus !== 'closed') dispatch(resumeRealtime());
             setIsPending(false);
             setIsError(true);
         }

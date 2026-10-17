@@ -3,7 +3,7 @@ import reducer, { retryMessage, selectChatMessages, sendMessage } from './messag
 import chats, { chatCreated, fetchChats, selectChatById } from './chats';
 import outbox, { selectChatOutbox } from './outbox';
 import { ApiError } from '../services/apiClient';
-import { messageAdded } from './messageEvents';
+import { chatRemoved, messageAdded } from './messageEvents';
 import { fetchOlderMessages, loadChatHistory } from './chatHistory';
 
 jest.mock('../services/chatsApi');
@@ -29,6 +29,15 @@ describe('messages reducer', () => {
 
   it('начальное состояние — пусто', () => {
     expect(reducer(undefined, { type: '@@init' })).toEqual({});
+  });
+
+  it('chatRemoved удаляет сообщения чата, остальные не трогает', () => {
+    let state = reducer(undefined, messageAdded(dto('c1', 1)));
+    state = reducer(state, messageAdded(dto('c2', 1)));
+
+    state = reducer(state, chatRemoved('c1'));
+
+    expect(Object.keys(state)).toEqual(['c2']);
   });
 
   it('messageAdded кладёт сообщение в коллекцию своего чата с ключом seq', () => {

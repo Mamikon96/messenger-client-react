@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import reducer, { selectChatMessages, sendMessage } from './messages';
 import chats, { chatCreated, selectChatById } from './chats';
 import { messageAdded } from './messageEvents';
+import { fetchOlderMessages, loadChatHistory } from './chatHistory';
 
 jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
 const { createClientId } = require('../services/clientId');
@@ -134,5 +135,23 @@ describe('messages reducer', () => {
       expect(selectChatMessages(state, 'c1')).toEqual([]);
       expect(selectChatMessages(state, 'c1')).toBe(selectChatMessages(state, null));
     });
+  });
+
+  it('loadChatHistory.fulfilled кладёт сообщения чата по seq, повтор не дублирует', () => {
+    const payload = { chat: { id: 'c1', members: [] }, messages: [dto('c1', 2), dto('c1', 1)], hasMore: false };
+
+    let state = reducer(undefined, loadChatHistory.fulfilled(payload, 'r1', 'c1'));
+    state = reducer(state, loadChatHistory.fulfilled(payload, 'r2', 'c1'));
+
+    expect(state.c1.ids).toEqual([1, 2]);
+  });
+
+  it('fetchOlderMessages.fulfilled добавляет старые сообщения перед имеющимися; повтор seq заменяет запись версией сервера', () => {
+    let state = reducer(undefined, messageAdded(dto('c1', 5, 'live')));
+
+    state = reducer(state, fetchOlderMessages.fulfilled({ messages: [dto('c1', 3), dto('c1', 5, 'старое')] }, 'r', { chatId: 'c1', before: 5 }));
+
+    expect(state.c1.ids).toEqual([3, 5]);
+    expect(state.c1.entities[5].body).toBe('старое');
   });
 });

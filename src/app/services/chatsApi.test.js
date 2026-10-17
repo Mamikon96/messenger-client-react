@@ -1,4 +1,4 @@
-import { fetchChats } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -53,5 +53,61 @@ describe("chatsApi", () => {
 
         fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
         await expect(fetchChats()).rejects.toThrow("Failed to fetch");
+    });
+});
+
+describe("chatsApi: открытие чата", () => {
+    beforeEach(() => {
+        global.fetch = jest.fn();
+        setUnauthorizedHandler(null);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+    });
+
+    it("fetchChat шлёт GET /api/chats/:id и возвращает ChatDto как есть", async () => {
+        const chat = { id: "c 1", type: "group", title: "Team", lastSeq: 2, members: [] };
+        fetch.mockResolvedValueOnce(reply(200, chat));
+
+        await expect(fetchChat("c 1")).resolves.toEqual(chat);
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201");
+        expect(options.method).toBe("GET");
+    });
+
+    it("fetchMessages без параметров шлёт GET без query", async () => {
+        fetch.mockResolvedValueOnce(reply(200, []));
+
+        await expect(fetchMessages("c1")).resolves.toEqual([]);
+
+        expect(fetch.mock.calls[0][0]).toBe("/api/chats/c1/messages");
+    });
+
+    it("fetchMessages передаёт before и limit в query", async () => {
+        fetch.mockResolvedValueOnce(reply(200, []));
+
+        await fetchMessages("c1", { before: 51, limit: 50 });
+
+        expect(fetch.mock.calls[0][0]).toBe("/api/chats/c1/messages?before=51&limit=50");
+    });
+
+    it("fetchChat и fetchMessages пробрасывают signal", async () => {
+        fetch.mockResolvedValue(reply(200, []));
+        const { signal } = new AbortController();
+
+        await fetchChat("c1", { signal });
+        await fetchMessages("c1", { signal });
+
+        expect(fetch.mock.calls[0][1].signal).toBe(signal);
+        expect(fetch.mock.calls[1][1].signal).toBe(signal);
+    });
+
+    it("404 пробрасывается как ApiError", async () => {
+        fetch.mockResolvedValue(reply(404, { error: { code: "not_found", message: "x" } }));
+
+        await expect(fetchChat("c1")).rejects.toMatchObject({ status: 404, code: "not_found" });
+        await expect(fetchMessages("c1")).rejects.toMatchObject({ status: 404 });
     });
 });

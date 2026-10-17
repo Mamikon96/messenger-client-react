@@ -11,11 +11,12 @@ export function fetchChat(chatId, { signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}`, { signal });
 }
 
-// Сообщения чата по возрастанию seq: без курсора — последние `limit`, с `before` — ближайшие к курсору `seq < before` (§3.9).
+// Сообщения чата по возрастанию seq: без курсора — последние `limit`, с `before` — ближайшие к курсору `seq < before`, с `since` — следующие за `seq > since` (§3.9).
 // Ответ — голый массив ChatMessageDto, признака «есть ещё» нет.
-export function fetchMessages(chatId, { before, limit, signal } = {}) {
+export function fetchMessages(chatId, { before, since, limit, signal } = {}) {
     const query = new URLSearchParams();
     if (before !== undefined) query.set("before", before);
+    if (since !== undefined) query.set("since", since);
     if (limit !== undefined) query.set("limit", limit);
     const search = query.toString();
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/messages${search ? `?${search}` : ""}`, { signal });

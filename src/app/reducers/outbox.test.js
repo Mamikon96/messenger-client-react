@@ -5,7 +5,7 @@ import reducer, {
     selectChatOutbox,
     selectOutboxItem,
 } from './outbox';
-import { messageAdded } from './messageEvents';
+import { chatRemoved, messageAdded } from './messageEvents';
 import { fetchOlderMessages, loadChatHistory } from './chatHistory';
 
 const item = (clientId, chatId = 'c1') => ({
@@ -59,6 +59,15 @@ describe('outbox reducer', () => {
         const state = reducer(undefined, outboxEnqueued(item('k1')));
 
         expect(reducer(state, messageAdded({ ...item('other'), seq: 5 }))).toBe(state);
+    });
+
+    it('chatRemoved убирает из очереди сообщения этого чата', () => {
+        let state = reducer(undefined, outboxEnqueued(item('k1')));
+        state = reducer(state, outboxEnqueued(item('k2', 'c2')));
+
+        state = reducer(state, chatRemoved('c1'));
+
+        expect(state.ids).toEqual(['k2']);
     });
 
     describe('селекторы', () => {

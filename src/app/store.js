@@ -4,6 +4,7 @@ import activeChatIdSlice from './reducers/activeChatId'
 import messagesSlice from './reducers/messages'
 import outboxSlice from './reducers/outbox'
 import usersSlice from './reducers/users'
+import realtimeSlice from './reducers/realtime'
 import authSlice, { logout, selectAuthStatus, sessionClosed } from './reducers/auth'
 
 const appReducer = combineReducers({
@@ -12,6 +13,7 @@ const appReducer = combineReducers({
   messages: messagesSlice,
   outbox: outboxSlice,
   users: usersSlice,
+  realtime: realtimeSlice,
   auth: authSlice
 })
 

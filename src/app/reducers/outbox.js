@@ -1,5 +1,5 @@
 import { createEntityAdapter, createSelector, createSlice } from '@reduxjs/toolkit'
-import { messageAdded } from './messageEvents'
+import { chatRemoved, messageAdded } from './messageEvents'
 import { fetchOlderMessages, loadChatHistory } from './chatHistory'
 
 // Исходящие сообщения серверных чатов, ещё не подтверждённые сервером, по clientId. Живут только в памяти (FE-D15(1)).
@@ -30,6 +30,9 @@ export const outboxSlice = createSlice({
     extraReducers: (builder) => {
         builder.addCase(messageAdded, (state, action) => {
             if (action.payload.clientId in state.entities) outboxAdapter.removeOne(state, action.payload.clientId)
+        })
+        builder.addCase(chatRemoved, (state, action) => {
+            outboxAdapter.removeMany(state, state.ids.filter((id) => state.entities[id].chatId === action.payload))
         })
         builder.addCase(loadChatHistory.fulfilled, removeDelivered)
         builder.addCase(fetchOlderMessages.fulfilled, removeDelivered)

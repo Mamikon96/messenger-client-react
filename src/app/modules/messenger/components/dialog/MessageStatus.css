@@ -1,0 +1,41 @@
+.message-status {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.message-status__sending {
+    color: var(--color-text-muted);
+}
+
+.message-status__sent {
+    color: var(--color-success);
+}
+
+/* Цель касания 24x24 при иконке 14x14: padding и компенсирующий отрицательный margin не меняют вид и раскладку строки. */
+.message-status__retry {
+    box-sizing: content-box;
+    min-width: 14px;
+    min-height: 14px;
+    padding: 5px;
+    margin: -5px -5px -5px 1px;
+    border: 0;
+    background: none;
+    color: var(--color-danger);
+    cursor: pointer;
+}
+
+.message-status__glyph {
+    stroke: var(--color-danger-contrast);
+}
+
+.message-status__retry:hover {
+    opacity: 0.75;
+}
+
+.message-status__retry:focus-visible {
+    outline: 2px solid var(--color-danger);
+    outline-offset: 2px;
+    border-radius: 2px;
+}

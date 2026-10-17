@@ -1,11 +1,15 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import reducer, { selectChatMessages, sendMessage } from './messages';
-import chats, { chatCreated, selectChatById } from './chats';
+import reducer, { retryMessage, selectChatMessages, sendMessage } from './messages';
+import chats, { chatCreated, fetchChats, selectChatById } from './chats';
+import outbox, { selectChatOutbox } from './outbox';
+import { ApiError } from '../services/apiClient';
 import { messageAdded } from './messageEvents';
 import { fetchOlderMessages, loadChatHistory } from './chatHistory';
 
+jest.mock('../services/chatsApi');
 jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
 const { createClientId } = require('../services/clientId');
+const chatsApi = require('../services/chatsApi');
 
 const dto = (chatId, seq, body = `m${seq}`) => ({
   chatId,
@@ -153,5 +157,191 @@ describe('messages reducer', () => {
 
     expect(state.c1.ids).toEqual([3, 5]);
     expect(state.c1.entities[5].body).toBe('старое');
+  });
+});
+
+describe('sendMessage в серверном чате (FE-40)', () => {
+  // Jest 27 из react-scripts 5 не имеет advanceTimersByTimeAsync: сбрасываем микрозадачи до и после сдвига часов.
+  const flush = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+  const advance = async (ms) => {
+    await flush();
+    jest.advanceTimersByTime(ms);
+    await flush();
+  };
+  const serverDto = (seq, clientId = 'k1', body = 'привет') => ({
+    chatId: 's1',
+    seq,
+    senderId: 'u1',
+    clientId,
+    body,
+    createdAt: '2026-10-17T10:00:00.000Z',
+  });
+  const makeServerStore = async () => {
+    chatsApi.fetchChats.mockResolvedValue([{ id: 's1', type: 'group', title: 'Srv', lastSeq: 2, lastMessage: null, unreadCount: 0 }]);
+    const store = configureStore({ reducer: combineReducers({ chats, messages: reducer, outbox }) });
+    await store.dispatch(fetchChats());
+    return store;
+  };
+  const send = (store, body = 'привет') => store.dispatch(sendMessage({ chatId: 's1', senderId: 'u1', body }));
+  const outboxOf = (store) => selectChatOutbox(store.getState(), 's1');
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    createClientId.mockReturnValue('k1');
+    chatsApi.postMessage.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('сообщение сразу попадает в очередь со статусом sending, POST уходит с clientId и без seq', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockReturnValue(new Promise(() => {}));
+
+    send(store);
+
+    expect(outboxOf(store)).toEqual([expect.objectContaining({ clientId: 'k1', body: 'привет', senderId: 'u1', status: 'sending' })]);
+    expect(chatsApi.postMessage).toHaveBeenCalledWith('s1', expect.objectContaining({ clientId: 'k1', body: 'привет' }));
+    expect(selectChatMessages(store.getState(), 's1')).toEqual([]);
+  });
+
+  it('201: сообщение становится серверным (seq из ответа), очередь пустеет, чат получает lastSeq', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockResolvedValue(serverDto(3));
+
+    await send(store);
+
+    expect(outboxOf(store)).toEqual([]);
+    expect(selectChatMessages(store.getState(), 's1')).toEqual([serverDto(3)]);
+    expect(selectChatById(store.getState(), 's1')).toMatchObject({ lastSeq: 3, lastMessage: serverDto(3) });
+  });
+
+  it('сообщение, пришедшее раньше ответа (тот же clientId), не дублируется', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockImplementation(async () => {
+      store.dispatch(messageAdded(serverDto(3)));
+      return serverDto(3);
+    });
+
+    await send(store);
+
+    expect(selectChatMessages(store.getState(), 's1')).toHaveLength(1);
+    expect(outboxOf(store)).toEqual([]);
+  });
+
+  it('сеть упала: 3 автоповтора с одним clientId и паузами 1, 2, 4 с, затем failed', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const done = send(store);
+    await advance(0);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    await advance(999);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(2);
+    await advance(2000);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(3);
+    expect(outboxOf(store)[0].status).toBe('sending');
+    await advance(4000);
+    await done;
+
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(4);
+    chatsApi.postMessage.mock.calls.forEach(([, payload]) => expect(payload.clientId).toBe('k1'));
+    expect(outboxOf(store)).toEqual([expect.objectContaining({ clientId: 'k1', status: 'failed' })]);
+  });
+
+  it('5xx повторяется, успех на повторе даёт серверное сообщение', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(503, null)).mockResolvedValueOnce(serverDto(3));
+
+    const done = send(store);
+    await advance(1000);
+    await done;
+
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(2);
+    expect(selectChatMessages(store.getState(), 's1')).toHaveLength(1);
+    expect(outboxOf(store)).toEqual([]);
+  });
+
+  it('429: пауза берётся из Retry-After', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage
+      .mockRejectedValueOnce(new ApiError(429, null, { retryAfter: 7 }))
+      .mockResolvedValueOnce(serverDto(3));
+
+    const done = send(store);
+    await advance(6999);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    await advance(1);
+    await done;
+
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('джиттер добавляет к паузе не более четверти', async () => {
+    const store = await makeServerStore();
+    Math.random.mockReturnValue(0.999);
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(500, null)).mockResolvedValueOnce(serverDto(3));
+
+    const done = send(store);
+    await advance(1250);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(2);
+    await done;
+  });
+
+  it.each([400, 404])('%i: сразу failed без автоповтора', async (status) => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockRejectedValue(new ApiError(status, null));
+
+    await send(store);
+
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    expect(outboxOf(store)[0].status).toBe('failed');
+  });
+
+  it('retryMessage: failed → sending → отправлено с тем же clientId, дубликата нет', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(400, null));
+    await send(store);
+    chatsApi.postMessage.mockResolvedValueOnce(serverDto(3));
+
+    const retry = store.dispatch(retryMessage('k1'));
+    expect(outboxOf(store)[0].status).toBe('sending');
+    await retry;
+
+    expect(chatsApi.postMessage).toHaveBeenLastCalledWith('s1', expect.objectContaining({ clientId: 'k1', body: 'привет' }));
+    expect(outboxOf(store)).toEqual([]);
+    expect(selectChatMessages(store.getState(), 's1')).toHaveLength(1);
+  });
+
+  it('retryMessage не трогает сообщение не в статусе failed и неизвестный clientId', async () => {
+    const store = await makeServerStore();
+    chatsApi.postMessage.mockReturnValue(new Promise(() => {}));
+    send(store);
+    chatsApi.postMessage.mockClear();
+
+    await store.dispatch(retryMessage('k1'));
+    await store.dispatch(retryMessage('nope'));
+
+    expect(chatsApi.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('local-чат: POST не уходит, очередь не используется', async () => {
+    const store = await makeServerStore();
+    createClientId.mockReturnValueOnce('loc');
+    store.dispatch(chatCreated({ title: 'Local' }));
+    createClientId.mockReturnValue('k9');
+
+    await store.dispatch(sendMessage({ chatId: 'loc', senderId: 'u1', body: 'x' }));
+
+    expect(chatsApi.postMessage).not.toHaveBeenCalled();
+    expect(selectChatOutbox(store.getState(), 'loc')).toEqual([]);
+    expect(selectChatMessages(store.getState(), 'loc')).toHaveLength(1);
   });
 });

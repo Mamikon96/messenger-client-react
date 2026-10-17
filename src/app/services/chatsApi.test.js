@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages, postMessage } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -109,5 +109,26 @@ describe("chatsApi: открытие чата", () => {
 
         await expect(fetchChat("c1")).rejects.toMatchObject({ status: 404, code: "not_found" });
         await expect(fetchMessages("c1")).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("postMessage шлёт POST /api/chats/:id/messages с clientId и body и возвращает сообщение", async () => {
+        const dto = { chatId: "c 1", seq: 3, senderId: "u1", clientId: "k1", body: "hi", createdAt: "2026-10-15T10:00:00.000Z" };
+        fetch.mockResolvedValueOnce(reply(201, dto));
+
+        await expect(postMessage("c 1", { clientId: "k1", body: "hi" })).resolves.toEqual(dto);
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201/messages");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body)).toEqual({ clientId: "k1", body: "hi" });
+    });
+
+    it("postMessage пробрасывает signal", async () => {
+        fetch.mockResolvedValue(reply(201, {}));
+        const { signal } = new AbortController();
+
+        await postMessage("c1", { clientId: "k1", body: "hi", signal });
+
+        expect(fetch.mock.calls[0][1].signal).toBe(signal);
     });
 });

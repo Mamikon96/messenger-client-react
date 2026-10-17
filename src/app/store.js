@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit'
 import chatsSlice from './reducers/chats'
 import activeChatIdSlice from './reducers/activeChatId'
 import messagesSlice from './reducers/messages'
+import outboxSlice from './reducers/outbox'
 import usersSlice from './reducers/users'
 import authSlice, { logout, selectAuthStatus, sessionClosed } from './reducers/auth'
 
@@ -9,6 +10,7 @@ const appReducer = combineReducers({
   chats: chatsSlice,
   activeChatId: activeChatIdSlice,
   messages: messagesSlice,
+  outbox: outboxSlice,
   users: usersSlice,
   auth: authSlice
 })

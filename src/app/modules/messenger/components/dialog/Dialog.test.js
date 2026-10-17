@@ -1,9 +1,10 @@
-import { render, screen, waitFor, act, within } from '@testing-library/react';
+import { render, screen, waitFor, act, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import Dialog from './Dialog';
 import { rootReducer } from '../../../../store';
+import { ApiError } from '../../../../services/apiClient';
 import { checkSession } from '../../../../reducers/auth';
 import { chatSelected } from '../../../../reducers/activeChatId';
 import { chatCreated, fetchChats, selectChats } from '../../../../reducers/chats';
@@ -252,5 +253,130 @@ describe('Dialog: история серверного чата', () => {
     expect(chatsApi.fetchChat).not.toHaveBeenCalled();
     expect(chatsApi.fetchMessages).not.toHaveBeenCalled();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
+describe('Dialog: отправка в серверном чате (FE-40)', () => {
+  const listGroup = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+  const groupDto = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 0, members: [{ userId: 'u1', name: 'Ann', avatarUrl: '', role: 'owner' }] };
+  const created = (seq, body, clientId = 'k1') => ({ chatId: 'g1', seq, senderId: 'u1', clientId, body, createdAt: '2026-10-17T10:00:00.000Z' });
+
+  const renderServerChat = async () => {
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    chatsApi.fetchMessages.mockResolvedValue([]);
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    store.dispatch(fetchChats.pending('req'));
+    store.dispatch(fetchChats.fulfilled([listGroup], 'req'));
+    render(
+      <Provider store={store}>
+        <Dialog />
+      </Provider>
+    );
+    await act(async () => {
+      store.dispatch(chatSelected('g1'));
+    });
+    return { store };
+  };
+
+  const setText = (value) => fireEvent.change(input(), { target: { value } });
+  const pressEnter = () => fireEvent.keyDown(input(), { key: 'Enter' });
+  const typeAndSend = (value) => {
+    setText(value);
+    pressEnter();
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('сообщение сразу видно с иконкой «Отправляется», после ответа сервера — «Отправлено»', async () => {
+    let release;
+    chatsApi.postMessage.mockImplementation((chatId, { clientId }) => new Promise((resolve) => { release = () => resolve(created(1, 'привет', clientId)); }));
+    await renderServerChat();
+
+    typeAndSend('привет');
+
+    expect(await screen.findByText('привет')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Отправляется' })).toBeInTheDocument();
+    expect(chatsApi.postMessage).toHaveBeenCalledWith('g1', expect.objectContaining({ body: 'привет', clientId: expect.any(String) }));
+    await act(async () => {
+      release();
+    });
+
+    expect(await screen.findByRole('img', { name: 'Отправлено' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Отправляется' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('привет')).toHaveLength(1);
+  });
+
+  it('при ошибке 400 — кнопка «Не отправлено. Повторить»; нажатие отправляет тот же clientId, дубликата нет', async () => {
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(400, null));
+    await renderServerChat();
+    typeAndSend('привет');
+
+    const retry = await screen.findByRole('button', { name: 'Не отправлено. Повторить' });
+    const firstClientId = chatsApi.postMessage.mock.calls[0][1].clientId;
+    chatsApi.postMessage.mockResolvedValueOnce(created(1, 'привет', firstClientId));
+    fireEvent.click(retry);
+
+    expect(await screen.findByRole('img', { name: 'Отправлено' })).toBeInTheDocument();
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(2);
+    expect(chatsApi.postMessage.mock.calls[1][1].clientId).toBe(firstClientId);
+    expect(screen.getAllByText('привет')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Повторить/ })).not.toBeInTheDocument();
+  });
+
+  it('текст длиннее 4000 кодовых точек: счётчик «N / 4000», Send и Enter не отправляют, текст не обрезается', async () => {
+    await renderServerChat();
+    const long = '😀'.repeat(4001);
+
+    setText(long);
+    fireEvent.click(sendButton());
+    pressEnter();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('4001 / 4000');
+    expect(chatsApi.postMessage).not.toHaveBeenCalled();
+    expect(input()).toHaveValue(long);
+  });
+
+  it('после сокращения до 4000 счётчик пропадает и сообщение отправляется', async () => {
+    chatsApi.postMessage.mockResolvedValue(created(1, 'x'.repeat(4000)));
+    await renderServerChat();
+    setText('x'.repeat(4001));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    setText('x'.repeat(4000));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(sendButton());
+
+    await waitFor(() => expect(chatsApi.postMessage).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('img', { name: 'Отправлено' })).toBeInTheDocument();
+    expect(input()).toHaveValue('');
+  });
+
+  it('при превышении поле помечено aria-invalid и связано со счётчиком, после сокращения атрибутов нет', async () => {
+    await renderServerChat();
+
+    setText('x'.repeat(4001));
+
+    const counter = screen.getByRole('alert');
+    expect(counter).toHaveAttribute('id');
+    expect(input()).toHaveAttribute('aria-invalid', 'true');
+    expect(input()).toHaveAttribute('aria-describedby', counter.id);
+
+    setText('x'.repeat(4000));
+
+    expect(input()).not.toHaveAttribute('aria-invalid');
+    expect(input()).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('в local-чате иконки статуса нет и POST не уходит', () => {
+    const { messagesOf } = renderDialog();
+
+    typeAndSend('локально');
+
+    expect(messagesOf()).toHaveLength(1);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(chatsApi.postMessage).not.toHaveBeenCalled();
   });
 });

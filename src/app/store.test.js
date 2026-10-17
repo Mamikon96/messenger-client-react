@@ -6,8 +6,9 @@ import * as chatsApi from './services/chatsApi';
 import { chatCreated, selectChats } from './reducers/chats';
 import { selectActiveChatId, chatSelected } from './reducers/activeChatId';
 import { selectUsers, usersReceived } from './reducers/users';
-import { selectChatMessages } from './reducers/messages';
+import { selectChatMessages, sendMessage } from './reducers/messages';
 import { messageAdded } from './reducers/messageEvents';
+import { outboxEnqueued, selectChatOutbox } from './reducers/outbox';
 import { checkSession, logout, sessionClosed } from './reducers/auth';
 
 jest.mock('./services/chatsApi');
@@ -17,6 +18,7 @@ const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann
 const emptyState = {
   chats: { ids: [], entities: {}, status: 'idle', requestId: null },
   messages: {},
+  outbox: { ids: [], entities: {} },
   users: { ids: [], entities: {} },
   activeChatId: null,
 };
@@ -31,6 +33,10 @@ const filledState = () => {
     state,
     messageAdded({ chatId, seq: 1, senderId: '1', clientId: 'k1', body: 'hi', createdAt: '2026-10-15T10:00:00.000Z' })
   );
+  state = rootReducer(
+    state,
+    outboxEnqueued({ clientId: 'k2', chatId, senderId: '1', body: 'в очереди', createdAt: '2026-10-17T10:00:00.000Z' })
+  );
   return rootReducer(state, checkSession.fulfilled(user, 'req'));
 };
 
@@ -43,6 +49,7 @@ describe('rootReducer: сброс store при выходе', () => {
     expect(selectUsers(state)).toHaveLength(1);
     expect(selectChatMessages(state, chat.id)).toHaveLength(1);
     expect(selectActiveChatId(state)).toBe(chat.id);
+    expect(selectChatOutbox(state, chat.id)).toHaveLength(1);
     expect(state.auth).toEqual({ status: 'authenticated', user });
   });
 
@@ -174,5 +181,79 @@ describe('rootReducer: запоздавший ответ истории посл
 
     expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
     expect(store.getState().messages).toEqual({});
+  });
+});
+
+describe('rootReducer: выход во время отправки сообщения (FE-40)', () => {
+  // Jest 27 из react-scripts 5 не имеет advanceTimersByTimeAsync: сбрасываем микрозадачи до и после сдвига часов.
+  const flush = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+  const advance = async (ms) => {
+    await flush();
+    jest.advanceTimersByTime(ms);
+    await flush();
+  };
+  const serverDto = { chatId: 's1', seq: 3, senderId: 'u1', clientId: 'k1', body: 'привет', createdAt: '2026-10-17T10:00:00.000Z' };
+  const makeStore = async () => {
+    chatsApi.fetchChats.mockResolvedValue([{ id: 's1', type: 'group', title: 'Srv', lastSeq: 2, lastMessage: null, unreadCount: 0 }]);
+    const store = configureStore({ reducer: rootReducer });
+    await store.dispatch(fetchChats());
+    return store;
+  };
+  const send = (store) => store.dispatch(sendMessage({ chatId: 's1', senderId: 'u1', body: 'привет' }));
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    chatsApi.postMessage.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('ответ сервера после выхода не возвращает сообщение в store', async () => {
+    const store = await makeStore();
+    let resolvePost;
+    chatsApi.postMessage.mockReturnValue(new Promise((resolve) => { resolvePost = resolve; }));
+
+    const done = send(store);
+    store.dispatch(logout.fulfilled(undefined, 'r'));
+    resolvePost(serverDto);
+    await done;
+
+    expect(store.getState().messages).toEqual({});
+    expect(store.getState().outbox.ids).toEqual([]);
+  });
+
+  it('выход во время паузы перед повтором останавливает автоповторы', async () => {
+    const store = await makeStore();
+    chatsApi.postMessage.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const done = send(store);
+    await advance(0);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    store.dispatch(logout.fulfilled(undefined, 'r'));
+    await advance(1000);
+    await done;
+
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
+    expect(store.getState().outbox.ids).toEqual([]);
+  });
+
+  it('ошибка запроса после выхода не ставит failed в очередь нового сеанса', async () => {
+    const store = await makeStore();
+    let rejectPost;
+    chatsApi.postMessage.mockReturnValue(new Promise((_, reject) => { rejectPost = reject; }));
+
+    const done = send(store);
+    store.dispatch(logout.fulfilled(undefined, 'r'));
+    rejectPost(new TypeError('Failed to fetch'));
+    await done;
+
+    expect(store.getState().outbox.ids).toEqual([]);
+    expect(chatsApi.postMessage).toHaveBeenCalledTimes(1);
   });
 });

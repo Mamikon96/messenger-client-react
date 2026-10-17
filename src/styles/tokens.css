@@ -14,6 +14,7 @@
   --color-accent: #4f46e5;
   --color-accent-contrast: #ffffff;
   --color-danger: #c62828;
+  --color-danger-contrast: #ffffff;
   --color-success: #1b7f4b;
   --color-own-message: #e6e8ff;
 
@@ -62,6 +63,7 @@
   --color-accent: #8b93ff;
   --color-accent-contrast: #0f1115;
   --color-danger: #ff7b7b;
+  --color-danger-contrast: #0f1115;
   --color-success: #4cc38a;
   --color-own-message: #2b2f6b;
 

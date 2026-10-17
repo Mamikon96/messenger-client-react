@@ -75,3 +75,12 @@
     font-size: 12px;
     font-weight: 700;
 }
+
+.dialog__counter {
+    position: absolute;
+    right: 12px;
+    bottom: 100%;
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-danger);
+}

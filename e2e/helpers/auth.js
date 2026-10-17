@@ -32,7 +32,11 @@ const login = async (page) => {
   await expect(userMenuButton(page)).toBeVisible();
 };
 
+// Id вошедшего пользователя: в mock-BFF он случайный (`user-<hex>`), берётся из реальной сессии.
+const sessionUserId = async (page) => (await (await page.request.get('/api/auth/session')).json()).user.id;
+
 module.exports = {
+  sessionUserId,
   MOCK_USER_LOGIN,
   MOCK_USER_PASSWORD,
   MOCK_USER_NAME,

@@ -10,7 +10,7 @@ const THEMED = [
     "--color-bg", "--color-surface", "--color-surface-2",
     "--color-text", "--color-text-muted", "--color-border",
     "--color-accent", "--color-accent-contrast",
-    "--color-danger", "--color-success", "--color-own-message",
+    "--color-danger", "--color-danger-contrast", "--color-success", "--color-own-message",
     "--shadow-sm", "--shadow-md",
 ];
 // Общие токены: одинаковы в обеих темах.
@@ -59,6 +59,7 @@ const AA_PAIRS = [
     ["--color-text-muted", "--color-surface-2"], ["--color-text-muted", "--color-own-message"],
     ["--color-accent-contrast", "--color-accent"],
     ["--color-accent", "--color-bg"], ["--color-accent", "--color-surface"],
+    ["--color-danger-contrast", "--color-danger"],
     ["--color-danger", "--color-bg"], ["--color-danger", "--color-surface"],
     ["--color-success", "--color-bg"], ["--color-success", "--color-surface"],
 ];

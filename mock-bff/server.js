@@ -201,7 +201,18 @@ function createServer() {
     if (MUTATING.includes(req.method) && req.headers['x-csrf-token'] !== session.csrfToken) return empty(res, 403);
     // GET /api/chats (пока всегда пустой список)
     if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
+    // POST /api/chats/:id/messages (чатов в mock нет: валидное тело -> 404)
+    if (req.method === 'POST' && parts.length === 4 && parts[1] === 'chats' && parts[3] === 'messages') return postMessage(req, res);
     return empty(res, 404);
+  }
+
+  async function postMessage(req, res) {
+    const body = await readBody(req);
+    // Длина считается по телу «как есть» (кодовые точки), непустота — после trim.
+    const text = body && typeof body.body === 'string' ? body.body : '';
+    const valid = body && typeof body.clientId === 'string' && body.clientId !== '' && text.trim() !== '' && [...text].length <= 4000;
+    if (!valid) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
+    return error(res, 404, 'not_found', 'Чат не найден');
   }
 }
 

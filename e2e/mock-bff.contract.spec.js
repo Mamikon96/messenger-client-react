@@ -72,6 +72,26 @@ test('GET /api/chats: с сессией — 200 и пустой список', a
   expect(await res.json()).toEqual([]);
 });
 
+test('POST /api/chats/:id/messages: невалидное тело — 400 validation_failed, валидное — 404 not_found', async () => {
+  const { csrfToken } = await (await signIn()).json();
+  const post = (data) => api.post('/api/chats/c1/messages', { data, headers: { 'X-CSRF-Token': csrfToken } });
+  const invalid = [{}, { body: 'текст' }, { clientId: 'c1' }, { clientId: 'c1', body: '   ' }, { clientId: 'c1', body: 'я'.repeat(4001) }, { clientId: 'c1', body: ` ${'я'.repeat(4000)}` }];
+  for (const data of invalid) {
+    const res = await post(data);
+    expect(res.status(), JSON.stringify(data).slice(0, 40)).toBe(400);
+    expect((await res.json()).error.code).toBe('validation_failed');
+  }
+  const res = await post({ clientId: 'c1', body: 'я'.repeat(4000) });
+  expect(res.status()).toBe(404);
+  expect((await res.json()).error.code).toBe('not_found');
+});
+
+test('POST /api/chats/:id/messages: без сессии — 401, без CSRF — 403', async () => {
+  expect((await api.post('/api/chats/c1/messages', { data: { clientId: 'c1', body: 'x' } })).status()).toBe(401);
+  await signIn();
+  expect((await api.post('/api/chats/c1/messages', { data: { clientId: 'c1', body: 'x' } })).status()).toBe(403);
+});
+
 test('прочие изменяющие /api/*: с сессией без CSRF — 403', async () => {
   await signIn();
   for (const method of ['post', 'put', 'patch', 'delete']) {

@@ -20,3 +20,8 @@ export function fetchMessages(chatId, { before, limit, signal } = {}) {
     const search = query.toString();
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/messages${search ? `?${search}` : ""}`, { signal });
 }
+
+// Отправка сообщения: ChatMessageDto (201 — создано, 200 — повтор с тем же clientId; §3.8).
+export function postMessage(chatId, { clientId, body, signal } = {}) {
+    return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/messages`, { method: "POST", body: { clientId, body }, signal });
+}

@@ -52,6 +52,7 @@ describe('меню пользователя', () => {
     expect(store.getState()).toEqual({
       chats: { ids: [], entities: {}, status: 'idle', requestId: null },
       messages: {},
+      outbox: { ids: [], entities: {} },
       users: { ids: [], entities: {} },
       activeChatId: null,
       auth: { status: 'anonymous', user: null },

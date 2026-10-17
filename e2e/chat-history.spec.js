@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { login } = require('./helpers/auth');
+const { login, sessionUserId } = require('./helpers/auth');
 
 const message = (chatId, seq, senderId, body) => ({
   chatId,
@@ -51,7 +51,13 @@ const mockServer = async (page, { messagesHandler } = {}) => {
     requests.chat.push(id);
     return route.fulfill({ json: id === 'g1' ? GROUP_DTO : DIRECT_DTO });
   });
-  await page.route('**/api/chats/*/messages**', (route) => {
+  await page.route('**/api/chats/*/messages**', async (route) => {
+    if (route.request().method() === 'POST') {
+      const { clientId, body } = route.request().postDataJSON();
+      const chatId = new URL(route.request().url()).pathname.split('/')[3];
+      const senderId = await sessionUserId(page);
+      return route.fulfill({ status: 201, json: { ...message(chatId, 3, senderId, body), clientId } });
+    }
     const id = new URL(route.request().url()).pathname.split('/')[3];
     requests.messages.push(id);
     if (messagesHandler) return messagesHandler(route, id);
@@ -152,4 +158,5 @@ test('[UC-MSG-01] отправка в серверном чате после з�
 
   await expect(page.locator('.dialog__message')).toHaveCount(3);
   await expect(page.locator('.dialog__message').last()).toHaveText('Моё');
+  await expect(page.locator('.dialog__message').last().getByRole('img', { name: 'Отправлено' })).toBeVisible();
 });

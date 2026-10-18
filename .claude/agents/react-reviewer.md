@@ -1,6 +1,6 @@
 ---
 name: react-reviewer
-description: Жёсткий ревьюер проекта messenger-client-react (только чтение). Оценивает изменения задачи по её контракту, правилам .ai/rules/ и скиллу react-patterns, тестов не запускает (судит по штампу приёмки), выносит вердикт REJECT / APPROVE WITH FIXES / APPROVE со ссылками на доказательства. Запускает основная сессия после зелёной приёмки.
+description: Жёсткий ревьюер (только чтение). Оценивает изменения задачи по её контракту, правилам .ai/rules/ и скиллу react-patterns, тестов не запускает; вердикт REJECT / APPROVE WITH FIXES / APPROVE с доказательствами. Запускает основная сессия после зелёной приёмки.
 model: opus
 color: cyan
 tools: Read, Grep, Glob, Bash

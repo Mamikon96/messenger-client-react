@@ -96,7 +96,9 @@
   },
   "enabledPlugins": {
     "superpowers@anthropic-plugin-directory": false,
-    "code-review@anthropic-plugin-directory": false
+    "code-review@anthropic-plugin-directory": false,
+    "chrome-devtools-mcp@claude-plugins-official": false,
+    "context7@anthropic-plugin-directory": false
   },
   "skillOverrides": {
     "angular-development": "off",

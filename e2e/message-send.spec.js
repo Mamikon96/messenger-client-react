@@ -8,12 +8,12 @@ const CHAT = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 1, las
 const CHAT_DTO = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 1, members: [BOB] };
 
 // postHandler(route, request) отвечает на отправку; возвращает список полученных POST-тел.
-const mockServer = async (page, postHandler) => {
+const mockServer = async (page, postHandler, messagesList = history) => {
   const posts = [];
   await page.route('**/api/chats', (route) => route.fulfill({ json: [CHAT] }));
   await page.route('**/api/chats/*', (route) => route.fulfill({ json: CHAT_DTO }));
   await page.route('**/api/chats/*/messages**', (route) => {
-    if (route.request().method() !== 'POST') return route.fulfill({ json: history });
+    if (route.request().method() !== 'POST') return route.fulfill({ json: messagesList });
     const data = route.request().postDataJSON();
     posts.push(data);
     return postHandler(route, data);
@@ -29,10 +29,10 @@ const created = async (page, data, seq = 2) => ({
 const openChat = async (page) => {
   await login(page);
   await page.locator('.chat', { hasText: 'Команда' }).click();
-  await expect(page.locator('.dialog__message')).toHaveCount(1);
+  await expect(page.getByRole('article')).toHaveCount(1);
 };
 
-const messages = (page) => page.locator('.dialog__message');
+const messages = (page) => page.getByRole('article');
 const own = (page) => messages(page).last();
 
 // Прокручивает время приложения, пока не появится красный треугольник: автоповторы идут с паузой 1/2/4 с.
@@ -102,6 +102,7 @@ test('[UC-MSG-08] длиннее 4000 символов: счётчик «N / 400
   await field.fill('а'.repeat(4001));
   await expect(page.getByText('4001 / 4000')).toBeVisible();
   await page.getByRole('button', { name: 'Send' }).click();
+  await expect(field).toBeFocused();
   await field.press('Enter');
   await expect(messages(page)).toHaveCount(1);
   expect(posts).toHaveLength(0);
@@ -115,4 +116,41 @@ test('[UC-MSG-08] длиннее 4000 символов: счётчик «N / 400
   await expect(own(page).getByRole('img', { name: 'Отправлено' })).toBeVisible();
   expect(posts).toHaveLength(1);
   expect(posts[0].body).toBe('а'.repeat(4000));
+});
+
+test('[UC-MSG-01] свои сообщения справа, чужие слева, фокус возвращается в поле после Send', async ({ page }) => {
+  await mockServer(page, async (route, data) => route.fulfill(await created(page, data)));
+  await openChat(page);
+  const field = page.getByLabel('Сообщение');
+
+  await field.fill('Мой ответ');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(messages(page)).toHaveCount(2);
+  await expect(field).toBeFocused();
+  await expect(own(page).getByRole('img', { name: 'Отправлено' })).toBeVisible();
+
+  const log = await page.getByRole('log', { name: 'Сообщения' }).boundingBox();
+  const bob = await messages(page).filter({ hasText: 'Привет, команда' }).boundingBox();
+  const mine = await own(page).boundingBox();
+  expect(bob.x + bob.width / 2).toBeLessThan(log.x + log.width / 2);
+  expect(mine.x + mine.width / 2).toBeGreaterThan(log.x + log.width / 2);
+});
+
+test('[UC-MSG-01] длинная лента сама прокручивается к последнему сообщению', async ({ page }) => {
+  const many = Array.from({ length: 40 }, (_, index) => ({ ...history[0], seq: index + 1, clientId: `c-g1-${index + 1}`, body: `Сообщение ${index + 1}` }));
+  await mockServer(page, async (route, data) => route.fulfill(await created(page, data, 41)), many);
+  await login(page);
+  await page.locator('.chat', { hasText: 'Команда' }).click();
+  const log = page.getByRole('log', { name: 'Сообщения' });
+  const atBottom = () => log.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight < 2);
+
+  await expect(messages(page)).toHaveCount(40);
+  expect(await log.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect.poll(atBottom).toBe(true);
+
+  await page.getByLabel('Сообщение').fill('Новое');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(messages(page)).toHaveCount(41);
+  await expect.poll(atBottom).toBe(true);
+  await expect(own(page).getByRole('img', { name: 'Отправлено' })).toBeVisible();
 });

@@ -1,27 +1,26 @@
 .dialog {
     width: 68%;
-    border-radius: 10px;
-    border: 6px solid #611fad;
-    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 6px solid var(--color-accent);
+    padding: var(--space-1);
     display: flex;
     flex-direction: column;
     position: relative;
-    /* background-color: #611fad; */
 }
 
 .dialog__header {
     display: flex;
     justify-content: center;
-    font-size: 28px;
+    font-size: var(--font-size-lg);
     font-weight: 700;
-    color: black;
+    color: var(--color-text);
 }
 
 .dialog__footer {
     position: absolute;
-    left: 4px;
-    right: 4px;
-    bottom: 4px;
+    left: var(--space-1);
+    right: var(--space-1);
+    bottom: var(--space-1);
     display: flex;
     align-items: center;
 }
@@ -30,11 +29,11 @@
     display: block;
     width: 99%;
     height: 60px;
-    margin-right: 4px;
+    margin-right: var(--space-1);
 }
 
 .dialog__footer .dialog__footer-send {
-    font-size: 16px;
+    font-size: var(--font-size-md);
 }
 
 .dialog__content {
@@ -42,45 +41,48 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 8px 76px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) 76px;
 }
 
 .dialog__message {
     align-self: flex-start;
     max-width: 70%;
-    padding: 6px 10px;
-    border-radius: 8px;
-    background-color: #e6e0f0;
-    color: black;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
 
 .dialog__message._own {
     align-self: flex-end;
-    background-color: #611fad;
-    color: white;
+    background-color: var(--color-own-message);
+    color: var(--color-text);
 }
 
 .dialog__status {
     align-self: center;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
+    padding: var(--space-1);
+    color: var(--color-text-muted);
 }
 
 .dialog__message-author {
     display: block;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 700;
 }
 
 .dialog__counter {
     position: absolute;
-    right: 12px;
+    right: var(--space-3);
     bottom: 100%;
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
     color: var(--color-danger);
 }

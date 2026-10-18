@@ -17,35 +17,36 @@ test('[UC-MSG-01] сообщение отправляется кнопкой и 
   await login(page);
   await createChat(page, 'Room A');
 
-  const input = page.locator('.dialog__footer-input');
+  const input = page.getByLabel('Сообщение');
   await input.fill('Первое');
   await page.getByRole('button', { name: 'Send' }).click();
-  await expect(page.locator('.dialog__content').getByText('Первое')).toBeVisible();
+  await expect(page.getByRole('log', { name: 'Сообщения' }).getByText('Первое')).toBeVisible();
   await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
 
   await input.fill('Второе');
   await input.press('Enter');
-  await expect(page.locator('.dialog__content').getByText('Второе')).toBeVisible();
+  await expect(page.getByRole('log', { name: 'Сообщения' }).getByText('Второе')).toBeVisible();
   await expect(input).toHaveValue('');
 });
 
 test('[UC-MSG-03] сообщения не смешиваются между чатами', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
-  await page.locator('.dialog__footer-input').fill('Только в A');
-  await page.locator('.dialog__footer-input').press('Enter');
+  await page.getByLabel('Сообщение').fill('Только в A');
+  await page.getByLabel('Сообщение').press('Enter');
 
   await createChat(page, 'Room B');
 
-  await expect(page.locator('.dialog__content').getByText('Только в A')).toHaveCount(0);
+  await expect(page.getByRole('log', { name: 'Сообщения' }).getByText('Только в A')).toHaveCount(0);
 });
 
 test('[UC-SESSION-05] после выхода сообщения предыдущего пользователя не видны', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
-  await page.locator('.dialog__footer-input').fill('Секрет');
-  await page.locator('.dialog__footer-input').press('Enter');
-  await expect(page.locator('.dialog__content').getByText('Секрет')).toBeVisible();
+  await page.getByLabel('Сообщение').fill('Секрет');
+  await page.getByLabel('Сообщение').press('Enter');
+  await expect(page.getByRole('log', { name: 'Сообщения' }).getByText('Секрет')).toBeVisible();
 
   await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
@@ -58,8 +59,8 @@ test('[UC-SESSION-05] после выхода сообщения предыду�
 test('[UC-MSG-02] Shift+Enter переносит строку, пустое сообщение и пробелы не отправляются', async ({ page }) => {
   await login(page);
   await createChat(page, 'Room A');
-  const input = page.locator('.dialog__footer-input');
-  const messages = page.locator('.dialog__message');
+  const input = page.getByLabel('Сообщение');
+  const messages = page.getByRole('article');
 
   await input.fill('Строка 1');
   await input.press('Shift+Enter');
@@ -73,4 +74,17 @@ test('[UC-MSG-02] Shift+Enter переносит строку, пустое со
   await page.getByRole('button', { name: 'Send' }).click();
   await input.press('Enter');
   await expect(messages).toHaveCount(0);
+});
+
+test('[UC-MSG-01] без выбранного чата и в пустом чате показан понятный текст', async ({ page }) => {
+  await login(page);
+  await expect(page.getByText('Чат не выбран')).toBeVisible();
+
+  await createChat(page, 'Room A');
+
+  await expect(page.getByText('Сообщений пока нет')).toBeVisible();
+  await expect(page.getByText('Чат не выбран')).toHaveCount(0);
+  await page.getByLabel('Сообщение').fill('Первое');
+  await page.getByLabel('Сообщение').press('Enter');
+  await expect(page.getByText('Сообщений пока нет')).toHaveCount(0);
 });

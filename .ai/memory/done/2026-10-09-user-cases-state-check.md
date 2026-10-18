@@ -1,0 +1,3 @@
+# 2026-10-09-user-cases-state-check
+
+- 2026-10-09 — chore user-cases-state-check: `docs/user-cases.md` — источник истины о поведении (19 active, 11 planned, утверждён пользователем, хэш `.ai/user-cases.sha256`, `scripts/approve-usecases.sh`); `scripts/check-state.js` + `scripts/check-state.sh` сверяет кейсы ↔ e2e-теги `[UC-…]` ↔ API ↔ код ↔ mock-BFF и даёт матрицу «кейс → результат» (71 тест); агент `qa-tester` и гейт свежего QA-отчёта в `git-task.sh commit`; e2e размечены, добавлены UC-CHAT-01/02, UC-MSG-02; mock-BFF и прокси по умолчанию на 3333; права в `.claude/settings.json` (мягкая защита). Решения FE-D16, FE-D17. Приёмка: `npm run accept` ✓ (206 unit, 56 e2e, 19/19), QA PASS 19/19; ревью: react-reviewer APPROVE.

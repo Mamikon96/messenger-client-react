@@ -6,7 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { loadCaseSet, currentBranch, taskIdFromBranch, taskCaseIds } = require('./check-state.js');
+const { loadCaseSet, currentBranch, taskIdFromBranch, taskCaseIds, readDoneFile } = require('./check-state.js');
 
 const LINT_RE = /^(src|e2e|scripts|mock-bff)\/.*\.js$/;
 const MOCK_BFF_SPECS = ['e2e/mock-bff.contract.spec.js', 'e2e/mock-bff-proxy.spec.js'];
@@ -97,7 +97,8 @@ function main(argv) {
     return 2;
   }
   // Кейсы контракта задачи ветки, только active: у удаляемых и planned кейсов нет e2e, grep дал бы «No tests found»
-  const contract = taskCaseIds({ tasksMd: read('.ai/memory/tasks.md'), doneMd: read('.ai/memory/done.md'), taskId: taskIdFromBranch(currentBranch(root)) });
+  const taskId = taskIdFromBranch(currentBranch(root));
+  const contract = taskCaseIds({ tasksMd: read('.ai/memory/tasks.md'), doneMd: readDoneFile(root, taskId), taskId });
   for (const e of contract.errors) console.log(`  ⚠ ${e}`);
   const active = activeCaseIds(root);
   const plan = planChecks({ changed, contractCases: contract.ids.filter((id) => active.has(id)), exists });

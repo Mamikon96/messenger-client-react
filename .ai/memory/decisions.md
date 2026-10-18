@@ -25,6 +25,7 @@
 | SH-D11 | Память: плоская раскладка `.ai/memory/` без подпапки `frontend/`, один `decisions.md` (2026-10-05) | действует | `decisions/memory-structure.md` |
 | FE-D50 | Удаление `auth-contract.md` (2026-10-18) | действует | `decisions/memory-structure.md` |
 | FE-D51 | `decisions.md` — роутер, тексты решений по темам в `decisions/*.md` (2026-10-18) | действует | `decisions/memory-structure.md` |
+| FE-D52 | Архив `done.md` — роутер, записи по одной в `done/<ID>.md` (2026-10-18) | действует | `decisions/memory-structure.md` |
 
 ## Процесс: правила для агентов
 | ID | Название | Статус | Файл |

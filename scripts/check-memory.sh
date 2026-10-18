@@ -64,8 +64,8 @@ check_files() {
     # «В работе»: каждая задача с блоком «Осталось»
     local wip
     wip=$(awk '/^## В работе/{f=1;next} /^## /{f=0} f' "$dir/tasks.md")
-    if echo "$wip" | grep -qE '^- \*\*'; then
-      echo "$wip" | grep -q 'Осталось' || fail "$dir/tasks.md: в «В работе» есть задачи без блока «Осталось»"
+    if grep -qE '^- \*\*' <<<"$wip"; then
+      grep -q 'Осталось' <<<"$wip" || fail "$dir/tasks.md: в «В работе» есть задачи без блока «Осталось»"
     fi
 
     # «В работе»: у каждой задачи полный контракт (.ai/rules/task-contract.md)
@@ -183,17 +183,18 @@ if [ -f "$MEM/decisions.md" ]; then
     fail "$MEM/decisions.md: текст решения $id в роутере — перенести в decisions/<тема>.md"
   done
   router_ids=$(grep -oE '^\| *[A-Z]+-D[0-9]+ *\|' "$MEM/decisions.md" | grep -oE '[A-Z]+-D[0-9]+' || true)
+  router_rows=$(grep -E '^\|' "$MEM/decisions.md" || true)
   for df in "$MEM"/decisions/*.md; do
     [ -e "$df" ] || continue
     dn="decisions/$(basename "$df")"
-    grep -E '^\|' "$MEM/decisions.md" | grep -qF "$dn" || fail "$MEM/decisions.md: нет строки роутера для $dn"
+    grep -qF "$dn" <<<"$router_rows" || fail "$MEM/decisions.md: нет строки роутера для $dn"
     for id in $(grep -oE '^## [A-Z]+-D[0-9]+' "$df" | sed 's/^## //'); do
       d_ids=$(printf '%s\n%s\n' "$d_ids" "$id")
       row=$(grep -E "^\| *$id *\|" "$MEM/decisions.md" || true)
       if [ -z "$row" ]; then
         fail "$MEM/decisions.md: нет строки роутера для $id ($dn)"
       else
-        echo "$row" | grep -qF "$dn" || fail "$MEM/decisions.md: строка $id указывает не на $dn"
+        grep -qF "$dn" <<<"$row" || fail "$MEM/decisions.md: строка $id указывает не на $dn"
       fi
     done
   done
@@ -201,7 +202,7 @@ if [ -f "$MEM/decisions.md" ]; then
   r_dups=$(echo "$router_ids" | sort | uniq -d)
   [ -z "$r_dups" ] || fail "$MEM/decisions.md: повторяющиеся строки роутера: $(echo $r_dups)"
   for id in $router_ids; do
-    echo "$d_ids" | grep -qx "$id" || fail "$MEM/decisions.md: строка роутера $id без решения в decisions/*.md"
+    grep -qx "$id" <<<"$d_ids" || fail "$MEM/decisions.md: строка роутера $id без решения в decisions/*.md"
   done
   d_dups=$(echo "$d_ids" | sort | uniq -d)
   [ -z "$d_dups" ] || fail "$MEM/decisions: повторяющиеся ID: $(echo $d_dups)"

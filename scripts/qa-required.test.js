@@ -43,3 +43,7 @@ test('пути нормализуются: ./src, абсолютный, a/../src
 test('test-файл в mock-bff/ — QA не нужен', () => {
   assert.equal(required('mock-bff/server.test.js'), 1);
 });
+
+test('пустой путь вместе с кодом в src/ — QA нужен (гейт не открывается из-за сбоя нормализации)', () => {
+  assert.equal(required('', 'src/App.js'), 0);
+});

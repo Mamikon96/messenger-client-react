@@ -1,0 +1,7 @@
+# Компоненты
+> Проверено: 2026-10-17 @ f5bc883+dirty
+
+- `Header` → `Actions` → `Action` (кнопка + `Popover`) → контент `JoinForm` (создаёт чат); вторая `Action` с именем пользователя → `UserMenu` («Выйти», ошибка выхода — `role=alert`)
+- `Popover` = `InnerPopover` (контент) + `Overlay` (затемнение, клик закрывает)
+- `Messenger` = `Chats` (список `Chat`) + `Dialog` (заголовок, сообщения активного чата, ввод; автор = `auth.user.id`); загрузку списка чатов ведёт хук `modules/messenger/useChatsLoader.js` (`fetchChats` при монтировании, `load` для «Повторить», отмена текущего запроса при новом запуске и размонтировании); `Chats` показывает состояния по `selectChatsStatus` (FE-38)
+- `Login` (FE-25, FE-89, FE-90) — карточка по центру: заголовок, вкладки «Вход» / «Регистрация» (WAI-ARIA Tabs: `tablist`/`tab`/`aria-selected`, стрелки и Home/End, форма — `tabpanel`), форма «Логин» + «Пароль» (`Input`, `useState`) — submit диспатчит thunk `login`/`register` и через `unwrap()` получает модель ошибки (payload отклонённого thunk) и до отправки проверяет поля `validateCredentials` (FE-92; модель `fields` того же вида, что у `toFormError`, поэтому тексты общие), показывает тексты из `loginErrors.js`: общее сообщение в `role=alert` над формой или ошибки у полей `Input` (`error`, снимается правкой поля); одна отправка за раз: `Button loading`, ref-флаг в обработчике, вкладки `disabled` на время запроса, после ошибки фокус на первом поле с ошибкой или на кнопке (`useEffect` по `focusRequest`); ссылок OAuth нет (FE-90)

@@ -14,6 +14,11 @@ const STAMP = `> Проверено: 2026-10-13 @ ${SHA}`;
 const TASKS = `# Задачи\n${STAMP}\n\n## В работе\n—\n\n## Бэклог\n- **FE-90 (P3)** задача\n`;
 const DONE = `# Сделано (архив)\n\n## Сделано\n- 2026-10-01 — FE-89: закрыта\n`;
 
+// Папка decisions/ (FE-130): decisions.md — роутер (строка таблицы на каждое решение), тексты решений в decisions/*.md
+const D_ROUTER = (rows) => `# Решения\n\n| ID | Название | Статус | Файл |\n|---|---|---|---|\n${rows}`;
+const D_ROW = '| FE-D01 | Redux | действует | `decisions/state.md` |\n';
+const D_FILE = '# Состояние\n\n## FE-D01 — Redux (2026-10-04)\n- **Решение:** x\n';
+
 const run = (files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-'));
   const all = {
@@ -115,13 +120,13 @@ test('backlog/ с файлом неверного имени — ошибка', 
 });
 
 test('ID решения повторяется в decisions.md и decisions-archive.md — ошибка', () => {
-  const r = run({ 'decisions.md': '# Решения\n\n## FE-D01 — a\n', 'decisions-archive.md': '# Архив\n\n## FE-D01 — a (ЗАМЕНЕНО)\n' });
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE, 'decisions-archive.md': '# Архив\n\n## FE-D01 — a (ЗАМЕНЕНО)\n' });
   assert.equal(r.code, 1);
   assert.match(r.out, /FE-D01/);
 });
 
 test('разные ID в decisions.md и decisions-archive.md — код 0', () => {
-  const r = run({ 'decisions.md': '# Решения\n\n## FE-D02 — b\n', 'decisions-archive.md': '# Архив\n\n## FE-D01 — a (ЗАМЕНЕНО)\n' });
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE, 'decisions-archive.md': '# Архив\n\n## FE-D05 — a (ЗАМЕНЕНО)\n' });
   assert.equal(r.code, 0, r.out);
 });
 
@@ -144,4 +149,74 @@ test('файл architecture/ не упомянут в роутере — оши�
   const r = run({ 'architecture/store.md': SUB });
   assert.equal(r.code, 1);
   assert.match(r.out, /store\.md.*architecture\.md|architecture\.md.*store\.md/);
+});
+
+// Папка decisions/ (FE-130): тесты ниже
+
+test('decisions/*.md со строкой роутера на каждое решение — код 0', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('решение из decisions/*.md без строки в роутере — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(''), 'decisions/state.md': D_FILE });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D01/);
+});
+
+test('строка роутера без решения в decisions/*.md — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW + '| FE-D09 | Призрак | действует | `decisions/state.md` |\n'), 'decisions/state.md': D_FILE });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D09/);
+});
+
+test('строка роутера указывает на другой файл, чем лежит решение — ошибка', () => {
+  const r = run({
+    'decisions.md': D_ROUTER('| FE-D01 | Redux | действует | `decisions/other.md` |\n'),
+    'decisions/state.md': D_FILE, 'decisions/other.md': '# Другое\n',
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D01/);
+});
+
+test('файл decisions/*.md не упомянут в роутере — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE, 'decisions/extra.md': '# Лишний\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /extra\.md/);
+});
+
+test('ID решения повторяется в двух файлах decisions/ — ошибка', () => {
+  const r = run({
+    'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE,
+    'decisions/other.md': '# Другое\n\n## FE-D01 — дубль\n',
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D01/);
+});
+
+test('ID решения из decisions/ повторяется в архиве — ошибка', () => {
+  const r = run({
+    'decisions.md': D_ROUTER(D_ROW), 'decisions/state.md': D_FILE,
+    'decisions-archive.md': '# Архив\n\n## FE-D01 — a (ЗАМЕНЕНО)\n',
+  });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D01/);
+});
+
+test('текст решения (заголовок ## ID) в роутере decisions.md — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW) + '\n## FE-D07 — в роутере\n', 'decisions/state.md': D_FILE });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D07/);
+});
+
+test('две строки роутера на один ID — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW + D_ROW), 'decisions/state.md': D_FILE });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-D01/);
+});
+
+test('файл decisions/ упомянут только в прозе роутера, не в таблице — ошибка', () => {
+  const r = run({ 'decisions.md': D_ROUTER(D_ROW) + '\nСм. `decisions/extra.md`.\n', 'decisions/state.md': D_FILE, 'decisions/extra.md': '# Лишний\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /extra\.md/);
 });

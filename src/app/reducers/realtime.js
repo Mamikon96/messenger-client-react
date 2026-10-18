@@ -1,12 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { createWsService } from '../services/wsService'
-import { fetchChat, fetchMessages } from '../services/chatsApi'
+import { fetchChat, fetchChats as fetchChatsRequest, fetchMessages } from '../services/chatsApi'
 import { fetchSession } from '../services/authApi'
 import { getWsUrl } from '../services/wsUrl'
 import { selectAuthStatus, selectAuthUserId, sessionClosed } from './auth'
-import { chatReceived, chatUpdated, selectChatById, toChatFromDto } from './chats'
+import { chatReceived, chatsReconciled, chatUpdated, selectChatById, selectChats, selectChatsStatus, toChatFromDto } from './chats'
 import { chatRemoved, messageAdded } from './messageEvents'
 import { selectActiveChatId } from './activeChatId'
+import { selectChatMessages } from './messages'
 import { usersReceived } from './users'
 
 // Статус WebSocket (FE-41): closed / connecting / open / reconnecting / displaced. Меняет только сервис через onStatus.
@@ -94,6 +95,65 @@ const catchUp = (chatId, signal) => async (dispatch, getState) => {
     }
 }
 
+// Догонка чата, ожидая операцию над ним, если она уже идёт. true — чат догнан (или догонять нечего).
+const syncChat = (chatId, signal) => async (dispatch, getState) => {
+    while (pendingByChat.has(chatId)) await pendingByChat.get(chatId)
+    if (!canContinue(getState, chatId, signal)) return false
+    return runForChat(chatId, () => dispatch(catchUp(chatId, signal)))
+}
+
+// Сверка со списком чатов сервера после повторного open (docs/client-integration.md, §5.4, §6): источник истины — REST.
+// Исчезнувшие чаты убираются, у выросших чатов подкачиваются сообщения (since = lastSeq), затем список сливается
+// с серверным (название, порядок, непрочитанные) без потери history. Ответ — снимок на момент запроса: события, пришедшие
+// во время сверки, не откатываются (удаляются только чаты, известные до запроса; chat.removed во время сверки сильнее снимка;
+// непрочитанные дополняются сообщениями после снимка). Ошибка запроса списка глотается.
+const reconcileChats = (signal) => async (dispatch, getState) => {
+    const knownBefore = new Set(selectChats(getState()).map(({ id }) => id))
+    const removedBefore = new Set(removedChatIds)
+    let serverChats
+    try {
+        serverChats = await fetchChatsRequest({ signal })
+    } catch {
+        return
+    }
+    if (signal.aborted || selectAuthStatus(getState()) !== 'authenticated') return
+    const removedDuring = new Set([...removedChatIds].filter((id) => !removedBefore.has(id)))
+    const actual = serverChats.filter(({ id }) => !removedDuring.has(id))
+    actual.forEach(({ id }) => removedChatIds.delete(id))
+    const serverIds = new Set(actual.map(({ id }) => id))
+    selectChats(getState())
+        .filter(({ id, local }) => !local && knownBefore.has(id) && !serverIds.has(id) && !removedDuring.has(id))
+        .forEach(({ id }) => {
+            removedChatIds.add(id)
+            dispatch(chatRemoved(id))
+        })
+    dispatch(usersReceived(actual.flatMap(({ peer }) => (peer ? [peer] : []))))
+    const grown = actual.filter((server) => {
+        const current = selectChatById(getState(), server.id)
+        return current && server.lastSeq > current.lastSeq
+    })
+    const results = await Promise.all(grown.map((server) => dispatch(syncChat(server.id, signal))))
+    if (signal.aborted || selectAuthStatus(getState()) !== 'authenticated') return
+    const failed = new Set(grown.filter((_, index) => !results[index]).map(({ id }) => id))
+    const state = getState()
+    const meId = selectAuthUserId(state)
+    const unreadExtra = {}
+    actual.forEach((server) => {
+        const current = selectChatById(state, server.id)
+        if (!current || current.lastSeq <= server.lastSeq) return
+        const count = selectChatMessages(state, server.id).filter((m) => m.seq > server.lastSeq && m.senderId !== meId).length
+        if (count > 0) unreadExtra[server.id] = count
+    })
+    dispatch(
+        chatsReconciled({
+            chats: actual.filter(({ id }) => !removedChatIds.has(id)),
+            syncedIds: actual.filter(({ id }) => !failed.has(id)).map(({ id }) => id),
+            openChatId: selectActiveChatId(state),
+            unreadExtra,
+        })
+    )
+}
+
 const handleMessageNew = (message, signal) => async (dispatch, getState) => {
     const { chatId } = message
     if (removedChatIds.has(chatId)) return
@@ -143,6 +203,17 @@ export const startRealtime = () => (dispatch, getState) => {
     removedChatIds = new Set()
     pendingByChat = new Map()
     const controller = new AbortController()
+    // Открывался ли сокет этого запуска: каждый следующий open — возвращение связи, требующее сверки. Сверка одна: новая отменяет прежнюю.
+    let hasOpened = false
+    let reconcile = null
+    const startReconcile = () => {
+        reconcile?.abort()
+        // Пока список чатов не загружен или загрузка не удалась, его догонит загрузчик (useChatsLoader).
+        if (selectChatsStatus(getState()) !== 'succeeded') return
+        reconcile = new AbortController()
+        const { signal } = reconcile
+        dispatch(reconcileChats(signal))
+    }
     const instance = createWsService({
         url: getWsUrl(),
         createSocket: (url) => new WebSocket(url),
@@ -150,7 +221,12 @@ export const startRealtime = () => (dispatch, getState) => {
         clearTimer: (id) => clearTimeout(id),
         random: Math.random,
         checkSession: fetchSession,
-        onStatus: (status) => dispatch(realtimeStatusChanged(status)),
+        onStatus: (status) => {
+            dispatch(realtimeStatusChanged(status))
+            if (status !== 'open') return
+            if (hasOpened) startReconcile()
+            hasOpened = true
+        },
         onSessionClosed: () => dispatch(sessionClosed()),
         onFrame: (frame) => {
             // Кадр после потери сессии не принимаем: store уже сброшен или будет сброшен.
@@ -163,6 +239,7 @@ export const startRealtime = () => (dispatch, getState) => {
     })
     const stop = () => {
         controller.abort()
+        reconcile?.abort()
         instance.close()
     }
     service = instance
@@ -180,6 +257,11 @@ export const startRealtime = () => (dispatch, getState) => {
 // Пауза на время выхода: сокет закрывается до запроса logout, чтобы кадры не пришли в сбрасываемый store.
 export const pauseRealtime = () => () => {
     service?.close()
+}
+
+// Сеть вернулась или вкладка снова видна: если сокет ждёт повтора, повторить сразу, не дожидаясь backoff.
+export const nudgeRealtime = () => () => {
+    service?.retryNow()
 }
 
 // Возобновление: после неудачного выхода и по кнопке «Подключиться» при вытеснении (4008).

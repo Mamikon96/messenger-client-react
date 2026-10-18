@@ -34,6 +34,27 @@ export const toChatFromDto = ({ id, type, title, lastSeq, members }, meId) => {
     return { ...chat, peerId: members.find(({ userId }) => userId !== meId)?.userId ?? meId }
 }
 
+// Сверка списка с сервером после переподключения (ChatListItemDto[]): чаты сервера в его порядке, history и сообщения сохраняются.
+// payload: chats — ответ сервера; syncedIds — чаты, догнанные до lastSeq сервера (только им поднимаются lastSeq и lastMessage:
+// на lastSeq стоит since, пока подкачка не прошла, пропуск нельзя скрывать); openChatId — открытый чат, его непрочитанные считает клиент;
+// unreadExtra — чужие сообщения, пришедшие уже после снимка списка (сервер их в unreadCount не учёл).
+// Текущие чаты, которых нет в ответе (локальные, пришедшие событием после снимка), остаются; исчезнувшие убирает вызывающий через chatRemoved.
+const reconcile = (state, { chats, syncedIds, openChatId, unreadExtra = {} }) => {
+    const merged = chats.map((server) => {
+        const current = state.entities[server.id]
+        if (!current) return toChat(server)
+        const next = { ...current, title: server.title }
+        if (server.id !== openChatId) next.unreadCount = server.unreadCount + (unreadExtra[server.id] ?? 0)
+        const synced = syncedIds.includes(server.id)
+        if (synced && server.lastSeq > current.lastSeq) next.lastSeq = server.lastSeq
+        if (synced && server.lastMessage && (!current.lastMessage || server.lastMessage.seq > current.lastMessage.seq)) next.lastMessage = server.lastMessage
+        return next
+    })
+    const serverIds = new Set(chats.map(({ id }) => id))
+    const kept = state.ids.filter((id) => !serverIds.has(id)).map((id) => state.entities[id])
+    chatsAdapter.setAll(state, [...merged, ...kept])
+}
+
 export const chatsSlice = createSlice({
     name: "chats",
     // status: idle — ещё не грузили, loading — идёт загрузка, succeeded — список получен, failed — загрузить не удалось.
@@ -48,6 +69,7 @@ export const chatsSlice = createSlice({
         },
         // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
         chatReceived: chatsAdapter.addOne,
+        chatsReconciled: (state, action) => reconcile(state, action.payload),
         chatUpdated: (state, action) => {
             const { chatId, title, members } = action.payload
             const chat = state.entities[chatId]
@@ -127,7 +149,7 @@ export const chatsSlice = createSlice({
     },
 })
 
-export const { chatCreated, chatReceived, chatUpdated } = chatsSlice.actions
+export const { chatCreated, chatReceived, chatsReconciled, chatUpdated } = chatsSlice.actions
 
 export const { selectAll: selectChats, selectById: selectChatById } =
     chatsAdapter.getSelectors((state) => state.chats)

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { chatCreated, chatReceived, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
+import reducer, { chatCreated, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
@@ -583,5 +583,73 @@ describe('chats reducer', () => {
 
       expect(chatsApi.fetchMessages).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('chatsReconciled (сверка списка после переподключения)', () => {
+  const m = (seq) => ({ chatId: 'a', seq, senderId: 'u2', clientId: `k${seq}`, body: `m${seq}`, createdAt: '2026-10-17T10:00:00.000Z' });
+  const item = (id, extra = {}) => ({ id, type: 'group', title: id, lastSeq: 0, lastMessage: null, unreadCount: 0, members: [{ userId: 'me', role: 'owner' }], ...extra });
+  const history = { status: 'succeeded', requestId: null, hasMore: true, olderStatus: 'idle', olderRequestId: null };
+  const start = () => {
+    let state = reducer(undefined, { type: '@@init' });
+    state = reducer(state, chatReceived(item('a', { lastSeq: 2, lastMessage: m(2), unreadCount: 1, history })));
+    return reducer(state, chatReceived(item('b')));
+  };
+  const reconcile = (state, chats, { syncedIds = [], openChatId = null } = {}) => reducer(state, chatsReconciled({ chats, syncedIds, openChatId }));
+
+  it('сохраняет history и обновляет название, последнее сообщение, lastSeq и непрочитанные синхронизированного чата', () => {
+    const next = reconcile(
+      start(),
+      [item('a', { title: 'Новое', lastSeq: 4, lastMessage: m(4), unreadCount: 3 }), item('b')],
+      { syncedIds: ['a'] }
+    );
+
+    expect(selectChatById(wrap(next), 'a')).toMatchObject({ title: 'Новое', lastSeq: 4, lastMessage: m(4), unreadCount: 3, history });
+  });
+
+  it('lastSeq и lastMessage чата без подкачки не меняются, остальное обновляется', () => {
+    const next = reconcile(start(), [item('a', { title: 'X', lastSeq: 4, lastMessage: m(4), unreadCount: 3 }), item('b')]);
+
+    expect(selectChatById(wrap(next), 'a')).toMatchObject({ title: 'X', lastSeq: 2, lastMessage: m(2), unreadCount: 3 });
+  });
+
+  it('lastSeq и lastMessage не откатываются назад', () => {
+    const next = reconcile(start(), [item('a', { lastSeq: 1, lastMessage: m(1) }), item('b')], { syncedIds: ['a'] });
+
+    expect(selectChatById(wrap(next), 'a')).toMatchObject({ lastSeq: 2, lastMessage: m(2) });
+  });
+
+  it('unreadCount открытого чата не берётся с сервера', () => {
+    const next = reconcile(start(), [item('a', { lastSeq: 2, lastMessage: m(2), unreadCount: 5 }), item('b')], { openChatId: 'a' });
+
+    expect(selectChatById(wrap(next), 'a').unreadCount).toBe(1);
+  });
+
+  it('новый чат добавляется, порядок — как у сервера', () => {
+    const next = reconcile(start(), [item('c'), item('b'), item('a', { lastSeq: 2 })]);
+
+    expect(next.ids).toEqual(['c', 'b', 'a']);
+    expect(selectChatById(wrap(next), 'c')).toMatchObject({ id: 'c' });
+  });
+
+  it('текущие чаты, которых нет в ответе (локальные, пришедшие событием), остаются после серверных', () => {
+    let state = start();
+    state = reducer(state, { type: chatCreated.type, payload: item('loc', { local: true }) });
+
+    const next = reconcile(state, [item('a', { lastSeq: 2 })]);
+
+    expect(next.ids).toEqual(['a', 'b', 'loc']);
+  });
+
+  it('unreadExtra добавляется к непрочитанным с сервера', () => {
+    const next = reducer(start(), chatsReconciled({ chats: [item('a', { lastSeq: 2, unreadCount: 3 })], syncedIds: [], openChatId: null, unreadExtra: { a: 2 } }));
+
+    expect(selectChatById(wrap(next), 'a').unreadCount).toBe(5);
+  });
+
+  it('status и requestId не меняются', () => {
+    const state = { ...start(), status: 'succeeded' };
+
+    expect(reconcile(state, [item('a')])).toMatchObject({ status: 'succeeded', requestId: null });
   });
 });

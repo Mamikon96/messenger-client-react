@@ -7,7 +7,7 @@
 set -uo pipefail
 ROOT=${STAMP_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 STAMP="$ROOT/.qa/accept.json"
-PATHS=(src e2e mock-bff scripts package.json playwright.config.js docs/user-cases.md)
+PATHS=(src e2e mock-bff scripts package.json playwright.config.js docs/user-cases.md docs/user-cases)
 
 tree_hash() {
   local tmp existing=()

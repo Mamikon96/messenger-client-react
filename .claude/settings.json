@@ -49,6 +49,8 @@
     "ask": [
       "Edit(docs/user-cases.md)",
       "Write(docs/user-cases.md)",
+      "Edit(docs/user-cases/**)",
+      "Write(docs/user-cases/**)",
       "Edit(.ai/user-cases.sha256)",
       "Write(.ai/user-cases.sha256)",
       "Edit(scripts/approve-usecases.sh)",

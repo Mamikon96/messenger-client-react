@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ 0ecd1a1+dirty
+> Проверено: 2026-10-18 @ ff7cc0f+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
@@ -7,6 +7,7 @@
 ## В работе
 ## Бэклог
 > Контекст решений по бэклогу — `.ai/memory/backlog/README.md`; подробности задачи — файл .ai/memory/backlog/FE-NN.md (читать, когда задачу берут в работу).
+- **FE-129 (P3)** Хвосты FE-128: устаревшие ссылки на `docs/user-cases.md`, проверка названий индекса, `isFile()`. Подробности: `.ai/memory/backlog/FE-129.md`
 - **FE-127 (P3)** Память `architecture/`: нет описания реалтайма (`wsService.js`, `reducers/realtime.js`, `useRealtime`), найдено при FE-126. Подробности: `.ai/memory/backlog/FE-127.md`
 - **FE-118 (P2)** `message.new` неизвестного чата: недосчёт unread при нескольких кадрах подряд (ревью FE-41, m3); сверит FE-42. Подробности: `.ai/memory/backlog/FE-118.md`
 - **FE-119 (P3)** e2e realtime: хрупкая схема `routeWebSocket` с общим URL для HMR и приложения, предложение `?app=1` (ревью FE-41, m5). Подробности: `.ai/memory/backlog/FE-119.md`

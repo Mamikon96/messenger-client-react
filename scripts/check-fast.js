@@ -6,7 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { parseCases, currentBranch, taskIdFromBranch, taskCaseIds } = require('./check-state.js');
+const { loadCaseSet, currentBranch, taskIdFromBranch, taskCaseIds } = require('./check-state.js');
 
 const LINT_RE = /^(src|e2e|scripts|mock-bff)\/.*\.js$/;
 const MOCK_BFF_SPECS = ['e2e/mock-bff.contract.spec.js', 'e2e/mock-bff-proxy.spec.js'];
@@ -22,6 +22,11 @@ function scriptTests(changed, exists) {
     else if (f === 'package.json') tests.push('scripts/eslint-rules.test.js');
   }
   return [...new Set(tests)].filter(exists);
+}
+
+// Active-кейсы набора user-кейсов (индекс + файлы docs/user-cases/)
+function activeCaseIds(root) {
+  return new Set(loadCaseSet(root).cases.filter((c) => c.status === 'active').map((c) => c.id));
 }
 
 function planChecks({ changed, contractCases, exists }) {
@@ -94,7 +99,7 @@ function main(argv) {
   // Кейсы контракта задачи ветки, только active: у удаляемых и planned кейсов нет e2e, grep дал бы «No tests found»
   const contract = taskCaseIds({ tasksMd: read('.ai/memory/tasks.md'), doneMd: read('.ai/memory/done.md'), taskId: taskIdFromBranch(currentBranch(root)) });
   for (const e of contract.errors) console.log(`  ⚠ ${e}`);
-  const active = new Set(parseCases(read('docs/user-cases.md') || '').cases.filter((c) => c.status === 'active').map((c) => c.id));
+  const active = activeCaseIds(root);
   const plan = planChecks({ changed, contractCases: contract.ids.filter((id) => active.has(id)), exists });
 
   console.log(`==> Лёгкие проверки по изменениям ветки (${plan.length})`);
@@ -112,6 +117,6 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { planChecks, scriptTests, splitZ };
+module.exports = { planChecks, activeCaseIds, scriptTests, splitZ };
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Проверка состояния системы: рассинхрон между user-кейсами, API-контрактом, кодом и поведением (e2e).
-// Источник истины — docs/user-cases.md (защищён хэшем .ai/user-cases.sha256, меняет его только scripts/approve-usecases.sh).
+// Источник истины — набор user-кейсов: индекс docs/user-cases.md и файлы по областям docs/user-cases/*.md (FE-128).
+// Набор защищён одним хэшем .ai/user-cases.sha256 (индекс + имена и содержимое всех файлов), меняет его только scripts/approve-usecases.sh.
 // Только встроенные модули Node. Логика — чистые функции (тесты: scripts/check-state.test.js), CLI — внизу файла.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const CASES_FILE = 'docs/user-cases.md';
+const CASES_FILE = 'docs/user-cases.md'; // индекс
+const CASES_DIR = 'docs/user-cases'; // файлы кейсов по областям
+const CASES_SET = `набор user-кейсов (${CASES_FILE} и ${CASES_DIR}/*.md)`;
 const LOCK_FILE = '.ai/user-cases.sha256';
 const CONTRACT_FILE = 'docs/client-integration.md';
 // Временно (FE-86, FE-D39): до BE-42 эндпоинты входа по паролю берутся ещё и из спеки; удаляется в FE-98.
@@ -80,12 +83,113 @@ function parseCases(md) {
 
 const hashText = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
+// Индекс: строки таблиц `| ID | Название | Статус | Файл |`
+function parseIndex(md) {
+  const rows = [];
+  const errors = [];
+  const seen = new Set();
+  for (const line of md.split('\n')) {
+    if (!/^\|\s*UC-/.test(line)) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length !== 4) {
+      errors.push(`индекс: строка «${line.trim()}» не вида «| ID | Название | Статус | Файл |»`);
+      continue;
+    }
+    const [id, title, status, file] = cells;
+    if (!ID_RE.test(id)) errors.push(`индекс: ${id}: ID не вида UC-ОБЛАСТЬ-NN`);
+    if (seen.has(id)) errors.push(`индекс: ${id}: повторяющийся ID`);
+    seen.add(id);
+    if (!STATUSES.includes(status)) errors.push(`индекс: ${id}: статус должен быть active или planned (сейчас: ${status})`);
+    if (!file) errors.push(`индекс: ${id}: не указан файл`);
+    rows.push({ id, title, status, file });
+  }
+  if (rows.length === 0) errors.push('индекс: нет ни одной строки кейса «| UC-… | … | … | … |»');
+  return { rows, errors };
+}
+
+// Согласованность индекса и файлов. casesByFile: { путь файла: [кейсы] } для всех файлов docs/user-cases/
+function checkIndex(rows, casesByFile) {
+  const errors = [];
+  const indexed = new Set(rows.map((r) => `${r.file}\u0000${r.id}`));
+  const reportedMissing = new Set();
+  for (const { id, status, file } of rows) {
+    const cases = casesByFile[file];
+    if (!cases) {
+      if (!reportedMissing.has(file)) errors.push(`индекс: файл ${file} не найден среди файлов ${CASES_DIR}/ (кейс ${id})`);
+      reportedMissing.add(file);
+      continue;
+    }
+    const found = cases.find((c) => c.id === id);
+    if (!found) errors.push(`${id}: указан в индексе в файле ${file}, но там такого кейса нет`);
+    else if (found.status !== status) errors.push(`${id}: статус в индексе (${status}) не совпадает со статусом в ${file} (${found.status})`);
+  }
+  const filesOf = {};
+  for (const [file, cases] of Object.entries(casesByFile)) {
+    for (const c of cases) {
+      (filesOf[c.id] = filesOf[c.id] || []).push(file);
+      if (!indexed.has(`${file}\u0000${c.id}`)) errors.push(`${c.id}: кейс из ${file} не указан в индексе ${CASES_FILE}`);
+    }
+  }
+  for (const [id, files] of Object.entries(filesOf)) {
+    if (files.length > 1) errors.push(`${id}: повторяющийся ID в файлах ${files.join(', ')}`);
+  }
+  const used = new Set(rows.map((r) => r.file));
+  for (const file of Object.keys(casesByFile)) {
+    if (!used.has(file)) errors.push(`${file}: файл не указан ни в одной строке индекса ${CASES_FILE}`);
+  }
+  return errors;
+}
+
+// Текст для хэша: индекс первым, затем файлы по алфавиту; в хэш входят и пути, и содержимое
+function bundleText(files) {
+  const rank = (f) => (f.path === CASES_FILE ? 0 : 1);
+  const byPath = (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  return [...files]
+    .sort((a, b) => rank(a) - rank(b) || byPath(a, b))
+    .map((f) => `=== ${f.path} ${Buffer.byteLength(f.text)}\n${f.text}\n`)
+    .join('');
+}
+
+// Все файлы набора: { text, files: [{ path, text }] } (индекс, если есть, первым)
+function casesBundle(root) {
+  const files = [];
+  const index = readIf(path.join(root, CASES_FILE));
+  if (index !== null) files.push({ path: CASES_FILE, text: index });
+  const dir = path.join(root, CASES_DIR);
+  if (fs.existsSync(dir)) {
+    for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.md')).sort()) {
+      files.push({ path: `${CASES_DIR}/${name}`, text: fs.readFileSync(path.join(dir, name), 'utf8') });
+    }
+  }
+  return { text: bundleText(files), files };
+}
+
+// Кейсы всех файлов областей + ошибки разбора и согласованности с индексом
+function loadCaseSet(root) {
+  const bundle = casesBundle(root);
+  const index = bundle.files.find((f) => f.path === CASES_FILE);
+  if (!index) return { cases: [], errors: [`нет ${CASES_FILE}`], bundle };
+  const errors = [];
+  const cases = [];
+  const casesByFile = {};
+  for (const f of bundle.files) {
+    if (f.path === CASES_FILE) continue;
+    const parsed = parseCases(f.text);
+    errors.push(...parsed.errors.map((e) => `${f.path}: ${e}`));
+    casesByFile[f.path] = parsed.cases;
+    cases.push(...parsed.cases);
+  }
+  const parsedIndex = parseIndex(index.text);
+  errors.push(...parsedIndex.errors, ...checkIndex(parsedIndex.rows, casesByFile));
+  return { cases, errors, bundle };
+}
+
 function checkLock(text, lock) {
   if (lock === null || lock === undefined) {
-    return [`${CASES_FILE} не утверждён: нет ${LOCK_FILE}. Утверждает пользователь: bash scripts/approve-usecases.sh`];
+    return [`${CASES_SET} не утверждён: нет ${LOCK_FILE}. Утверждает пользователь: bash scripts/approve-usecases.sh`];
   }
   if (hashText(text) !== String(lock).trim()) {
-    return [`${CASES_FILE} изменён без утверждения (хэш не совпадает с ${LOCK_FILE}). Менять кейсы можно только с разрешения пользователя; утверждает он сам: bash scripts/approve-usecases.sh`];
+    return [`${CASES_SET} изменён без утверждения (хэш не совпадает с ${LOCK_FILE}). Менять кейсы можно только с разрешения пользователя; утверждает он сам: bash scripts/approve-usecases.sh`];
   }
   return [];
 }
@@ -159,7 +263,7 @@ function checkCoverage(cases, tags) {
   }
   for (const t of tags) {
     const c = byId.get(t.id);
-    if (!c) errors.push(`${t.file}: тег [${t.id}] — такого кейса нет в ${CASES_FILE}`);
+    if (!c) errors.push(`${t.file}: тег [${t.id}] — такого кейса нет в ${CASES_SET}`);
     else if (c.status === 'planned') {
       errors.push(`${t.file}: тест на кейс ${t.id} со статусом planned — перевести в active может только пользователь`);
     }
@@ -343,7 +447,7 @@ function taskCaseIds({ tasksMd, doneMd, taskId }) {
 function qaScope({ smoke, contractIds, activeIds }) {
   const errors = smoke
     .filter((id) => !activeIds.includes(id))
-    .map((id) => `smoke-кейс ${id} не active в docs/user-cases.md — обнови QA_SMOKE в scripts/check-state.js`);
+    .map((id) => `smoke-кейс ${id} не active в наборе user-кейсов — обнови QA_SMOKE в scripts/check-state.js`);
   const ids = uniq([...smoke, ...contractIds.filter((id) => activeIds.includes(id))]);
   return { ids, errors };
 }
@@ -366,7 +470,7 @@ function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, tagg
   if (!tree || !cases || !verdict || scopeLine === undefined) return errors;
   const scope = uniq(scopeLine.match(UC_ANY_RE) || []);
 
-  if (cases !== casesHash) errors.push('QA-отчёт устарел: документ кейсов изменился после прохода тестировщика');
+  if (cases !== casesHash) errors.push('QA-отчёт устарел: набор user-кейсов изменился после прохода тестировщика');
   if (tree !== treeHash) errors.push('QA-отчёт устарел: код или тесты изменились после прохода тестировщика — запусти qa-tester заново');
   if (verdict !== 'PASS') errors.push(`QA-отчёт: Вердикт ${verdict} — проблемы нужно исправить и повторить проход`);
 
@@ -375,7 +479,7 @@ function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, tagg
     if (!scope.includes(id)) errors.push(`QA-отчёт: кейс ${id} обязателен (контракт или smoke), но не вошёл в «Объём»`);
   }
   for (const id of scope) {
-    if (!activeIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} из «Объёма» не active в docs/user-cases.md`);
+    if (!activeIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} из «Объёма» не active в наборе user-кейсов`);
     else if (!rows.has(id)) errors.push(`QA-отчёт: кейс ${id} не пройден (нет в матрице)`);
     else if (rows.get(id) === 'pass (e2e)') {
       if (!taggedIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} отмечен «pass (e2e)», но e2e-теста с тегом [${id}] нет`);
@@ -433,12 +537,18 @@ function main(argv) {
     else if (argv[i] === '--behavior-report') args.behaviorReport = path.resolve(argv[++i]);
     else if (argv[i] === '--require-qa') args.requireQa = true;
     else if (argv[i] === '--tree-hash') args.treeHash = true;
+    else if (argv[i] === '--cases-hash') args.casesHash = true;
     else if (argv[i] === '--qa-scope') args.qaScope = true;
     else if (argv[i] === '--qa-report-path') args.qaReportPath = true;
   }
   const at = (rel) => path.join(args.root, rel);
   if (args.treeHash) {
     console.log(codeTreeHash(args.root));
+    return 0;
+  }
+  if (args.casesHash) {
+    // Отпечаток набора user-кейсов для шапки QA-отчёта
+    console.log(hashText(casesBundle(args.root).text));
     return 0;
   }
   const reportPath = qaReportPath(currentBranch(args.root));
@@ -452,15 +562,15 @@ function main(argv) {
 
   if (!args.qaScope) console.log('==> Проверка состояния: кейсы ↔ API ↔ код ↔ поведение');
 
-  const casesText = readIf(at(CASES_FILE));
-  if (casesText === null) {
+  const loaded = loadCaseSet(args.root);
+  if (loaded.bundle.files.every((f) => f.path !== CASES_FILE)) {
     console.log(`  ✗ нет ${CASES_FILE}`);
     return 1;
   }
+  const casesText = loaded.bundle.text;
   errors.push(...checkLock(casesText, readIf(at(LOCK_FILE))));
-  const parsed = parseCases(casesText);
-  errors.push(...parsed.errors);
-  const { cases } = parsed;
+  errors.push(...loaded.errors);
+  const { cases } = loaded;
   const activeIds = cases.filter((c) => c.status === 'active').map((c) => c.id);
   const contract = taskCaseIds({ tasksMd: readIf(at(TASKS_FILE)), doneMd: readIf(at(DONE_FILE)), taskId: taskIdFromBranch(currentBranch(args.root)) });
   const scope = qaScope({ smoke: QA_SMOKE, contractIds: contract.ids, activeIds });
@@ -541,6 +651,11 @@ function main(argv) {
 
 module.exports = {
   parseCases,
+  parseIndex,
+  checkIndex,
+  bundleText,
+  casesBundle,
+  loadCaseSet,
   hashText,
   checkLock,
   scanTests,

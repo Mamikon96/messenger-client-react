@@ -7,8 +7,7 @@ set -uo pipefail
 root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 
 # Пути — к виду от корня репозитория (./src/x, абсолютный путь, a/../src/x); realpath -m работает и для удалённых/новых файлов
-realpath -m --relative-to="$root" -- "$@" \
-  | grep -E '^(src|mock-bff)(/|$)' \
-  | grep -vE '(\.test\.js|(^|/)setupTests\.js)$' \
-  | grep -q . && exit 0
+rel=$(realpath -m --relative-to="$root" -- "$@")
+src=$(grep -E '^(src|mock-bff)(/|$)' <<<"$rel" | grep -vE '(\.test\.js|(^|/)setupTests\.js)$' || true)
+[ -n "$src" ] && exit 0
 exit 1

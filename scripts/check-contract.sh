@@ -19,7 +19,7 @@ for id in $ids; do
     f')
   missing=()
   for field in "${FIELDS[@]}"; do
-    echo "$block" | grep -qE "^[[:space:]]+- (\*\*)?$field:(\*\*)?[[:space:]]*[^[:space:]]" || missing+=("$field")
+    grep -qE "^[[:space:]]+- (\*\*)?$field:(\*\*)?[[:space:]]*[^[:space:]]" <<<"$block" || missing+=("$field")
   done
   if [ ${#missing[@]} -gt 0 ]; then
     errors=$((errors + 1))

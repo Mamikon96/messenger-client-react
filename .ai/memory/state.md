@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-18 @ 6a021a1+dirty
+> Проверено: 2026-10-19 @ 7895dd9+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка и локальные чаты из Join — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -32,7 +32,7 @@
 8. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-18 20:15:59) · ревью react-reviewer APPROVE (2 раунда) · QA PASS (6 из 6, `.qa/runs/FE-26.md`) · FE-26 · 2026-10-18
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-19 00:02:27) · ревью react-reviewer APPROVE (1 раунд) · QA не требовался (только scripts/) · FE-134 · 2026-10-19
 
 ## Фокус сейчас
 Эпик входа по логину/паролю (FE-D38, SH-D18) и экран чатов закрыты по FE-28 (`Header`, `UserMenu`) включительно; история — `done.md`. Дальше FE-29 …

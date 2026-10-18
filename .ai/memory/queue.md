@@ -50,7 +50,6 @@
 - **FE-55 (P3)** ESLint `console.log`: закрыть обход через `console["log"](x)` селектором в `no-restricted-syntax` и тестом правила. Подробности: `.ai/memory/backlog/FE-55.md`
 - **FE-20 (P3)** Доработки по ревью FE-13/FE-14: убрать предупреждение `act` в `App.test.js`, фокус после «Повторить», `condition` для `checkSession`. Подробности: `.ai/memory/backlog/FE-20.md`
 - **FE-08 (P3)** Заполнить README: запуск, команды, структура, запуск с реальным бэкендом и вход при разработке. Подробности: `.ai/memory/backlog/FE-08.md`
-- **FE-134 (P2, харнес)** `check-memory.sh`: `grep | grep -q` при `pipefail` даёт ложный сбой по SIGPIPE (ревью FE-132; объединена с FE-137). Подробности: `.ai/memory/backlog/FE-134.md`
 - **FE-135 (P3)** Сверка после реконнекта: `unreadExtra` завышает unread, если открытый чат сменили во время сверки (ревью FE-42). Подробности: `.ai/memory/backlog/FE-135.md`
 - **FE-139 (P3)** Предупреждение консоли «WebSocket closed before the connection is established» на каждый вход (QA FE-27, NIT). Подробности: `.ai/memory/backlog/FE-139.md`
 - **FE-140 (P3)** `UserMenu`: `aria-controls`, `ThemeSwitch.css`, e2e клика снаружи мышью (ревью FE-28, MINOR). Подробности: `.ai/memory/backlog/FE-140.md`

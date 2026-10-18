@@ -48,7 +48,9 @@ check_repo() {
 check_task() {
   local id=$1
   [ -f "$TASKS" ] || die "нет $TASKS"
-  awk '/^## В работе/{f=1;next} /^## Бэклог/{f=1;next} /^## /{f=0} f' "$TASKS" | grep -qE "^- \*\*$id[ *]" \
+  local active
+  active=$(awk '/^## В работе/{f=1;next} /^## Бэклог/{f=1;next} /^## /{f=0} f' "$TASKS")
+  grep -qE "^- \*\*$id[ *]" <<<"$active" \
     || die "$id нет в «В работе»/«Бэклог» файла $TASKS (закрыта или не заведена) — сначала актуализировать задачи"
 }
 

@@ -867,7 +867,7 @@ test.describe('задача ветки', () => {
     assert.equal(S.contractCaseIds(md, 'FE-3'), null);
   });
 
-  test('doneCaseIds: поле «Кейсы:» записи задачи в done.md', () => {
+  test('doneCaseIds: поле «Кейсы:» записи задачи из файла done/<ID>.md', () => {
     const md = '- 2026-10-13 — FE-1: x · Кейсы: UC-A-01, UC-A-02 · ревью\n- 2026-10-13 — FE-12: y · Кейсы: UC-Z-01\n- 2026-10-13 — FE-3: без поля\n';
     assert.deepEqual(S.doneCaseIds(md, 'FE-1'), { found: true, ids: ['UC-A-01', 'UC-A-02'], hasField: true });
     assert.deepEqual(S.doneCaseIds(md, 'FE-3'), { found: true, ids: [], hasField: false });
@@ -1148,12 +1148,12 @@ test.describe('CLI на фикстурном репозитории', () => {
       assert.equal(runQa(root).status, 0, runQa(root).stdout);
     });
 
-    test('задача уже в done.md (момент коммита) — кейсы берутся из поля «Кейсы:» её записи', () => {
+    test('задача уже в done/FE-1.md (момент коммита) — кейсы берутся из поля «Кейсы:» её записи', () => {
       const root = makeGitRoot(
         'PASS',
         {
           '.ai/memory/tasks.md': wip('—\n'),
-          '.ai/memory/done.md': '# Сделано\n- 2026-10-13 — FE-1: сделано · Кейсы: UC-AUTH-02 · ревью APPROVE\n',
+          '.ai/memory/done/FE-1.md': '# FE-1\n\n- 2026-10-13 — FE-1: сделано · Кейсы: UC-AUTH-02 · ревью APPROVE\n',
         },
         'feature/FE-1-a'
       );
@@ -1164,10 +1164,10 @@ test.describe('CLI на фикстурном репозитории', () => {
       assert.equal(runQa(root).status, 0, runQa(root).stdout);
     });
 
-    test('задача в done.md без поля «Кейсы:» — код 1 с подсказкой', () => {
+    test('задача в done/FE-1.md без поля «Кейсы:» — код 1 с подсказкой', () => {
       const root = makeGitRoot(
         'PASS',
-        { '.ai/memory/tasks.md': wip('—\n'), '.ai/memory/done.md': '# Сделано\n- 2026-10-13 — FE-1: сделано\n' },
+        { '.ai/memory/tasks.md': wip('—\n'), '.ai/memory/done/FE-1.md': '# FE-1\n\n- 2026-10-13 — FE-1: сделано\n' },
         'feature/FE-1-a'
       );
       const r = runQa(root);
@@ -1175,11 +1175,11 @@ test.describe('CLI на фикстурном репозитории', () => {
       assert.match(r.stdout + r.stderr, /FE-1.*Кейсы/);
     });
 
-    test('задачи ветки нет ни в «В работе», ни в done.md — код 1', () => {
+    test('задачи ветки нет ни в «В работе», ни в done/ — код 1', () => {
       const root = makeGitRoot('PASS', { '.ai/memory/tasks.md': wip('—\n') }, 'feature/FE-1-a');
       const r = runQa(root);
       assert.equal(r.status, 1);
-      assert.match(r.stdout + r.stderr, /FE-1/);
+      assert.match(r.stdout + r.stderr, /done\/FE-1\.md/);
     });
 
     test('--qa-scope печатает smoke и active-кейсы контракта только задачи ветки', () => {

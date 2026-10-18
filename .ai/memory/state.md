@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-18 @ ff7cc0f+dirty
+> Проверено: 2026-10-18 @ 0beed45+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка и локальные чаты из Join — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -35,7 +35,7 @@
 10. Форма Join (QA-проход 2026-10-09, QA-1 MINOR, QA-2 NIT): после создания чата popover остаётся открытым с прежними значениями — повторное нажатие создаст дубликат; Escape форму не закрывает, только клик по оверлею. Кейс UC-CHAT-01 о закрытии формы молчит. Исправление — FE-29. → FE-44, FE-29
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-17 18:32:28; unit 512 ✓, e2e 95 ✓) · ревью react-reviewer APPROVE (2 раунда) · QA PASS (`.qa/runs/FE-40.md`, 8 кейсов) · FE-40 · 2026-10-17
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-18 17:27:52) · ревью react-reviewer APPROVE (2 раунда) · QA не требуется (нет изменений `src/`, `mock-bff/`) · FE-131 · 2026-10-18
 
 ## Фокус сейчас
 Задач в работе нет. FE-105 проверена после слияния (2026-10-15, headless-сессия на develop 7769baa): первый ход 28K (было 51K, интерактивная сессия); плагин `superpowers` не загружается; deny `Agent(angular-engineer)` блокирует вызов; `PostToolUse` внутри субагента получает `agent_id` и `agent_type`, но не `agent_transcript_path` — `context-guard.sh` берёт запасной путь `<сессия>/subagents/agent-<agent_id>.jsonl`, проверено на реальном входе. Эпик входа по логину/паролю (FE-D38, SH-D18; эпик passkey отменён): FE-56, FE-88, FE-87, FE-89, FE-90, FE-91, FE-92, FE-35 закрыты; FE-37 (нормализованный стор) и FE-38 (список чатов с сервера) закрыты 2026-10-15, FE-39 (открытие чата и история) и FE-40 (оптимистичная отправка) — 2026-10-17; дальше FE-41 → …; копия `docs/auth-password-spec.md` (§1–11) синхронизирована с бэкендом в FE-91; при новых правках спеки бэкенда сверять снова.

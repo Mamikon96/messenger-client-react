@@ -27,7 +27,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 | Любая git-операция (коммит, ветка, слияние, push, PR) | `.ai/rules/git-flow.md` |
 | Финальный отчёт | `.ai/rules/report-format.md` |
 | Сомнение / не хватает данных (любая задача) | `.ai/rules/ask-user.md` |
-| История закрытых задач | `.ai/memory/done.md` (поиском по ID) |
+| История закрытых задач | `.ai/memory/done.md` — роутер (таблица по ID) → файл из `done/` |
 | Взять задачу из бэклога / заменённые решения | .ai/memory/backlog/FE-NN.md · `.ai/memory/decisions-archive.md` (поиском по ID) |
 | Правка структуры памяти | `.ai/memory/README.md`, `scripts/check-memory.sh` |
 

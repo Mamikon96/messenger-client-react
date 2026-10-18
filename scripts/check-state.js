@@ -17,7 +17,7 @@ const SPEC_FILE = 'docs/auth-password-spec.md';
 const MOCK_FILE = 'mock-bff/server.js';
 const QA_RUNS_DIR = '.qa/runs';
 const TASKS_FILE = '.ai/memory/tasks.md';
-const DONE_FILE = '.ai/memory/done.md';
+const DONE_DIR = '.ai/memory/done';
 // Smoke-кейсы, которые qa-tester проходит в каждой задаче вдобавок к кейсам контракта (FE-D35).
 // Без явного входа: вход меняется эпиком passkey, а эти кейсы проходят через него неявно.
 const QA_SMOKE = ['UC-SESSION-01', 'UC-CHAT-02', 'UC-MSG-01'];
@@ -426,7 +426,10 @@ function contractCaseIds(tasksMd, taskId = null) {
   return uniq(ids);
 }
 
-// Поле «Кейсы: …» записи задачи в done.md (до следующего « · » или конца строки): к моменту git-task.sh commit контракт из tasks.md уже удалён.
+// Файл архива закрытых задач для ID (FE-D52).
+const doneFileOf = (taskId) => `${DONE_DIR}/${taskId}.md`;
+
+// Поле «Кейсы: …» записи задачи в файле архива done/<ID>.md (FE-D52; до следующего « · » или конца строки): к моменту git-task.sh commit контракт из tasks.md уже удалён.
 function doneCaseIds(doneMd, taskId) {
   const line = (doneMd || '').split('\n').find((l) => new RegExp(`^- \\d{4}-\\d{2}-\\d{2} — ${taskId}\\b(?!-)`).test(l));
   if (!line) return { found: false, ids: [], hasField: false };
@@ -434,15 +437,15 @@ function doneCaseIds(doneMd, taskId) {
   return { found: true, ids: field ? uniq(field[1].match(UC_ANY_RE) || []) : [], hasField: Boolean(field) };
 }
 
-// Кейсы контракта задачи ветки: «В работе», а после закрытия — запись в done.md (FE-D35).
+// Кейсы контракта задачи ветки: «В работе», а после закрытия — запись в done/<ID>.md (FE-D35, FE-D52); doneMd — текст этого файла или null.
 function taskCaseIds({ tasksMd, doneMd, taskId }) {
   if (!taskId) return { ids: contractCaseIds(tasksMd), errors: [] };
   const wip = contractCaseIds(tasksMd, taskId);
   if (wip) return { ids: wip, errors: [] };
   const done = doneCaseIds(doneMd, taskId);
-  if (!done.found) return { ids: [], errors: [`задача ${taskId} (из имени ветки) не найдена ни в «В работе» ${TASKS_FILE}, ни в ${DONE_FILE}`] };
+  if (!done.found) return { ids: [], errors: [`задача ${taskId} (из имени ветки) не найдена ни в «В работе» ${TASKS_FILE}, ни в ${doneFileOf(taskId)}`] };
   if (!done.hasField) {
-    return { ids: [], errors: [`в записи ${taskId} в ${DONE_FILE} нет поля «Кейсы: … | нет» — без него объём QA не восстановить (memory-protocol.md)`] };
+    return { ids: [], errors: [`в записи ${taskId} в ${doneFileOf(taskId)} нет поля «Кейсы: … | нет» — без него объём QA не восстановить (memory-protocol.md)`] };
   }
   return { ids: done.ids, errors: [] };
 }
@@ -533,6 +536,9 @@ function walk(dir, filter, base = dir, out = {}) {
 
 const readIf = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
 
+// Текст done/<ID>.md задачи или null (нет ID или файла).
+const readDoneFile = (root, taskId) => (taskId ? readIf(path.join(root, doneFileOf(taskId))) : null);
+
 function main(argv) {
   const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false, qaReportPath: false };
   for (let i = 0; i < argv.length; i++) {
@@ -576,7 +582,8 @@ function main(argv) {
   errors.push(...loaded.errors);
   const { cases } = loaded;
   const activeIds = cases.filter((c) => c.status === 'active').map((c) => c.id);
-  const contract = taskCaseIds({ tasksMd: readIf(at(TASKS_FILE)), doneMd: readIf(at(DONE_FILE)), taskId: taskIdFromBranch(currentBranch(args.root)) });
+  const taskId = taskIdFromBranch(currentBranch(args.root));
+  const contract = taskCaseIds({ tasksMd: readIf(at(TASKS_FILE)), doneMd: readDoneFile(args.root, taskId), taskId });
   const scope = qaScope({ smoke: QA_SMOKE, contractIds: contract.ids, activeIds });
   scope.errors.unshift(...contract.errors);
   if (args.qaScope) {
@@ -675,6 +682,7 @@ module.exports = {
   QA_SMOKE,
   currentBranch,
   taskIdFromBranch,
+  readDoneFile,
   qaReportPath,
   contractCaseIds,
   doneCaseIds,

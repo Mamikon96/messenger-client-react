@@ -50,7 +50,7 @@ check_files() {
       grep -q "^$sec" "$dir/tasks.md" || fail "$dir/tasks.md: нет секции '$sec'"
     done
     # История закрытых задач — в архиве done.md (FE-D27), чтобы старт задачи не читал её
-    grep -q '^## Сделано' "$dir/tasks.md" && fail "$dir/tasks.md: раздел «Сделано» — перенеси записи в $dir/done.md"
+    grep -q '^## Сделано' "$dir/tasks.md" && fail "$dir/tasks.md: раздел «Сделано» — перенеси записи в $dir/done/<ID>.md и строки — в таблицу $dir/done.md"
 
     # Уникальность ID и правильный префикс
     local ids dups bad
@@ -100,14 +100,50 @@ for (const l of lines) {
     fi
   fi
 
-  # Архив «Сделано»: раздел есть, каждая запись начинается с даты
+  # Архив «Сделано» (FE-D52): done.md — роутер-таблица `| Дата | ID | Суть | Файл |`, записи лежат в done/<ID>.md
+  # (без ID — done/<ГГГГ-ММ-ДД>-<слаг>.md); строка роутера на каждую запись, дата и ID совпадают с записью
   if [ ! -f "$dir/done.md" ]; then
-    fail "нет файла $dir/done.md (архив «Сделано»)"
+    fail "нет файла $dir/done.md (роутер архива «Сделано»)"
   else
-    grep -q '^## Сделано' "$dir/done.md" || fail "$dir/done.md: нет секции '## Сделано'"
-    local done_bad
-    done_bad=$(awk '/^## Сделано/{f=1;next} /^## /{f=0} f && /^- /' "$dir/done.md" | grep -vE '^- [0-9]{4}-[0-9]{2}-[0-9]{2} — ' || true)
-    [ -z "$done_bad" ] || fail "$dir/done.md: записи «Сделано» без даты 'ГГГГ-ММ-ДД — ': $(echo "$done_bad" | head -1)"
+    grep -qE '^## Сделано' "$dir/done.md" && fail "$dir/done.md: раздел «Сделано» — записи лежат в $dir/done/<ID>.md, в роутере только таблица"
+    local rows row_date row_id row_file
+    rows=$(grep -E '^\| *[0-9]{4}-[0-9]{2}-[0-9]{2} *\|' "$dir/done.md" || true)
+    local dr_bad
+    dr_bad=$(grep -E '^- ' "$dir/done.md" || true)
+    [ -z "$dr_bad" ] || fail "$dir/done.md: запись-строка в роутере (должна быть в done/<ID>.md): $(echo "$dr_bad" | head -1 | cut -c1-60)"
+    while IFS= read -r row; do
+      [ -n "$row" ] || continue
+      row_file=$(echo "$row" | awk -F'|' '{print $(NF-1)}' | tr -d ' `')
+      [[ $row_file =~ ^done/[^/]+\.md$ ]] || fail "$dir/done.md: строка роутера должна ссылаться на done/*.md, а не на $row_file"
+      [ -f "$dir/$row_file" ] || fail "$dir/done.md: строка роутера ссылается на несуществующий файл $row_file"
+    done <<< "$rows"
+    local dfile dname dbase want have head1 recs line
+    for dfile in "$dir"/done/*.md; do
+      [ -e "$dfile" ] || continue
+      dbase=$(basename "$dfile" .md)
+      dname="done/$dbase.md"
+      head1=$(head -1 "$dfile")
+      [ "$head1" = "# $dbase" ] || fail "$dname: заголовок '$head1' не совпадает с именем файла (нужен '# $dbase')"
+      # записи файла: «дата|ID» (ID — «—», если запись без ID)
+      have=""
+      while IFS= read -r line; do
+        [[ $line =~ ^'- '([0-9]{4}-[0-9]{2}-[0-9]{2})' — '(.*)$ ]] || { fail "$dname: запись без даты 'ГГГГ-ММ-ДД — ': $(echo "$line" | cut -c1-60)"; continue; }
+        local rdate=${BASH_REMATCH[1]} rtext=${BASH_REMATCH[2]} rid='—'
+        [[ $rtext =~ ^([A-Z]+-[0-9]+)([^0-9-]|$) ]] && rid=${BASH_REMATCH[1]}
+        if [[ $dbase =~ ^[A-Z]+-[0-9]+$ ]]; then
+          [ "$rid" = "$dbase" ] || fail "$dname: запись начинается с ID '$rid', а не с $dbase"
+        else
+          [ "$rid" = '—' ] || fail "$dname: файл без ID в имени содержит запись с ID $rid"
+        fi
+        have+="$rdate|$rid"$'\n'
+      done < <(grep -E '^- ' "$dfile")
+      want=$(echo "$rows" | grep -F "\`$dname\`" | awk -F'|' '{gsub(/ /,"",$2); gsub(/ /,"",$3); print $2 "|" $3}' || true)
+      if [ -z "$want" ]; then
+        fail "$dir/done.md: нет строки роутера для $dname"
+      elif [ "$(echo "$want" | sort)" != "$(printf '%s' "$have" | sort)" ]; then
+        fail "$dir/done.md: строки роутера для $dname (дата|ID: $(echo $want)) не совпадают с записями файла ($(echo $have))"
+      fi
+    done
   fi
 }
 

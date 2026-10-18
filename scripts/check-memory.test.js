@@ -1,4 +1,4 @@
-// Тесты scripts/check-memory.sh в части архива «Сделано» (FE-52, FE-D27). Каталог памяти подменяется через MEM_DIR.
+// Тесты scripts/check-memory.sh в части архива «Сделано» (FE-52, FE-D27, FE-D52: роутер done.md + файлы done/). Каталог памяти подменяется через MEM_DIR.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +12,10 @@ const SHA = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, e
 const STAMP = `> Проверено: 2026-10-13 @ ${SHA}`;
 
 const TASKS = `# Задачи\n${STAMP}\n\n## В работе\n—\n\n## Бэклог\n- **FE-90 (P3)** задача\n`;
-const DONE = `# Сделано (архив)\n\n## Сделано\n- 2026-10-01 — FE-89: закрыта\n`;
+// Архив (FE-131): done.md — роутер-таблица, записи лежат в done/<ID>.md (без ID — done/<дата>-<слаг>.md)
+const D_HEAD = `# Сделано (архив)\n${STAMP}\n\n| Дата | ID | Суть | Файл |\n|---|---|---|---|\n`;
+const DONE = `${D_HEAD}| 2026-10-01 | FE-89 | закрыта | \`done/FE-89.md\` |\n`;
+const DONE_FILE = '# FE-89\n\n- 2026-10-01 — FE-89: закрыта\n';
 
 // Папка decisions/ (FE-130): decisions.md — роутер (строка таблицы на каждое решение), тексты решений в decisions/*.md
 const D_ROUTER = (rows) => `# Решения\n\n| ID | Название | Статус | Файл |\n|---|---|---|---|\n${rows}`;
@@ -28,6 +31,7 @@ const run = (files) => {
     'architecture.md': `# Архитектура\n${STAMP}\n`,
     'tasks.md': TASKS,
     'done.md': DONE,
+    'done/FE-89.md': DONE_FILE,
     ...files,
   };
   for (const [name, content] of Object.entries(all)) {
@@ -48,7 +52,7 @@ test('корректные tasks.md и архив done.md — код 0', () => {
 test('раздел «Сделано» в tasks.md — ошибка: история живёт в done.md', () => {
   const r = run({ 'tasks.md': `${TASKS}\n## Сделано\n- 2026-10-01 — старое\n` });
   assert.equal(r.code, 1);
-  assert.match(r.out, /done\.md/);
+  assert.match(r.out, /done\/<ID>\.md/);
 });
 
 test('нет done.md — ошибка', () => {
@@ -57,15 +61,74 @@ test('нет done.md — ошибка', () => {
   assert.match(r.out, /done\.md/);
 });
 
-test('запись в done.md без даты — ошибка', () => {
-  const r = run({ 'done.md': `# Сделано (архив)\n\n## Сделано\n- FE-89 без даты\n` });
+test('запись в файле done/ без даты — ошибка', () => {
+  const r = run({ 'done/FE-89.md': '# FE-89\n\n- FE-89 без даты\n' });
   assert.equal(r.code, 1);
   assert.match(r.out, /без даты/);
 });
 
-test('в done.md нет раздела «## Сделано» — ошибка', () => {
-  const r = run({ 'done.md': '# Сделано (архив)\n- 2026-10-01 — запись\n' });
+test('записи «Сделано» в самом роутере done.md — ошибка', () => {
+  const r = run({ 'done.md': `${DONE}\n## Сделано\n- 2026-10-02 — FE-90: x\n` });
   assert.equal(r.code, 1);
+  assert.match(r.out, /done\.md/);
+});
+
+test('строка роутера ссылается на несуществующий файл — ошибка', () => {
+  const r = run({ 'done.md': `${DONE}| 2026-10-02 | FE-90 | x | \`done/FE-90.md\` |\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /done\/FE-90\.md/);
+});
+
+test('файл в done/ без строки в роутере — ошибка', () => {
+  const r = run({ 'done/FE-90.md': '# FE-90\n\n- 2026-10-02 — FE-90: x\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /done\/FE-90\.md/);
+});
+
+test('дата в строке роутера не совпадает с записью — ошибка', () => {
+  const r = run({ 'done.md': `${D_HEAD}| 2026-10-05 | FE-89 | закрыта | \`done/FE-89.md\` |\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-89/);
+});
+
+test('ID в строке роутера не совпадает с файлом — ошибка', () => {
+  const r = run({ 'done.md': `${D_HEAD}| 2026-10-01 | FE-88 | закрыта | \`done/FE-89.md\` |\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-8[89]/);
+});
+
+test('запись файла FE-89.md начинается не с ID файла — ошибка', () => {
+  const r = run({ 'done/FE-89.md': '# FE-89\n\n- 2026-10-01 — FE-77: чужая запись\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-89/);
+});
+
+test('две записи одного ID в одном файле и две строки роутера — код 0', () => {
+  const r = run({
+    'done.md': `${DONE}| 2026-10-02 | FE-89 | проверка | \`done/FE-89.md\` |\n`,
+    'done/FE-89.md': `${DONE_FILE}- 2026-10-02 — FE-89 (проверка после слияния): ok\n`,
+  });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('запись файла с двумя записями, но одной строкой роутера — ошибка', () => {
+  const r = run({ 'done/FE-89.md': `${DONE_FILE}- 2026-10-02 — FE-89 (проверка после слияния): ok\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-89/);
+});
+
+test('запись без ID в файле done/<дата>-<слаг>.md и ID «—» в роутере — код 0', () => {
+  const r = run({
+    'done.md': `${DONE}| 2026-10-02 | — | chore | \`done/2026-10-02-chore-x.md\` |\n`,
+    'done/2026-10-02-chore-x.md': '# 2026-10-02-chore-x\n\n- 2026-10-02 — chore x: сделано\n',
+  });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('в файле done/ заголовок не совпадает с именем — ошибка', () => {
+  const r = run({ 'done/FE-89.md': '# FE-77\n\n- 2026-10-01 — FE-89: закрыта\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /заголовок/);
 });
 
 const LONG = 'x'.repeat(201);
@@ -82,6 +145,12 @@ test('строка бэклога ровно 200 символов — код 0',
   assert.equal(r.code, 0, r.out);
 });
 
+test('строка роутера ссылается не на done/*.md — ошибка', () => {
+  const r = run({ 'done.md': `${DONE}| 2026-10-02 | FE-90 | x | \`state.md\` |\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /state\.md.*done\/|done\/.*state\.md/);
+});
+
 test('длинная строка в «В работе» — не ошибка: ограничение только у бэклога', () => {
   const wip = `# Задачи\n${STAMP}\n\n## В работе\n—\n\n## Бэклог\n- **FE-90 (P3)** задача\n`;
   const r = run({ 'tasks.md': wip });
@@ -96,6 +165,8 @@ const withBacklog = (files, extra = {}) => {
     'README.md': '# Память\n', 'decisions.md': '# Решения\n', 'state.md': `# Состояние\n${STAMP}\n`,
     'architecture.md': `# Архитектура\n${STAMP}\n`, 'tasks.md': TASKS, 'done.md': DONE, ...extra,
   };
+  fs.mkdirSync(path.join(dir, 'done'));
+  fs.writeFileSync(path.join(dir, 'done', 'FE-89.md'), DONE_FILE);
   for (const [name, content] of Object.entries(all)) fs.writeFileSync(path.join(dir, name), content);
   const r = spawnSync('bash', [SCRIPT], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, MEM_DIR: dir } });
   fs.rmSync(dir, { recursive: true, force: true });

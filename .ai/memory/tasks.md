@@ -1,10 +1,11 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ ce6ba74+dirty
+> Проверено: 2026-10-18 @ 0beed45+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
 
 ## В работе
+Задач в работе нет.
 
 ## Бэклог
 > Контекст решений по бэклогу — `.ai/memory/backlog/README.md`; подробности задачи — файл .ai/memory/backlog/FE-NN.md (читать, когда задачу берут в работу).
@@ -28,7 +29,7 @@
 - **FE-99 (P3, харнес)** `git-task.sh commit`: добавлять футер `Co-Authored-By` без дублирования, как в бэкенде (BE-28). Подробности: `.ai/memory/backlog/FE-99.md`
 - **FE-103 (P3)** `Button`: пробрасывать `ref` (`forwardRef`) и использовать его в `Login` для фокуса на кнопку отправки. Подробности: `.ai/memory/backlog/FE-103.md`
 - **FE-104 (P3)** `Input`: у ошибки поля `role="alert"` вместе с `aria-describedby` озвучивается дважды; решить с пользователем. Подробности: `.ai/memory/backlog/FE-104.md`
-- **FE-82 (P3)** `doneCaseIds` в `check-state.js`: привязать поле «Кейсы:» к разделителю записи `done.md`, чтобы не терять кейсы. Подробности: `.ai/memory/backlog/FE-82.md`
+- **FE-82 (P3)** `doneCaseIds` в `check-state.js`: привязать поле «Кейсы:» к разделителю записи `done/<ID>.md`, чтобы не терять кейсы. Подробности: `.ai/memory/backlog/FE-82.md`
 - **FE-83 (P3)** Приёмка не ловит невалидный `.claude/settings.json`: добавить проверку `JSON.parse` в `check-memory.sh` или `check-state.sh`. Подробности: `.ai/memory/backlog/FE-83.md`
 - **FE-26 (P1)** Каркас `Messenger` и список чатов: две панели, `Chat` с аватаром, активный чат, пустое состояние; правки по аудиту FE-46. Подробности: `.ai/memory/backlog/FE-26.md`
 - **FE-27 (P1)** `Dialog`: пузыри, статусы `sending`/`failed` и «Повторить», Enter/Shift+Enter, автопрокрутка, пустые состояния, селекторы. Подробности: `.ai/memory/backlog/FE-27.md`

@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ 2559ad8+dirty
+> Проверено: 2026-10-18 @ 83bb088+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
@@ -12,7 +12,6 @@
 - **FE-26 (P1)** Каркас `Messenger` и список чатов: две панели, `Chat` с аватаром, активный чат, пустое состояние; правки по аудиту FE-46. Подробности: `.ai/memory/backlog/FE-26.md`
 - **FE-27 (P1)** `Dialog`: пузыри, статусы `sending`/`failed` и «Повторить», Enter/Shift+Enter, автопрокрутка, пустые состояния, селекторы. Подробности: `.ai/memory/backlog/FE-27.md`
 - **FE-28 (P1)** Header и `UserMenu`: аватар с инициалами, переключатель темы, выход, закрытие по Esc/клику снаружи; правки по аудиту FE-46. Подробности: `.ai/memory/backlog/FE-28.md`
-- **FE-42 (P1)** Догонка при реконнекте: сверка `GET /api/chats`, `since` с подкачкой, реакция на `online`/`visibilitychange`. Подробности: `.ai/memory/backlog/FE-42.md`
 - **FE-96 (P1)** apiClient: после `403 csrf_invalid` перечитать сессию (single-flight), повторить запрос раз, при смене `user.id` сбросить store. Подробности: `.ai/memory/backlog/FE-96.md`
 - **FE-98 (P1)** Перейти на итоговый контракт бэкенда: заменить `docs/client-integration.md`, сверить mock-BFF, пройти `qa-tester` на реальном сервере. Подробности: `.ai/memory/backlog/FE-98.md`
 - **FE-44 (P1)** Поиск людей в левой панели (`GET /api/users?q=`), «Написать» → direct-чат (`POST /api/chats`), удаление `JoinForm`. Подробности: `.ai/memory/backlog/FE-44.md`

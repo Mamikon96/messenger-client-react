@@ -313,4 +313,43 @@ describe('createWsService', () => {
       expect(timers.setTimer).not.toHaveBeenCalled();
     });
   });
+
+  describe('retryNow: повтор без ожидания backoff', () => {
+    it('при ожидании повтора отменяет таймер и открывает сокет сразу', () => {
+      const { service, options, timers } = setup();
+      service.connect();
+      lastSocket().open();
+      lastSocket().drop(1006);
+
+      service.retryNow();
+
+      expect(timers.clearTimer).toHaveBeenCalledTimes(1);
+      expect(timers.pending.size).toBe(0);
+      expect(FakeSocket.instances).toHaveLength(2);
+      expect(options.onStatus).toHaveBeenLastCalledWith('connecting');
+    });
+
+    it('при живом сокете, вытеснении и закрытом сервисе ничего не делает', () => {
+      const { service, timers } = setup();
+      service.connect();
+      service.retryNow();
+      lastSocket().drop(4008);
+      service.retryNow();
+      service.close();
+      service.retryNow();
+
+      expect(FakeSocket.instances).toHaveLength(1);
+      expect(timers.setTimer).not.toHaveBeenCalled();
+    });
+
+    it('во время проверки сессии (таймера нет) ничего не открывает', () => {
+      const { service } = setup({ checkSession: jest.fn(() => new Promise(() => {})) });
+      service.connect();
+      lastSocket().drop(4401);
+
+      service.retryNow();
+
+      expect(FakeSocket.instances).toHaveLength(1);
+    });
+  });
 });

@@ -102,6 +102,13 @@ export function createWsService({ url, createSocket, setTimer, clearTimer, rando
             cancelRetry()
             open()
         },
+        // Повтор без ожидания backoff (сеть вернулась, вкладка снова видна): только пока ждём таймер повтора.
+        // Вытеснение, проверка сессии, живой или закрытый сокет не затрагиваются.
+        retryNow() {
+            if (retryTimer === null) return
+            cancelRetry()
+            open()
+        },
         close() {
             generation += 1
             cancelRetry()

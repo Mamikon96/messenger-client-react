@@ -5,11 +5,11 @@ import messagesReducer from './messages';
 import outboxReducer from './outbox';
 import usersReducer from './users';
 import activeChatIdReducer from './activeChatId';
-import { chatReceived, selectChatById } from './chats';
+import { chatReceived, fetchChats, selectChatById } from './chats';
 import { chatSelected } from './activeChatId';
 import { selectChatMessages } from './messages';
 import { selectUserById } from './users';
-import reducer, { pauseRealtime, realtimeStatusChanged, resumeRealtime, selectRealtimeStatus, startRealtime } from './realtime';
+import reducer, { nudgeRealtime, pauseRealtime, realtimeStatusChanged, resumeRealtime, selectRealtimeStatus, startRealtime } from './realtime';
 import { createWsService } from '../services/wsService';
 import * as chatsApi from '../services/chatsApi';
 
@@ -65,7 +65,7 @@ const setup = ({ withChat = true } = {}) => {
 beforeEach(() => {
   createWsService.mockImplementation((opts) => {
     options = opts;
-    service = { connect: jest.fn(), close: jest.fn() };
+    service = { connect: jest.fn(), close: jest.fn(), retryNow: jest.fn() };
     return service;
   });
 });
@@ -458,5 +458,279 @@ describe('chat.*', () => {
     await receive(data);
 
     expect(store.getState()).toEqual(before);
+  });
+});
+
+describe('сверка после переподключения', () => {
+  const item = (extra = {}) => ({ ...chat, members: [{ userId: 'me', role: 'owner' }], ...extra });
+  const history = { status: 'succeeded', requestId: null, hasMore: false, olderStatus: 'idle', olderRequestId: null };
+
+  // Список чатов уже загружен (status succeeded), сокет открыт один раз.
+  const setupOpened = ({ listStatus = 'succeeded' } = {}) => {
+    setup({ withChat: false });
+    store.dispatch(fetchChats.pending('req'));
+    if (listStatus === 'succeeded') store.dispatch(fetchChats.fulfilled([], 'req'));
+    store.dispatch(chatReceived({ ...chat, lastMessage: msg(2), unreadCount: 1, history }));
+    options.onStatus('open');
+  };
+
+  const reopen = async () => {
+    options.onStatus('reconnecting');
+    options.onStatus('open');
+    await flush();
+  };
+
+  it('первый open сверку не запускает', async () => {
+    setupOpened();
+    await flush();
+
+    expect(chatsApi.fetchChats).not.toHaveBeenCalled();
+  });
+
+  it('повторный open: догонка since=lastSeq, сообщения по порядку без дублей, последнее сообщение и счётчик как у сервера, history цела', async () => {
+    setupOpened();
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 4, lastMessage: msg(4), unreadCount: 3, title: 'Новое имя' })]);
+    chatsApi.fetchMessages.mockResolvedValue([msg(2), msg(3), msg(4)]);
+
+    await reopen();
+
+    expect(chatsApi.fetchMessages).toHaveBeenCalledWith('c1', { since: 2, limit: 100, signal: expect.any(AbortSignal) });
+    const state = store.getState();
+    expect(selectChatMessages(state, 'c1').map((m) => m.seq)).toEqual([2, 3, 4]);
+    expect(selectChatById(state, 'c1')).toMatchObject({ title: 'Новое имя', lastSeq: 4, lastMessage: msg(4), unreadCount: 3, history });
+  });
+
+  it('чат без новых сообщений не подкачивается', async () => {
+    setupOpened();
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 2, lastMessage: msg(2), unreadCount: 0 })]);
+
+    await reopen();
+
+    expect(chatsApi.fetchMessages).not.toHaveBeenCalled();
+    expect(selectChatById(store.getState(), 'c1').unreadCount).toBe(0);
+  });
+
+  it('открытый чат: непрочитанные с сервера не применяются', async () => {
+    setupOpened();
+    store.dispatch(chatSelected('c1'));
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 3, lastMessage: msg(3), unreadCount: 7 })]);
+    chatsApi.fetchMessages.mockResolvedValue([msg(3)]);
+
+    await reopen();
+
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ lastSeq: 3, unreadCount: 1 });
+  });
+
+  it('новый чат добавляется с собеседником в users, исчезнувший убирается вместе с сообщениями', async () => {
+    setupOpened();
+    store.dispatch({ type: 'messages/messageAdded', payload: msg(3), meta: { unread: false } });
+    const peer = { id: 'u9', name: 'Нина', avatarUrl: '' };
+    chatsApi.fetchChats.mockResolvedValue([{ id: 'd1', type: 'direct', peer, lastSeq: 1, lastMessage: null, unreadCount: 1, members: [] }]);
+
+    await reopen();
+
+    const state = store.getState();
+    expect(selectChatById(state, 'c1')).toBeUndefined();
+    expect(selectChatMessages(state, 'c1')).toHaveLength(0);
+    expect(selectChatById(state, 'd1')).toMatchObject({ peerId: 'u9' });
+    expect(selectUserById(state, 'u9')).toMatchObject({ name: 'Нина' });
+  });
+
+  it('удалённый при сверке чат не воскресает опоздавшим message.new', async () => {
+    setupOpened();
+    chatsApi.fetchChats.mockResolvedValue([]);
+    await reopen();
+
+    await receive(frame(3));
+
+    expect(chatsApi.fetchChat).not.toHaveBeenCalled();
+    expect(selectChatById(store.getState(), 'c1')).toBeUndefined();
+  });
+
+  it('ошибка догонки: lastSeq чата не поднимается, остальное обновляется', async () => {
+    setupOpened();
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 4, lastMessage: msg(4), unreadCount: 3, title: 'Новое имя' })]);
+    chatsApi.fetchMessages.mockRejectedValue(new Error('network'));
+
+    await reopen();
+
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ title: 'Новое имя', lastSeq: 2, lastMessage: msg(2) });
+  });
+
+  it('ошибка запроса списка глотается, store цел', async () => {
+    setupOpened();
+    chatsApi.fetchChats.mockRejectedValue(new Error('network'));
+    const before = store.getState();
+
+    await reopen();
+
+    expect(store.getState()).toEqual(before);
+  });
+
+  it.each(['idle', 'loading'])('пока список чатов не загружен (%s), сверка не запускается', async (status) => {
+    setup({ withChat: false });
+    if (status === 'loading') store.dispatch(fetchChats.pending('req'));
+    options.onStatus('open');
+
+    await reopen();
+
+    expect(chatsApi.fetchChats).not.toHaveBeenCalled();
+  });
+
+  it('новая сверка отменяет прежнюю: ответ прежней в store не попадает', async () => {
+    setupOpened();
+    const signals = [];
+    let resolveFirst;
+    chatsApi.fetchChats
+      .mockImplementationOnce((opts) => {
+        signals.push(opts.signal);
+        return new Promise((resolve) => { resolveFirst = resolve; });
+      })
+      .mockImplementationOnce((opts) => {
+        signals.push(opts.signal);
+        return Promise.resolve([item({ title: 'Вторая' })]);
+      });
+
+    await reopen();
+    await reopen();
+    resolveFirst([item({ title: 'Первая' })]);
+    await flush();
+
+    expect(signals[0].aborted).toBe(true);
+    expect(selectChatById(store.getState(), 'c1').title).toBe('Вторая');
+  });
+
+  it('cleanup отменяет сверку', async () => {
+    setupOpened();
+    let signal;
+    chatsApi.fetchChats.mockImplementation((opts) => {
+      signal = opts.signal;
+      return new Promise(() => {});
+    });
+    await reopen();
+
+    cleanup();
+
+    expect(signal.aborted).toBe(true);
+  });
+});
+
+describe('сверка и живые события во время неё', () => {
+  const item = (extra = {}) => ({ ...chat, members: [{ userId: 'me', role: 'owner' }], ...extra });
+  const hold = () => {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+  };
+  const openTwice = async () => {
+    setup({ withChat: false });
+    store.dispatch(fetchChats.pending('req'));
+    store.dispatch(fetchChats.fulfilled([], 'req'));
+    store.dispatch(chatReceived({ ...chat, lastMessage: msg(2), unreadCount: 1 }));
+    options.onStatus('open');
+    options.onStatus('reconnecting');
+    options.onStatus('open');
+    await flush();
+  };
+
+  it('message.new в неоткрытый чат после снимка списка: непрочитанные = сервер + новые чужие сообщения', async () => {
+    const list = hold();
+    chatsApi.fetchChats.mockReturnValue(list.promise);
+    await openTwice();
+
+    await receive(frame(3));
+    list.resolve([item({ lastSeq: 2, lastMessage: msg(2), unreadCount: 1 })]);
+    await flush();
+
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ lastSeq: 3, unreadCount: 2 });
+  });
+
+  it('свои сообщения, пришедшие после снимка, непрочитанные не увеличивают', async () => {
+    const list = hold();
+    chatsApi.fetchChats.mockReturnValue(list.promise);
+    await openTwice();
+
+    await receive(frame(3, { senderId: 'me' }));
+    list.resolve([item({ lastSeq: 2, lastMessage: msg(2), unreadCount: 1 })]);
+    await flush();
+
+    expect(selectChatById(store.getState(), 'c1').unreadCount).toBe(1);
+  });
+
+  it('чат, появившийся во время запроса списка, не удаляется и принимает сообщения', async () => {
+    const list = hold();
+    chatsApi.fetchChats.mockReturnValue(list.promise);
+    await openTwice();
+
+    await receive({ type: 'chat.created', payload: chatDto('c9', 0) });
+    await receive(frame(1, { chatId: 'c9' }));
+    list.resolve([item({ lastSeq: 2, lastMessage: msg(2) })]);
+    await flush();
+
+    const state = store.getState();
+    expect(selectChatById(state, 'c9')).toBeDefined();
+    expect(selectChatMessages(state, 'c9')).toHaveLength(1);
+    await receive(frame(2, { chatId: 'c9' }));
+    expect(selectChatMessages(store.getState(), 'c9')).toHaveLength(2);
+  });
+
+  it('чат, появившийся во время подкачки, остаётся после слияния', async () => {
+    const page = hold();
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 4, lastMessage: msg(4), unreadCount: 2 })]);
+    chatsApi.fetchMessages.mockReturnValue(page.promise);
+    await openTwice();
+
+    await receive({ type: 'chat.created', payload: chatDto('c9', 0) });
+    page.resolve([msg(3), msg(4)]);
+    await flush();
+
+    expect(selectChatById(store.getState(), 'c9')).toBeDefined();
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ lastSeq: 4 });
+  });
+
+  it('chat.removed во время сверки: чат из старого снимка не возвращается', async () => {
+    const list = hold();
+    chatsApi.fetchChats.mockReturnValue(list.promise);
+    await openTwice();
+
+    await receive({ type: 'chat.removed', payload: { chatId: 'c1' } });
+    list.resolve([item({ lastSeq: 2, lastMessage: msg(2) })]);
+    await flush();
+
+    expect(selectChatById(store.getState(), 'c1')).toBeUndefined();
+  });
+
+  it('чат, удалённый раньше в этой сессии и снова присутствующий на сервере, возвращается', async () => {
+    chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 2, lastMessage: msg(2) })]);
+    await openTwice();
+    await receive({ type: 'chat.removed', payload: { chatId: 'c1' } });
+    options.onStatus('reconnecting');
+    options.onStatus('open');
+    await flush();
+
+    expect(selectChatById(store.getState(), 'c1')).toBeDefined();
+    chatsApi.fetchMessages.mockResolvedValue([]);
+    await receive(frame(3));
+    expect(selectChatMessages(store.getState(), 'c1').map((m) => m.seq)).toContain(3);
+  });
+});
+
+describe('nudgeRealtime', () => {
+  it('просит сервис повторить подключение сразу', () => {
+    setup();
+
+    store.dispatch(nudgeRealtime());
+
+    expect(service.retryNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('без запущенного сервиса ничего не делает', () => {
+    setup();
+    cleanup();
+    service.retryNow.mockClear();
+
+    store.dispatch(nudgeRealtime());
+
+    expect(service.retryNow).not.toHaveBeenCalled();
   });
 });

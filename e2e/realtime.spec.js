@@ -11,17 +11,28 @@ const CHATS = [
 ];
 const dto = (chat) => ({ id: chat.id, type: 'group', title: chat.title, lastSeq: chat.lastSeq, members: [BOB] });
 
-const mockRest = async (page) => {
-  await page.route('**/api/chats', (route) => route.fulfill({ json: CHATS }));
-  await page.route('**/api/chats/*', (route) => route.fulfill({ json: dto(CHATS.find((chat) => route.request().url().endsWith(`/${chat.id}`))) }));
-  await page.route('**/api/chats/g1/messages**', (route) => route.fulfill({ json: [first] }));
+// Состояние «сервера» меняется по ходу теста: chats — ответ GET /api/chats, messages — история по чатам (since фильтрует).
+const createServer = () => ({
+  chats: CHATS.map((chat) => ({ ...chat })),
+  messages: { g1: [first], g2: [] },
+});
+
+const mockRest = async (page, server) => {
+  await page.route('**/api/chats', (route) => route.fulfill({ json: server.chats }));
+  await page.route('**/api/chats/*', (route) => route.fulfill({ json: dto(server.chats.find((chat) => route.request().url().endsWith(`/${chat.id}`))) }));
+  await page.route('**/api/chats/*/messages**', (route) => {
+    const url = new URL(route.request().url());
+    const chatId = url.pathname.split('/')[3];
+    const since = Number(url.searchParams.get('since') ?? 0);
+    route.fulfill({ json: server.messages[chatId].filter((m) => m.seq > since) });
+  });
 };
 
 // Подключает подмену сокетов, открывает приложение и входит; возвращает управление сокетом приложения.
-const openApp = async (page) => {
+const openApp = async (page, server = createServer()) => {
   const sockets = [];
   await page.routeWebSocket(/\/ws$/, (ws) => sockets.push(ws));
-  await mockRest(page);
+  await mockRest(page, server);
   await page.goto('/');
   await expect(signInControl(page)).toBeVisible();
   const beforeLogin = sockets.length;
@@ -76,4 +87,34 @@ test('вытеснение лимитом вкладок (4008): баннер с
 
   await expect(page.getByText('Соединение занято в другой вкладке')).toHaveCount(0);
   await expect.poll(() => socket.appSocketCount()).toBe(countBefore + 1);
+});
+
+test('[UC-MSG-09] после обрыва связи пропущенные сообщения появляются сами: по порядку, без дублей, список чатов обновлён', async ({ page }) => {
+  const server = createServer();
+  const socket = await openApp(page, server);
+  await page.locator('.chat', { hasText: 'Команда' }).click();
+  await expect(page.locator('.dialog__message')).toHaveCount(1);
+  const countBefore = socket.appSocketCount();
+
+  // Пока связи нет, другой пользователь пишет в открытый чат и в неоткрытый.
+  const missed = [message('g1', 2, 'Пропущено раз'), message('g1', 3, 'Пропущено два')];
+  server.messages.g1.push(...missed);
+  server.chats[0] = { ...server.chats[0], lastSeq: 3, lastMessage: missed[1], unreadCount: 2 };
+  server.messages.g2.push(message('g2', 1, 'Привет, друзья'), message('g2', 2, 'Вы тут?'));
+  server.chats[1] = { ...server.chats[1], lastSeq: 2, lastMessage: server.messages.g2[1], unreadCount: 2 };
+  socket.close(1006);
+
+  await expect.poll(() => socket.appSocketCount()).toBe(countBefore + 1);
+
+  await expect(page.locator('.dialog__message')).toHaveCount(3);
+  await expect(page.locator('.dialog__message').nth(1)).toContainText('Пропущено раз');
+  await expect(page.locator('.dialog__message').nth(2)).toContainText('Пропущено два');
+  await expect(page.locator('.chat', { hasText: 'Команда' }).locator('.chat__last-message')).toHaveText('Пропущено два');
+  await expect(page.locator('.chat', { hasText: 'Команда' }).getByTestId('chat-unread')).toHaveCount(0);
+  await expect(page.locator('.chat', { hasText: 'Друзья' }).locator('.chat__last-message')).toHaveText('Вы тут?');
+  await expect(page.locator('.chat', { hasText: 'Друзья' }).getByTestId('chat-unread')).toHaveText('2');
+
+  // Повторное событие того же сообщения дублей не создаёт.
+  socket.send('message.new', missed[1]);
+  await expect(page.locator('.dialog__message')).toHaveCount(3);
 });

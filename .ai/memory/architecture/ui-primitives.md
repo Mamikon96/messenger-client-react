@@ -1,0 +1,4 @@
+# UI-примитивы (FE-24)
+> Проверено: 2026-10-17 @ f5bc883+dirty
+
+`src/app/modules/ui/` — `button/Button` (`variant` primary/secondary/ghost, `loading` → disabled + `aria-busy` + индикатор), `icon-button/IconButton` (обязательный `label` → `aria-label`), `input/Input` (input или textarea при `multiline`; `label`/`error` необязательны, без них рендерится голое поле; `aria-invalid`/`aria-describedby`; `forwardRef`), `avatar/Avatar` (картинка → при ошибке/без `src` инициалы на цвете из `id`; `size` sm/md/lg). Именованные экспорты, только токены, `:focus-visible` с обводкой акцентом, `className` пробрасывается. Глобальных стилей `button`/`input` больше нет (`App.css`); на примитивы переведены `App` (Повторить), `Action`, `UserMenu`, `JoinForm`, `Dialog`. `Button` с `href` рендерит ссылку (неактивная — `aria-disabled`, переход отменяется). `Avatar`/`IconButton` пока нигде не используются (FE-26, FE-28).

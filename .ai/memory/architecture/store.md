@@ -1,0 +1,12 @@
+# Store
+> Проверено: 2026-10-17 @ f5bc883+dirty
+
+| Слайс | Состояние | Actions / селекторы |
+|---|---|---|
+| chats | `createEntityAdapter`, элементы `ChatListItemDto` (раздел 4 `docs/client-integration.md`), порядок добавления | `chatCreated({title})` (локальный чат: id = `createClientId()`, `type: "group"`, `lastSeq: 0`); на `messageAdded` обновляет `lastSeq`/`lastMessage`, только если `seq` больше текущего `lastSeq` (дубль и сообщение не по порядку игнорируются); `selectChats`, `selectChatById` |
+| activeChatId | `string \| null` | `chatSelected`; `selectActiveChatId`, `selectActiveChat` |
+| messages | `{ [chatId]: EntityState }`, `ChatMessageDto`, ключ `seq`, сортировка по `seq` | обрабатывает `messageAdded`; thunk `sendMessage({chatId, senderId, body})` (в `messages.js`) считает `seq = lastSeq чата + 1` и диспатчит `messageAdded`; `selectChatMessages(state, chatId)` (мемоизирован) |
+| users | `createEntityAdapter` по `UserSummary`, пока пустой | `usersReceived`; `selectUsers`, `selectUserById` |
+| auth | `{status, user}` | thunks `checkSession`, `logout` |
+
+`default` экспорт `store.js` построен на `rootReducer` (`combineReducers` + сброс): на `logout.fulfilled` состояние `undefined` → все слайсы в начальное, `auth` → `anonymous`; на `sessionClosed` (401 `unauthorized` у вошедшего) — тот же сброс, `auth` → `sessionClosed`, у невошедшего действие игнорируется. Событие `messageAdded` (`ChatMessageDto`) вынесено в `reducers/messageEvents.js`, его обрабатывают `chats` и `messages` без импорта друг друга; `rootReducer` seq не назначает. Локальная отправка — thunk `sendMessage` (чата нет — ничего не делает). Клиентские UUID — `createClientId()` (`src/app/services/clientId.js`, FE-D15(11)). Компоненты читают store только через селекторы слайсов.

@@ -10,7 +10,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 - `bash scripts/check-fast.sh` — лёгкие проверки цикла разработки (только затронутые изменениями) · `npm run accept` — приёмка: память + кейсы/API/код + ESLint + unit + e2e (`scripts/accept.sh`) · `bash scripts/check-state.sh` — проверка состояния (быстро)
 
 ## Структура
-`src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/architecture.md`.
+`src/app/` — `store.js`, `reducers/` (слайсы), `services/`, `modules/<module>/` (компонент + css). Подробнее: `.ai/memory/architecture.md` (роутер по темам в `architecture/`).
 
 ## Контекст для AI: читай только нужное
 Правила и память разложены по файлам в `.ai/` (структура — `.ai/README.md`). **Не читай всё подряд** — открывай файлы по этой таблице (единственный маршрутизатор):
@@ -19,7 +19,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 |---|---|
 | Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/tasks.md`, `.ai/rules/task-contract.md` |
 | Компоненты, слайсы, стили | `.ai/rules/code-style.md` |
-| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` (+ скилл `react-patterns`, `.ai/memory/architecture.md`, заголовки `decisions.md`) |
+| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` (+ скилл `react-patterns`, `.ai/memory/architecture.md` — роутер, открывать нужный файл из `architecture/`, заголовки `decisions.md`) |
 | Тесты / новое поведение, user-кейсы | `.ai/rules/testing.md` |
 | Баги, текущее состояние | `.ai/memory/state.md` |
 | Новая библиотека/подход | `.ai/rules/tech-approval.md`, заголовки `.ai/memory/decisions.md` |

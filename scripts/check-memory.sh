@@ -23,8 +23,17 @@ check_files() {
     [ -f "$dir/$f" ] || fail "нет файла $dir/$f"
   done
 
-  # Штамп «Проверено: дата @ sha[+dirty]» в state/tasks/architecture, sha должен существовать в git
-  for f in state.md tasks.md architecture.md; do
+  # architecture.md — роутер, подробности по темам лежат в architecture/*.md (FE-125); каждый файл упомянут в роутере
+  local arch_files=() af
+  for af in "$dir"/architecture/*.md; do
+    [ -e "$af" ] || continue
+    arch_files+=("architecture/$(basename "$af")")
+    grep -qF "architecture/$(basename "$af")" "$dir/architecture.md" 2>/dev/null \
+      || fail "$dir/architecture.md: нет строки роутера для architecture/$(basename "$af")"
+  done
+
+  # Штамп «Проверено: дата @ sha[+dirty]» в state/tasks/architecture и architecture/*.md, sha должен существовать в git
+  for f in state.md tasks.md architecture.md ${arch_files[@]+"${arch_files[@]}"}; do
     [ -f "$dir/$f" ] || continue
     local stamp sha
     stamp=$(grep -m1 -E '^> Проверено: ' "$dir/$f" || true)

@@ -26,7 +26,9 @@ const run = (files) => {
     ...files,
   };
   for (const [name, content] of Object.entries(all)) {
-    if (content !== null) fs.writeFileSync(path.join(dir, name), content);
+    if (content === null) continue;
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), content);
   }
   const r = spawnSync('bash', [SCRIPT], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, MEM_DIR: dir } });
   fs.rmSync(dir, { recursive: true, force: true });
@@ -121,4 +123,25 @@ test('ID решения повторяется в decisions.md и decisions-arch
 test('разные ID в decisions.md и decisions-archive.md — код 0', () => {
   const r = run({ 'decisions.md': '# Решения\n\n## FE-D02 — b\n', 'decisions-archive.md': '# Архив\n\n## FE-D01 — a (ЗАМЕНЕНО)\n' });
   assert.equal(r.code, 0, r.out);
+});
+
+// Папка architecture/ (FE-125): architecture.md — роутер, подробности по темам в architecture/*.md
+const ROUTER = `# Архитектура\n${STAMP}\n\n- \`architecture/store.md\` — store\n`;
+const SUB = `# Store\n${STAMP}\n`;
+
+test('architecture/*.md со штампом и строкой в роутере — код 0', () => {
+  const r = run({ 'architecture.md': ROUTER, 'architecture/store.md': SUB });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('файл architecture/ без штампа — ошибка', () => {
+  const r = run({ 'architecture.md': ROUTER, 'architecture/store.md': '# Store\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /architecture\/store\.md.*штамп/);
+});
+
+test('файл architecture/ не упомянут в роутере — ошибка', () => {
+  const r = run({ 'architecture/store.md': SUB });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /store\.md.*architecture\.md|architecture\.md.*store\.md/);
 });

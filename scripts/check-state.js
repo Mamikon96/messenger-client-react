@@ -112,7 +112,7 @@ function checkIndex(rows, casesByFile) {
   const errors = [];
   const indexed = new Set(rows.map((r) => `${r.file}\u0000${r.id}`));
   const reportedMissing = new Set();
-  for (const { id, status, file } of rows) {
+  for (const { id, title, status, file } of rows) {
     const cases = casesByFile[file];
     if (!cases) {
       if (!reportedMissing.has(file)) errors.push(`индекс: файл ${file} не найден среди файлов ${CASES_DIR}/ (кейс ${id})`);
@@ -122,6 +122,7 @@ function checkIndex(rows, casesByFile) {
     const found = cases.find((c) => c.id === id);
     if (!found) errors.push(`${id}: указан в индексе в файле ${file}, но там такого кейса нет`);
     else if (found.status !== status) errors.push(`${id}: статус в индексе (${status}) не совпадает со статусом в ${file} (${found.status})`);
+    else if (found.title !== title) errors.push(`${id}: название в индексе («${title}») не совпадает с заголовком в ${file} («${found.title}»)`);
   }
   const filesOf = {};
   for (const [file, cases] of Object.entries(casesByFile)) {
@@ -157,7 +158,10 @@ function casesBundle(root) {
   if (index !== null) files.push({ path: CASES_FILE, text: index });
   const dir = path.join(root, CASES_DIR);
   if (fs.existsSync(dir)) {
-    for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.md')).sort()) {
+    const names = fs.readdirSync(dir)
+      .filter((n) => n.endsWith('.md') && fs.statSync(path.join(dir, n)).isFile())
+      .sort();
+    for (const name of names) {
       files.push({ path: `${CASES_DIR}/${name}`, text: fs.readFileSync(path.join(dir, name), 'utf8') });
     }
   }

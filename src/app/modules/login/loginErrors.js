@@ -1,5 +1,5 @@
 // Тексты ошибок экрана входа по моделям из toFormError (services/authFormError.js).
-// Тексты кейсов UC-AUTH-09, 14, 15, 17, 19, 20 — из docs/user-cases.md.
+// Тексты кейсов UC-AUTH-09, 14, 15, 17, 19, 20 — из docs/user-cases/auth.md.
 
 const FIELD_MESSAGES = {
     login: {

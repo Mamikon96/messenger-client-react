@@ -141,7 +141,13 @@ test.describe('parseIndex', () => {
 
 test.describe('checkIndex', () => {
   const row = (id, status = 'active', file = 'docs/user-cases/auth.md') => ({ id, title: 't', status, file });
-  const c = (id, status = 'active') => ({ id, status });
+  const c = (id, status = 'active', title = 't') => ({ id, status, title });
+
+  test('название в индексе не совпадает с заголовком кейса в файле — ошибка', () => {
+    const errors = S.checkIndex([row('UC-AUTH-01')], { 'docs/user-cases/auth.md': [c('UC-AUTH-01', 'active', 'Другое')] });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /UC-AUTH-01.*назван/);
+  });
 
   test('согласованный набор — без ошибок', () => {
     const rows = [row('UC-AUTH-01'), row('UC-CHAT-04', 'planned', 'docs/user-cases/chat.md')];
@@ -193,6 +199,18 @@ test.describe('casesBundle и хэш набора', () => {
     return root;
   };
   const hashAt = (files) => S.hashText(S.casesBundle(mkRoot(files)).text);
+
+  test('папка с именем *.md в docs/user-cases/ не роняет чтение и в набор не входит', () => {
+    const root = mkRoot(base);
+    fs.mkdirSync(path.join(root, 'docs/user-cases/dir.md'));
+    assert.deepEqual(S.casesBundle(root).files.map((f) => f.path), [INDEX, caseFile('auth')]);
+  });
+
+  test('симлинк на файл кейсов входит в набор', () => {
+    const root = mkRoot({ ...base, 'elsewhere/extra.txt': 'z' });
+    fs.symlinkSync(path.join(root, 'elsewhere/extra.txt'), path.join(root, 'docs/user-cases/link.md'));
+    assert.deepEqual(S.casesBundle(root).files.map((f) => f.path), [INDEX, caseFile('auth'), caseFile('link')]);
+  });
 
   test('индекс первым, затем файлы по алфавиту', () => {
     const root = mkRoot({ ...base, [caseFile('chat')]: 'x', [caseFile('admin')]: 'y' });

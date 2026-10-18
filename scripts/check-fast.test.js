@@ -84,3 +84,27 @@ test.describe('splitZ', () => {
     assert.deepEqual(F.splitZ(''), []);
   });
 });
+
+test.describe('activeCaseIds', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const block = (id, status) => `### ${id} — Название\nСтатус: ${status}\nОписание: о.\nШаги: 1. ш.\nОжидается: о.\n`;
+
+  test('active-кейсы берутся из всех файлов docs/user-cases/, planned пропускаются', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-fast-'));
+    fs.mkdirSync(path.join(root, 'docs/user-cases'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'docs/user-cases.md'),
+      '# Кейсы\n\n| ID | Название | Статус | Файл |\n|---|---|---|---|\n| UC-A-01 | Название | active | docs/user-cases/a.md |\n| UC-A-02 | Название | planned | docs/user-cases/a.md |\n| UC-B-01 | Название | active | docs/user-cases/b.md |\n'
+    );
+    fs.writeFileSync(path.join(root, 'docs/user-cases/a.md'), `## A\n\n${block('UC-A-01', 'active')}\n${block('UC-A-02', 'planned')}`);
+    fs.writeFileSync(path.join(root, 'docs/user-cases/b.md'), `## B\n\n${block('UC-B-01', 'active')}`);
+    assert.deepEqual([...F.activeCaseIds(root)].sort(), ['UC-A-01', 'UC-B-01']);
+  });
+
+  test('нет набора кейсов — пустое множество', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-fast-'));
+    assert.equal(F.activeCaseIds(root).size, 0);
+  });
+});

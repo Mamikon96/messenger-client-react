@@ -29,6 +29,20 @@ const caseBlock = (over = {}) => {
 };
 const doc = (...blocks) => `# Кейсы\n\nпреамбула\n\n${blocks.join('\n\n')}\n`;
 
+// Набор кейсов из индекса и файлов по областям (FE-128)
+const INDEX = 'docs/user-cases.md';
+const caseFile = (area) => `docs/user-cases/${area}.md`;
+const indexDoc = (rows) =>
+  '# User-кейсы\n\nпояснение\n\n## Вход\n\n| ID | Название | Статус | Файл |\n|---|---|---|---|\n' +
+  rows.map((r) => `| ${r.id} | ${r.title} | ${r.status} | ${r.file} |`).join('\n') +
+  '\n';
+const indexFor = (md, file) => indexDoc(S.parseCases(md).cases.map((c) => ({ ...c, file })));
+// md — текст файла кейсов одной области; возвращает файлы набора (индекс + файл области)
+const caseSet = (md, area = 'auth') => ({ [INDEX]: indexFor(md, caseFile(area)), [caseFile(area)]: md });
+const toBundle = (files) => S.bundleText(Object.entries(files).map(([p, text]) => ({ path: p, text })));
+const hashOfSet = (files) => S.hashText(toBundle(files));
+const lockOf = (files) => hashOfSet(files) + '\n';
+
 test.describe('parseCases', () => {
   test('разбирает поля кейса', () => {
     const { cases, errors } = S.parseCases(doc(caseBlock()));
@@ -93,6 +107,187 @@ test.describe('parseCases', () => {
 
   test('документ без кейсов — ошибка', () => {
     assert.ok(S.parseCases('# пусто\n').errors.length > 0);
+  });
+});
+
+test.describe('parseIndex', () => {
+  const idx = indexDoc([
+    { id: 'UC-AUTH-01', title: 'Вход', status: 'active', file: 'docs/user-cases/auth.md' },
+    { id: 'UC-CHAT-04', title: 'Создание чата', status: 'planned', file: 'docs/user-cases/chat.md' },
+  ]);
+
+  test('разбирает строки таблиц всех областей', () => {
+    const { rows, errors } = S.parseIndex(idx);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(rows, [
+      { id: 'UC-AUTH-01', title: 'Вход', status: 'active', file: 'docs/user-cases/auth.md' },
+      { id: 'UC-CHAT-04', title: 'Создание чата', status: 'planned', file: 'docs/user-cases/chat.md' },
+    ]);
+  });
+
+  test('шапка и разделитель таблицы строками не считаются; текст вне таблиц игнорируется', () => {
+    assert.equal(S.parseIndex(idx).rows.length, 2);
+  });
+
+  test('индекс без строк — ошибка', () => {
+    assert.ok(S.parseIndex('# User-кейсы\n\nтекст\n').errors.length > 0);
+  });
+
+  test('дубль ID в индексе — ошибка', () => {
+    const row = { id: 'UC-AUTH-01', title: 'Вход', status: 'active', file: 'docs/user-cases/auth.md' };
+    assert.ok(S.parseIndex(indexDoc([row, row])).errors.some((e) => e.includes('UC-AUTH-01')));
+  });
+});
+
+test.describe('checkIndex', () => {
+  const row = (id, status = 'active', file = 'docs/user-cases/auth.md') => ({ id, title: 't', status, file });
+  const c = (id, status = 'active') => ({ id, status });
+
+  test('согласованный набор — без ошибок', () => {
+    const rows = [row('UC-AUTH-01'), row('UC-CHAT-04', 'planned', 'docs/user-cases/chat.md')];
+    const files = { 'docs/user-cases/auth.md': [c('UC-AUTH-01')], 'docs/user-cases/chat.md': [c('UC-CHAT-04', 'planned')] };
+    assert.deepEqual(S.checkIndex(rows, files), []);
+  });
+
+  test('статус в индексе не совпадает со статусом кейса', () => {
+    const errors = S.checkIndex([row('UC-AUTH-01', 'planned')], { 'docs/user-cases/auth.md': [c('UC-AUTH-01')] });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /UC-AUTH-01.*статус/i);
+  });
+
+  test('ID из индекса нет в указанном файле', () => {
+    const errors = S.checkIndex([row('UC-AUTH-02')], { 'docs/user-cases/auth.md': [c('UC-AUTH-01')] });
+    assert.ok(errors.some((e) => e.includes('UC-AUTH-02')), errors.join('\n'));
+  });
+
+  test('кейс из файла не указан в индексе', () => {
+    const errors = S.checkIndex([row('UC-AUTH-01')], { 'docs/user-cases/auth.md': [c('UC-AUTH-01'), c('UC-AUTH-02')] });
+    assert.ok(errors.some((e) => e.includes('UC-AUTH-02') && e.includes('индекс')), errors.join('\n'));
+  });
+
+  test('один ID в двух файлах', () => {
+    const rows = [row('UC-AUTH-01')];
+    const files = { 'docs/user-cases/auth.md': [c('UC-AUTH-01')], 'docs/user-cases/chat.md': [c('UC-AUTH-01')] };
+    assert.ok(S.checkIndex(rows, files).some((e) => e.includes('UC-AUTH-01') && /дубл|повтор/i.test(e)));
+  });
+
+  test('файл из индекса не существует', () => {
+    const errors = S.checkIndex([row('UC-AUTH-01', 'active', 'docs/user-cases/zzz.md')], {});
+    assert.ok(errors.some((e) => e.includes('zzz.md')), errors.join('\n'));
+  });
+
+  test('файл в docs/user-cases/ без строк в индексе', () => {
+    const errors = S.checkIndex([row('UC-AUTH-01')], { 'docs/user-cases/auth.md': [c('UC-AUTH-01')], 'docs/user-cases/extra.md': [] });
+    assert.ok(errors.some((e) => e.includes('extra.md')), errors.join('\n'));
+  });
+});
+
+test.describe('casesBundle и хэш набора', () => {
+  const base = caseSet(doc(caseBlock()));
+  const mkRoot = (files) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bundle-'));
+    for (const [rel, content] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), content);
+    }
+    return root;
+  };
+  const hashAt = (files) => S.hashText(S.casesBundle(mkRoot(files)).text);
+
+  test('индекс первым, затем файлы по алфавиту', () => {
+    const root = mkRoot({ ...base, [caseFile('chat')]: 'x', [caseFile('admin')]: 'y' });
+    assert.deepEqual(S.casesBundle(root).files.map((f) => f.path), [INDEX, caseFile('admin'), caseFile('auth'), caseFile('chat')]);
+  });
+
+  test('результат не зависит от порядка создания файлов', () => {
+    const a = hashAt({ ...base, [caseFile('chat')]: 'x', [caseFile('admin')]: 'y' });
+    const b = hashAt({ [caseFile('admin')]: 'y', [caseFile('chat')]: 'x', ...base });
+    assert.equal(a, b);
+  });
+
+  test('хэш совпадает с хэшем текста bundleText', () => {
+    assert.equal(hashAt(base), hashOfSet(base));
+  });
+
+  test('хэш меняется при правке индекса', () => {
+    assert.notEqual(hashAt(base), hashAt({ ...base, [INDEX]: base[INDEX] + 'x' }));
+  });
+
+  test('хэш меняется при правке файла кейсов', () => {
+    assert.notEqual(hashAt(base), hashAt({ ...base, [caseFile('auth')]: base[caseFile('auth')] + 'x' }));
+  });
+
+  test('хэш меняется при переименовании файла (содержимое прежнее)', () => {
+    const renamed = { [INDEX]: base[INDEX], [caseFile('login')]: base[caseFile('auth')] };
+    assert.notEqual(hashAt(base), hashAt(renamed));
+  });
+
+  test('хэш меняется при добавлении файла', () => {
+    assert.notEqual(hashAt(base), hashAt({ ...base, [caseFile('extra')]: '' }));
+  });
+
+  test('без каталога docs/user-cases остаётся один индекс', () => {
+    const root = mkRoot({ [INDEX]: base[INDEX] });
+    assert.deepEqual(S.casesBundle(root).files.map((f) => f.path), [INDEX]);
+  });
+});
+
+test.describe('loadCaseSet', () => {
+  const mk = (files) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'load-'));
+    for (const [rel, content] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), content);
+    }
+    return root;
+  };
+  const chat = doc(caseBlock({ id: 'UC-CHAT-01', title: 'Чат' }));
+  const auth = doc(caseBlock());
+  const full = () => ({
+    [INDEX]: indexDoc([
+      { id: 'UC-AUTH-01', title: 'Вход', status: 'active', file: caseFile('auth') },
+      { id: 'UC-CHAT-01', title: 'Чат', status: 'active', file: caseFile('chat') },
+    ]),
+    [caseFile('auth')]: auth,
+    [caseFile('chat')]: chat,
+  });
+
+  test('собирает кейсы всех файлов', () => {
+    const { cases, errors } = S.loadCaseSet(mk(full()));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(cases.map((c) => c.id).sort(), ['UC-AUTH-01', 'UC-CHAT-01']);
+  });
+
+  test('расхождение статуса индекс ↔ файл — ошибка', () => {
+    const files = full();
+    files[INDEX] = files[INDEX].replace('UC-CHAT-01 | Чат | active', 'UC-CHAT-01 | Чат | planned');
+    assert.ok(S.loadCaseSet(mk(files)).errors.some((e) => e.includes('UC-CHAT-01')));
+  });
+
+  test('кейс не в индексе — ошибка', () => {
+    const files = { ...full(), [caseFile('chat')]: doc(caseBlock({ id: 'UC-CHAT-01', title: 'Чат' }), caseBlock({ id: 'UC-CHAT-02', title: 'Ещё' })) };
+    assert.ok(S.loadCaseSet(mk(files)).errors.some((e) => e.includes('UC-CHAT-02')));
+  });
+
+  test('дубль ID между файлами — ошибка', () => {
+    const files = { ...full(), [caseFile('chat')]: auth };
+    assert.ok(S.loadCaseSet(mk(files)).errors.some((e) => e.includes('UC-AUTH-01')));
+  });
+
+  test('лишний файл без строк в индексе — ошибка', () => {
+    const files = { ...full(), [caseFile('extra')]: doc(caseBlock({ id: 'UC-EXTRA-01', title: 'x' })) };
+    assert.ok(S.loadCaseSet(mk(files)).errors.some((e) => e.includes('extra.md')));
+  });
+
+  test('ошибка разбора кейса называет файл', () => {
+    const files = { ...full(), [caseFile('chat')]: doc(caseBlock({ id: 'UC-CHAT-01', title: 'Чат', description: '' })) };
+    assert.ok(S.loadCaseSet(mk(files)).errors.some((e) => e.includes('chat.md') && e.includes('Описание')));
+  });
+
+  test('нет индекса — ошибка', () => {
+    const files = full();
+    delete files[INDEX];
+    assert.ok(S.loadCaseSet(mk(files)).errors.length > 0);
   });
 });
 
@@ -690,11 +885,15 @@ test.describe('CLI на фикстурном репозитории', () => {
     "const { test, expect } = require('@playwright/test');\n" +
     "test('[UC-AUTH-01] вход', async () => { expect(1).toBe(1); });\n";
 
+  const casesFiles = (md) => {
+    const files = caseSet(md);
+    return { ...files, '.ai/user-cases.sha256': lockOf(files) };
+  };
+
   const makeRoot = (over = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-state-'));
     const files = {
-      'docs/user-cases.md': goodCases,
-      '.ai/user-cases.sha256': S.hashText(goodCases) + '\n',
+      ...casesFiles(goodCases),
       'e2e/a.spec.js': goodSpec,
       'src/app/api.js': 'export const s = () => fetch("/api/auth/session");\n',
       'mock-bff/server.js': '// GET /api/auth/session\n',
@@ -717,9 +916,29 @@ test.describe('CLI на фикстурном репозитории', () => {
   });
 
   test('правка документа без утверждения — код 1', () => {
-    const r = run(makeRoot({ 'docs/user-cases.md': goodCases + '\nправка\n' }));
+    const r = run(makeRoot({ [caseFile('auth')]: goodCases + '\nправка\n' }));
     assert.equal(r.status, 1);
     assert.match(r.stdout + r.stderr, /approve-usecases\.sh/);
+  });
+
+  test('правка индекса без утверждения — код 1', () => {
+    const r = run(makeRoot({ [INDEX]: caseSet(goodCases)[INDEX] + '\nправка\n' }));
+    assert.equal(r.status, 1);
+    assert.match(r.stdout + r.stderr, /approve-usecases\.sh/);
+  });
+
+  test('статус в индексе расходится с файлом — код 1', () => {
+    const files = caseSet(goodCases);
+    const r = run(makeRoot({ ...files, [INDEX]: files[INDEX].replace('| active |', '| planned |'), '.ai/user-cases.sha256': null }));
+    assert.equal(r.status, 1);
+    assert.match(r.stdout + r.stderr, /UC-AUTH-01.*статус/i);
+  });
+
+  test('--cases-hash печатает хэш набора, он совпадает с lock-файлом', () => {
+    const root = makeRoot();
+    const r = run(root, ['--cases-hash']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), fs.readFileSync(path.join(root, '.ai/user-cases.sha256'), 'utf8').trim());
   });
 
   test('active-кейс без e2e-теста — код 1', () => {
@@ -779,7 +998,7 @@ test.describe('CLI на фикстурном репозитории', () => {
     const spec = '## 2. Эндпоинты\n### 2.1. `POST /api/auth/register`\n### 2.6. `PATCH /api/me`\n### 2.9. Удаляются\n- `POST /api/invites/inspect`\n## 3. Модели\n';
     const caseWithApi = (api) =>
       doc(caseBlock({ api: ['GET /api/auth/session', api] }), caseBlock({ id: 'UC-AUTH-02', status: 'planned', api: [] }));
-    const withCases = (md, extra = {}) => makeRoot({ 'docs/user-cases.md': md, '.ai/user-cases.sha256': S.hashText(md) + '\n', [SPEC]: spec, ...extra });
+    const withCases = (md, extra = {}) => makeRoot({ ...casesFiles(md), [SPEC]: spec, ...extra });
 
     test('вызов клиента на эндпоинт из §2.1–§2.8 принимается', () => {
       const r = run(makeRoot({ [SPEC]: spec, 'src/app/api.js': 'fetch("/api/auth/session"); fetch("/api/auth/register"); fetch("/api/me");\n' }));
@@ -843,12 +1062,11 @@ test.describe('CLI на фикстурном репозитории', () => {
     const writeReport = (root, ...a) => {
       const file = path.join(root, reportPathOf(root));
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, qaReport(treeOf(root), S.hashText(qaCases), ...a));
+      fs.writeFileSync(file, qaReport(treeOf(root), hashOfSet(caseSet(qaCases)), ...a));
     };
     const makeGitRoot = (verdict = 'PASS', over = {}, branch = null) => {
       const root = makeRoot({
-        'docs/user-cases.md': qaCases,
-        '.ai/user-cases.sha256': S.hashText(qaCases) + '\n',
+        ...casesFiles(qaCases),
         'e2e/a.spec.js': qaSpec,
         ...over,
       });

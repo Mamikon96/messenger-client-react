@@ -30,6 +30,7 @@ const run = (files) => {
     'state.md': `# Состояние\n${STAMP}\n`,
     'architecture.md': `# Архитектура\n${STAMP}\n`,
     'tasks.md': TASKS,
+    'queue.md': '# Очередь задач\n',
     'done.md': DONE,
     'done/FE-89.md': DONE_FILE,
     ...files,
@@ -163,7 +164,7 @@ const withBacklog = (files, extra = {}) => {
   for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, 'backlog', name), content);
   const all = {
     'README.md': '# Память\n', 'decisions.md': '# Решения\n', 'state.md': `# Состояние\n${STAMP}\n`,
-    'architecture.md': `# Архитектура\n${STAMP}\n`, 'tasks.md': TASKS, 'done.md': DONE, ...extra,
+    'architecture.md': `# Архитектура\n${STAMP}\n`, 'tasks.md': TASKS, 'queue.md': '# Очередь задач\n', 'done.md': DONE, ...extra,
   };
   fs.mkdirSync(path.join(dir, 'done'));
   fs.writeFileSync(path.join(dir, 'done', 'FE-89.md'), DONE_FILE);
@@ -290,4 +291,93 @@ test('файл decisions/ упомянут только в прозе роуте
   const r = run({ 'decisions.md': D_ROUTER(D_ROW) + '\nСм. `decisions/extra.md`.\n', 'decisions/state.md': D_FILE, 'decisions/extra.md': '# Лишний\n' });
   assert.equal(r.code, 1);
   assert.match(r.out, /extra\.md/);
+});
+
+// Лимит «Бэклога» и очередь queue.md (FE-132, FE-D53)
+const tasksWith = (lines) => `# Задачи\n${STAMP}\n\n## В работе\n—\n\n## Бэклог\n${lines.join('\n')}\n`;
+const T3 = ['- **FE-1 (P1)** a', '- **FE-2 (P1)** b', '- **FE-3 (P2)** c'];
+
+test('нет queue.md — ошибка', () => {
+  const r = run({ 'queue.md': null });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /queue\.md/);
+});
+
+test('queue.md без штампа «Проверено» — код 0', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': '# Очередь задач\n- **FE-4 (P2)** d\n' });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('в «Бэклоге» 7 задач — код 0, 8 — ошибка', () => {
+  const seven = Array.from({ length: 7 }, (_, i) => `- **FE-${i + 1} (P1)** t`);
+  assert.equal(run({ 'tasks.md': tasksWith(seven) }).code, 0);
+  const r = run({ 'tasks.md': tasksWith([...seven, '- **FE-8 (P1)** t']) });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /лимит 7/);
+});
+
+test('лимит считается только по «Бэклогу»: «В работе» не учитывается', () => {
+  const seven = Array.from({ length: 7 }, (_, i) => `- **FE-${i + 1} (P1)** t`);
+  const wip = ['- **FE-90 (P1)** в работе', '  - Цель: x', '  - Кейсы: нет', '  - Проверка задачи: y', '  - В скоупе: z', '  - Вне скоупа: w', '  - Открытые вопросы: нет', '  - Осталось: ревью'];
+  const tasks = `# Задачи\n${STAMP}\n\n## В работе\n${wip.join('\n')}\n\n## Бэклог\n${seven.join('\n')}\n`;
+  assert.equal(run({ 'tasks.md': tasks }).code, 0);
+});
+
+test('ID повторяется в tasks.md и queue.md — ошибка', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': '- **FE-3 (P3)** дубль\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-3/);
+});
+
+test('ID в queue.md не со своим префиксом — ошибка', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': '- **BE-4 (P3)** x\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /BE-4/);
+});
+
+test('строка queue.md длиннее 200 символов — ошибка', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': `- **FE-4 (P3)** ${LONG}\n` });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-4.*200|200.*FE-4/);
+});
+
+test('backlog/FE-NN.md со строкой только в queue.md — код 0', () => {
+  const r = withBacklog({ 'FE-4.md': '# FE-4\n' }, { 'tasks.md': tasksWith(T3), 'queue.md': '- **FE-4 (P3)** x\n' });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('строка без приоритета (P<число>) в «Бэклоге» или queue.md — ошибка', () => {
+  const a = run({ 'tasks.md': tasksWith([...T3, '- **FE-9** без приоритета']) });
+  assert.equal(a.code, 1);
+  assert.match(a.out, /FE-9/);
+  const b = run({ 'tasks.md': tasksWith(T3), 'queue.md': '- **FE-8 (важно)** x\n' });
+  assert.equal(b.code, 1);
+  assert.match(b.out, /FE-8/);
+});
+
+test('приоритет с пометкой «(P2, харнес)» распознаётся', () => {
+  const r = run({ 'tasks.md': tasksWith([...T3.slice(0, 2), '- **FE-3 (P2, харнес)** c']), 'queue.md': '- **FE-4 (P2, харнес)** d\n' });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('в queue.md приоритетнее, чем худший в «Бэклоге», — ошибка', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': '- **FE-4 (P1)** важнее\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /приоритет/);
+});
+
+test('равный приоритет в queue.md и «Бэклоге» — код 0', () => {
+  const r = run({ 'tasks.md': tasksWith(T3), 'queue.md': '- **FE-4 (P2)** равный\n' });
+  assert.equal(r.code, 0, r.out);
+});
+
+test('в «Бэклоге» меньше 3 задач при непустой queue.md — ошибка «пополни»', () => {
+  const r = run({ 'tasks.md': tasksWith(T3.slice(0, 2)), 'queue.md': '- **FE-4 (P3)** x\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /пополни/);
+});
+
+test('в «Бэклоге» меньше 3 задач при пустой queue.md — код 0', () => {
+  const r = run({ 'tasks.md': tasksWith(T3.slice(0, 1)) });
+  assert.equal(r.code, 0, r.out);
 });

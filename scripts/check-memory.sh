@@ -19,7 +19,7 @@ check_files() {
   local tp=$1   # tp = FE (префикс задач)
   local dir="$MEM"
 
-  for f in state.md tasks.md architecture.md; do
+  for f in state.md tasks.md queue.md architecture.md; do
     [ -f "$dir/$f" ] || fail "нет файла $dir/$f"
   done
 
@@ -54,11 +54,12 @@ check_files() {
 
     # Уникальность ID и правильный префикс
     local ids dups bad
-    ids=$(grep -oE '^- \*\*[A-Z]+-[0-9]+' "$dir/tasks.md" | sed 's/^- \*\*//')
+    # ID уникальны по tasks.md и queue.md вместе (FE-D53)
+    ids=$(grep -hoE '^- \*\*[A-Z]+-[0-9]+' "$dir/tasks.md" "$dir/queue.md" 2>/dev/null | sed 's/^- \*\*//')
     dups=$(echo "$ids" | sort | uniq -d)
-    [ -z "$dups" ] || fail "$dir/tasks.md: повторяющиеся ID: $(echo $dups)"
+    [ -z "$dups" ] || fail "$dir/tasks.md, $dir/queue.md: повторяющиеся ID: $(echo $dups)"
     bad=$(echo "$ids" | grep -vE "^$tp-[0-9]+$" || true)
-    [ -z "$bad" ] || fail "$dir/tasks.md: ID не со своим префиксом $tp-: $(echo $bad)"
+    [ -z "$bad" ] || fail "$dir/tasks.md, $dir/queue.md: ID не со своим префиксом $tp-: $(echo $bad)"
 
     # «В работе»: каждая задача с блоком «Осталось»
     local wip
@@ -72,18 +73,43 @@ check_files() {
 
   fi
 
-  # Бэклог — индекс (FE-D41): строка задачи ≤200 символов, подробности — в $dir/backlog/FE-NN.md
+  # Бэклог — индекс (FE-D41): строка задачи ≤200 символов, подробности — в $dir/backlog/FE-NN.md.
+  # В «Бэклоге» tasks.md ≤7 задач, остальные — в queue.md (FE-D53); у строки есть (P<число>…;
+  # худший приоритет в tasks.md не ниже лучшего в queue.md; в tasks.md <3 задач при непустой очереди — пополнить
   if [ -f "$dir/tasks.md" ]; then
-    local long
+    local problems
     # Длина — в символах (mawk считает байты, кириллица вдвое длиннее), поэтому через node
-    long=$(node -e '
-const lines = require("node:fs").readFileSync(process.argv[1], "utf8").split("\n");
-let inBacklog = false;
-for (const l of lines) {
-  if (/^## /.test(l)) inBacklog = l.startsWith("## Бэклог");
-  else if (inBacklog && l.startsWith("- **") && [...l].length > 200) console.log((l.match(/FE-[0-9]+/) || ["?"])[0]);
-}' "$dir/tasks.md")
-    for id in $long; do fail "$dir/tasks.md: строка бэклога $id длиннее 200 символов — подробности вынеси в $dir/backlog/$id.md"; done
+    problems=$(node -e '
+const fs = require("node:fs");
+const [dir] = process.argv.slice(1);
+const rows = (file, section) => {
+  if (!fs.existsSync(file)) return [];
+  let on = !section;
+  const out = [];
+  for (const l of fs.readFileSync(file, "utf8").split("\n")) {
+    if (/^## /.test(l)) on = !section || l.startsWith(section);
+    else if (on && l.startsWith("- **")) out.push(l);
+  }
+  return out;
+};
+const tasks = rows(`${dir}/tasks.md`, "## Бэклог");
+const queue = rows(`${dir}/queue.md`, null);
+const id = (l) => (l.match(/^- \*\*([A-Z]+-[0-9]+)/) || [null, "?"])[1];
+const prio = (l) => { const m = l.match(/^- \*\*[^ ]+ \(P([0-9]+)/); return m ? Number(m[1]) : null; };
+const say = (m) => console.log(m);
+for (const [name, list] of [["tasks.md", tasks], ["queue.md", queue]]) {
+  for (const l of list) {
+    if ([...l].length > 200) say(`${dir}/${name}: строка ${id(l)} длиннее 200 символов — подробности вынеси в ${dir}/backlog/${id(l)}.md`);
+    if (prio(l) === null) say(`${dir}/${name}: у строки ${id(l)} нет приоритета вида (P<число>…`);
+  }
+}
+if (tasks.length > 7) say(`${dir}/tasks.md: в «Бэклоге» ${tasks.length} задач, лимит 7 — менее приоритетные перенеси в ${dir}/queue.md`);
+const tp = tasks.map(prio).filter((x) => x !== null);
+const qp = queue.map(prio).filter((x) => x !== null);
+if (tp.length && qp.length && Math.max(...tp) > Math.min(...qp)) say(`${dir}/queue.md: приоритет нарушен — в очереди P${Math.min(...qp)}, а в «Бэклоге» tasks.md есть P${Math.max(...tp)}`);
+if (tasks.length < 3 && queue.length > 0) say(`${dir}/tasks.md: в «Бэклоге» ${tasks.length} задач (<3), а ${dir}/queue.md не пуст — пополни из queue.md до 7`);
+' "$dir")
+    [ -z "$problems" ] || while IFS= read -r line; do fail "$line"; done <<< "$problems"
     if [ -d "$dir/backlog" ]; then
       local bf name bid
       for bf in "$dir"/backlog/*.md; do
@@ -95,7 +121,7 @@ for (const l of lines) {
           continue
         fi
         bid=${name%.md}
-        grep -qE "^- \*\*$bid\b" "$dir/tasks.md" || fail "$bf: в $dir/tasks.md нет строки задачи $bid"
+        grep -qE "^- \*\*$bid\b" "$dir/tasks.md" "$dir/queue.md" 2>/dev/null || fail "$bf: в $dir/tasks.md и $dir/queue.md нет строки задачи $bid"
       done
     fi
   fi

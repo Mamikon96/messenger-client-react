@@ -4,7 +4,7 @@
 ```
 .ai/
   rules/     # правила работы (как делать): читать по теме, по таблице в CLAUDE.md
-  memory/    # состояние проекта (что есть): описание файлов — memory/README.md (бэклог: memory/backlog/, решения: роутер memory/decisions.md → memory/decisions/, архив решений: memory/decisions-archive.md)
+  memory/    # состояние проекта (что есть): описание файлов — memory/README.md (бэклог: memory/backlog/, решения: роутер memory/decisions.md → memory/decisions/, архив решений: memory/decisions-archive.md, очередь задач сверх лимита бэклога: memory/queue.md)
   user-cases.sha256  # хэш утверждённого набора user-кейсов: docs/user-cases.md + docs/user-cases/*.md (меняет только пользователь)
 ```
 

@@ -1,10 +1,11 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ bfc15bc+dirty
+> Проверено: 2026-10-18 @ ce6ba74+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
 
 ## В работе
+
 ## Бэклог
 > Контекст решений по бэклогу — `.ai/memory/backlog/README.md`; подробности задачи — файл .ai/memory/backlog/FE-NN.md (читать, когда задачу берут в работу).
 - **FE-127 (P3)** Память `architecture/`: нет описания реалтайма (`wsService.js`, `reducers/realtime.js`, `useRealtime`), найдено при FE-126. Подробности: `.ai/memory/backlog/FE-127.md`

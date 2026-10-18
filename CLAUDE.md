@@ -19,10 +19,10 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 |---|---|
 | Старт любой задачи разработки | `.ai/rules/memory-protocol.md`, `.ai/memory/tasks.md`, `.ai/rules/task-contract.md` |
 | Компоненты, слайсы, стили | `.ai/rules/code-style.md` |
-| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` (+ скилл `react-patterns`, `.ai/memory/architecture.md` — роутер, открывать нужный файл из `architecture/`, заголовки `decisions.md`) |
+| Архитектура, паттерны, ревью кода | `.ai/rules/patterns.md` (+ скилл `react-patterns`, `.ai/memory/architecture.md` — роутер, открывать нужный файл из `architecture/`; решения — роутер `decisions.md` → файл из `decisions/`) |
 | Тесты / новое поведение, user-кейсы | `.ai/rules/testing.md` |
 | Баги, текущее состояние | `.ai/memory/state.md` |
-| Новая библиотека/подход | `.ai/rules/tech-approval.md`, заголовки `.ai/memory/decisions.md` |
+| Новая библиотека/подход | `.ai/rules/tech-approval.md`, роутер `.ai/memory/decisions.md` → нужный файл из `decisions/` |
 | Закрытие задачи (приёмка, ревью, проход qa-tester) | `.ai/rules/acceptance.md` (+ `.ai/memory/failures.md` при REJECT/FAIL) |
 | Любая git-операция (коммит, ветка, слияние, push, PR) | `.ai/rules/git-flow.md` |
 | Финальный отчёт | `.ai/rules/report-format.md` |
@@ -33,7 +33,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 
 ## Неснимаемые правила (детали — в файлах по ссылкам)
 1. **Память:** после ЛЮБЫХ изменений, до ответа пользователю: `tasks.md` (+ `state.md`, штамп) и `bash scripts/check-memory.sh` = 0. `.ai/rules/memory-protocol.md`.
-2. **Новые технологии/подходы** — только после опроса пользователя (`AskUserQuestion`); выбор сразу пишется в `decisions.md`. `.ai/rules/tech-approval.md`.
+2. **Новые технологии/подходы** — только после опроса пользователя (`AskUserQuestion`); выбор сразу пишется в `decisions/<тема>.md` + строка в роутер `decisions.md`. `.ai/rules/tech-approval.md`.
 3. **Приёмка** (от дешёвого к дорогому): `check-fast.sh` в цикле → `npm run accept` = 0 → APPROVE `react-reviewer` → при изменении `src/`/`mock-bff/` PASS `qa-tester`; агентов запускает основная сессия. `.ai/rules/acceptance.md`.
 4. **Контракт задачи** — в «В работе» `tasks.md` до тестов и кода; проверяет `scripts/check-contract.sh`. Ревью/QA по одной причине дважды или >2 раундов — стоп, `failures.md`, вопрос пользователю. `.ai/rules/task-contract.md`.
 5. **Тесты вперёд:** новое поведение — unit и/или e2e в той же задаче, до реализации. `.ai/rules/testing.md`.

@@ -113,19 +113,44 @@ for (const l of lines) {
 
 check_files FE
 
-# Решения: SH-Dxx (общие) и FE-Dxx (frontend), ID уникальны
+# Решения: SH-Dxx (общие) и FE-Dxx (frontend), ID уникальны. decisions.md — роутер (FE-130): строка таблицы
+# `| ID | … | decisions/<файл>.md |` на каждое решение; тексты решений лежат в decisions/*.md
+d_ids=""
 if [ -f "$MEM/decisions.md" ]; then
-  d_ids=$(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions.md" | sed 's/^## //')
+  for id in $(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions.md" | sed 's/^## //' || true); do
+    fail "$MEM/decisions.md: текст решения $id в роутере — перенести в decisions/<тема>.md"
+  done
+  router_ids=$(grep -oE '^\| *[A-Z]+-D[0-9]+ *\|' "$MEM/decisions.md" | grep -oE '[A-Z]+-D[0-9]+' || true)
+  for df in "$MEM"/decisions/*.md; do
+    [ -e "$df" ] || continue
+    dn="decisions/$(basename "$df")"
+    grep -E '^\|' "$MEM/decisions.md" | grep -qF "$dn" || fail "$MEM/decisions.md: нет строки роутера для $dn"
+    for id in $(grep -oE '^## [A-Z]+-D[0-9]+' "$df" | sed 's/^## //'); do
+      d_ids=$(printf '%s\n%s\n' "$d_ids" "$id")
+      row=$(grep -E "^\| *$id *\|" "$MEM/decisions.md" || true)
+      if [ -z "$row" ]; then
+        fail "$MEM/decisions.md: нет строки роутера для $id ($dn)"
+      else
+        echo "$row" | grep -qF "$dn" || fail "$MEM/decisions.md: строка $id указывает не на $dn"
+      fi
+    done
+  done
+  d_ids=$(echo "$d_ids" | grep -v '^$' || true)
+  r_dups=$(echo "$router_ids" | sort | uniq -d)
+  [ -z "$r_dups" ] || fail "$MEM/decisions.md: повторяющиеся строки роутера: $(echo $r_dups)"
+  for id in $router_ids; do
+    echo "$d_ids" | grep -qx "$id" || fail "$MEM/decisions.md: строка роутера $id без решения в decisions/*.md"
+  done
   d_dups=$(echo "$d_ids" | sort | uniq -d)
-  [ -z "$d_dups" ] || fail "$MEM/decisions.md: повторяющиеся ID: $(echo $d_dups)"
+  [ -z "$d_dups" ] || fail "$MEM/decisions: повторяющиеся ID: $(echo $d_dups)"
   d_bad=$(echo "$d_ids" | grep -vE '^(SH|FE)-D[0-9]+$' || true)
-  [ -z "$d_bad" ] || fail "$MEM/decisions.md: ID не вида SH-Dxx/FE-Dxx: $(echo $d_bad)"
+  [ -z "$d_bad" ] || fail "$MEM/decisions: ID не вида SH-Dxx/FE-Dxx: $(echo $d_bad)"
 fi
-# Архив решений (FE-D41): записи «ЗАМЕНЕНО»; ID не повторяются ни внутри архива, ни с decisions.md
+# Архив решений (FE-D41): записи «ЗАМЕНЕНО»; ID не повторяются ни внутри архива, ни с decisions/*.md
 if [ -f "$MEM/decisions-archive.md" ]; then
   a_ids=$(grep -oE '^## [A-Z]+-D[0-9]+' "$MEM/decisions-archive.md" | sed 's/^## //')
   a_dups=$(printf '%s\n%s\n' "${d_ids:-}" "$a_ids" | grep -v '^$' | sort | uniq -d)
-  [ -z "$a_dups" ] || fail "$MEM/decisions-archive.md: ID повторяются (внутри архива или с decisions.md): $(echo $a_dups)"
+  [ -z "$a_dups" ] || fail "$MEM/decisions-archive.md: ID повторяются (внутри архива или с decisions/*.md): $(echo $a_dups)"
 fi
 
 # Актуальность: изменённые (относительно HEAD) файлы кода не должны быть новее tasks.md — память обновляют после любых правок

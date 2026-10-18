@@ -10,10 +10,6 @@ function Chats({ onRetry }) {
     const status = useSelector(selectChatsStatus);
     const dispatch = useDispatch();
 
-    const handleClick = (chat) => {
-        dispatch(chatSelected(chat.id));
-    }
-
     const renderContent = () => {
         switch (status) {
             case "failed":
@@ -30,7 +26,7 @@ function Chats({ onRetry }) {
                         <Chat
                             key={chat.id}
                             chat={chat}
-                            onClick={handleClick.bind(this, chat)}
+                            onClick={() => dispatch(chatSelected(chat.id))}
                         ></Chat>
                     ));
             default:

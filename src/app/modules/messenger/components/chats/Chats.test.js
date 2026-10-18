@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { configureStore } from "@reduxjs/toolkit";
 import Chats from "./Chats";
@@ -69,5 +69,25 @@ describe("Chats: загрузка и список", () => {
         expect(screen.getByText("привет, как дела")).toBeInTheDocument();
         expect(screen.getByText("3")).toBeInTheDocument();
         expect(screen.getAllByTestId("chat-unread")).toHaveLength(1);
+    });
+
+    test("каждый чат — кнопка с аватаром; блока «Members» нет", async () => {
+        const { store } = await renderChats(Promise.resolve([group, direct]));
+        await load(store);
+
+        expect(await screen.findAllByRole("button")).toHaveLength(2);
+        expect(within(screen.getByRole("button", { name: "Bob привет, как дела 3 непрочитанных" })).getByText("B")).toBeInTheDocument();
+        expect(within(screen.getByRole("button", { name: "Team" })).getByText("T")).toBeInTheDocument();
+        expect(screen.queryByText(/Members/)).not.toBeInTheDocument();
+    });
+
+    test("клик по карточке делает чат активным", async () => {
+        const { store } = await renderChats(Promise.resolve([group, direct]));
+        await load(store);
+
+        fireEvent.click(await screen.findByRole("button", { name: /Team/ }));
+
+        expect(screen.getByRole("button", { name: /Team/ })).toHaveClass("_active");
+        expect(screen.getByRole("button", { name: /Bob/ })).not.toHaveClass("_active");
     });
 });

@@ -3,9 +3,9 @@ import "./Header.css";
 
 function Header() {
     return (
-        <div className="header">
+        <header className="header">
             <Actions></Actions>
-        </div>
+        </header>
     );
 }
 

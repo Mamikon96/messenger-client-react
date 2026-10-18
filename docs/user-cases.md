@@ -49,7 +49,7 @@
 | UC-THEME-02 | Выбранная тема запоминается | active | docs/user-cases/theme.md |
 | UC-THEME-03 | Без вспышки неверной темы | active | docs/user-cases/theme.md |
 | UC-THEME-04 | Экран входа в тёмной теме | active | docs/user-cases/theme.md |
-| UC-THEME-05 | Переключатель темы в интерфейсе | planned | docs/user-cases/theme.md |
+| UC-THEME-05 | Переключатель темы в интерфейсе | active | docs/user-cases/theme.md |
 
 ### Чаты (CHAT)
 

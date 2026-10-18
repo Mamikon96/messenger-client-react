@@ -1,9 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import Actions from '../actions/Actions';
 import { rootReducer } from '../../../../store';
+import { initTheme } from '../../../theme/theme';
 import { checkSession } from '../../../../reducers/auth';
 import { startRealtime } from '../../../../reducers/realtime';
 import { createWsService } from '../../../../services/wsService';
@@ -14,9 +15,9 @@ jest.mock('../../../../services/wsService', () => ({ createWsService: jest.fn() 
 
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
-const renderMenu = () => {
+const renderMenu = (authUser = user) => {
   const store = configureStore({ reducer: rootReducer });
-  store.dispatch(checkSession.fulfilled(user, 'req'));
+  store.dispatch(checkSession.fulfilled(authUser, 'req'));
   render(
     <Provider store={store}>
       <Actions />
@@ -25,15 +26,129 @@ const renderMenu = () => {
   return { store };
 };
 
+const menuButton = () => screen.getByRole('button', { name: 'Ann' });
+
 // клик не обёрнут в act (см. FE-20), поэтому ждём появления меню
 const openMenu = async () => {
-  userEvent.click(screen.getByRole('button', { name: 'Ann' }));
+  userEvent.click(menuButton());
   return screen.findByRole('button', { name: 'Выйти' });
 };
 
 describe('меню пользователя', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    initTheme();
+  });
+
   afterEach(() => {
     jest.resetAllMocks();
+  });
+
+  it('кнопка: имя пользователя, без aria-haspopup, aria-expanded и aria-controls', async () => {
+    renderMenu();
+    expect(menuButton()).not.toHaveAttribute('aria-haspopup');
+    expect(menuButton()).toHaveAttribute('aria-expanded', 'false');
+
+    await openMenu();
+
+    expect(menuButton()).toHaveAttribute('aria-expanded', 'true');
+    expect(menuButton().getAttribute('aria-controls')).toBeTruthy();
+  });
+
+  it('Esc закрывает меню и возвращает фокус на кнопку', async () => {
+    renderMenu();
+    await openMenu();
+
+    userEvent.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Выйти' })).not.toBeInTheDocument());
+    expect(menuButton()).toHaveFocus();
+    expect(menuButton()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('клик снаружи закрывает меню', async () => {
+    renderMenu();
+    await openMenu();
+
+    userEvent.click(document.body);
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Выйти' })).not.toBeInTheDocument());
+  });
+
+  it('клик внутри меню его не закрывает', async () => {
+    renderMenu();
+    await openMenu();
+
+    userEvent.click(screen.getByRole('group', { name: 'Тема' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['Esc', () => userEvent.keyboard('{Escape}')],
+    ['клик снаружи', () => userEvent.click(document.body)],
+    ['повторный клик по кнопке', () => userEvent.click(menuButton())],
+  ])('ошибка выхода не переживает закрытие меню (%s)', async (_, close) => {
+    authApi.logout.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderMenu();
+    await openMenu();
+    userEvent.click(screen.getByRole('button', { name: 'Выйти' }));
+    await screen.findByRole('alert');
+
+    close();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Выйти' })).not.toBeInTheDocument());
+    await openMenu();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('ошибка выхода, пришедшая в закрытое меню, не показывается при следующем открытии', async () => {
+    let rejectLogout;
+    authApi.logout.mockImplementationOnce(() => new Promise((_, reject) => { rejectLogout = reject; }));
+    renderMenu();
+    await openMenu();
+    userEvent.click(screen.getByRole('button', { name: 'Выйти' }));
+    userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Выйти' })).not.toBeInTheDocument());
+    await act(async () => {
+      rejectLogout(new TypeError('Failed to fetch'));
+    });
+
+    await openMenu();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('повторный клик по кнопке закрывает меню', async () => {
+    renderMenu();
+    await openMenu();
+
+    userEvent.click(menuButton());
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Выйти' })).not.toBeInTheDocument());
+  });
+
+  it('аватар с инициалами при пустом avatarUrl, имя кнопки остаётся именем пользователя', () => {
+    renderMenu({ ...user, name: 'Ann Lee', avatarUrl: '' });
+
+    expect(screen.getByRole('button', { name: 'Ann Lee' })).toHaveTextContent('AL');
+  });
+
+  it('выбор темы: три режима, текущий отмечен, выбор применяется и сохраняется', async () => {
+    renderMenu();
+    await openMenu();
+    const group = screen.getByRole('group', { name: 'Тема' });
+    ['Светлая', 'Тёмная', 'Как в системе'].forEach((label) => expect(within(group).getByRole('radio', { name: label })).toBeInTheDocument());
+    expect(screen.getByRole('radio', { name: 'Как в системе' })).toBeChecked();
+
+    userEvent.click(screen.getByRole('radio', { name: 'Тёмная' }));
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Тёмная' })).toBeChecked());
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(localStorage.getItem('theme')).toBe('dark');
   });
 
   it('кнопка с именем пользователя открывает меню с «Выйти»', async () => {

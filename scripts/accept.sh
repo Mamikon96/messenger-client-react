@@ -14,7 +14,7 @@ echo "==> Unit-тесты (Jest)"
 CI=true npx react-scripts test --watchAll=false
 
 echo "==> Тесты чекеров, правил ESLint и hook-скриптов (node --test)"
-node --test scripts/check-state.test.js scripts/check-contract.test.js scripts/qa-required.test.js scripts/eslint-rules.test.js scripts/check-memory.test.js scripts/accept-stamp.test.js scripts/hooks.test.js scripts/check-fast.test.js scripts/mock-bff-port.test.js
+node --test scripts/check-state.test.js scripts/check-contract.test.js scripts/qa-required.test.js scripts/eslint-rules.test.js scripts/check-memory.test.js scripts/accept-stamp.test.js scripts/hooks.test.js scripts/check-fast.test.js scripts/mock-bff-port.test.js scripts/git-task.test.js
 
 # Прогон e2e + матрица «кейс → результат»: упавший тест = нарушенный user-кейс (набор: docs/user-cases.md + docs/user-cases/)
 bash scripts/check-state.sh --behavior --no-precheck

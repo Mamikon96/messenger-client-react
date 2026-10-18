@@ -82,3 +82,4 @@
 | 2026-10-18 | FE-130 | decisions.md стал роутером, тексты решений в decisions/*.md | `done/FE-130.md` |
 | 2026-10-18 | FE-131 | done.md стал роутером, тексты записей в done/*.md | `done/FE-131.md` |
 | 2026-10-18 | FE-132 | Лимит «Бэклога» tasks.md в 7 задач, остальные в queue.md | `done/FE-132.md` |
+| 2026-10-18 | FE-133 | `git-task.sh start`: изменённый queue.md не блокирует старт | `done/FE-133.md` |

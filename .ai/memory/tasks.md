@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ 4624a1e+dirty
+> Проверено: 2026-10-18 @ 6a021a1+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
@@ -9,7 +9,6 @@
 
 ## Бэклог
 > Контекст решений по бэклогу — `.ai/memory/backlog/README.md`; подробности задачи — файл .ai/memory/backlog/FE-NN.md (читать, когда задачу берут в работу).
-- **FE-28 (P1)** Header и `UserMenu`: аватар с инициалами, переключатель темы, выход, закрытие по Esc/клику снаружи; правки по аудиту FE-46. Подробности: `.ai/memory/backlog/FE-28.md`
 - **FE-96 (P1)** apiClient: после `403 csrf_invalid` перечитать сессию (single-flight), повторить запрос раз, при смене `user.id` сбросить store. Подробности: `.ai/memory/backlog/FE-96.md`
 - **FE-98 (P1)** Перейти на итоговый контракт бэкенда: заменить `docs/client-integration.md`, сверить mock-BFF, пройти `qa-tester` на реальном сервере. Подробности: `.ai/memory/backlog/FE-98.md`
 - **FE-44 (P1)** Поиск людей в левой панели (`GET /api/users?q=`), «Написать» → direct-чат (`POST /api/chats`), удаление `JoinForm`. Подробности: `.ai/memory/backlog/FE-44.md`

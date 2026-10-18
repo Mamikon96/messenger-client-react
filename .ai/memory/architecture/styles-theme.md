@@ -7,4 +7,4 @@
 ## Тема (FE-23, FE-D08)
 - `src/app/modules/theme/theme.js` — внешнее хранилище вне Redux: режим `light`/`dark`/`system`, применённая тема, `initTheme()` (вызывается в `src/index.js` до рендера: читает localStorage `theme`, слушает `prefers-color-scheme`), `setMode`, `subscribe`/`getSnapshot`; хук `useTheme()` (`useSyncExternalStore`) отдаёт `{ mode, theme, setMode }` любому компоненту без провайдера.
 - Тема ставится атрибутом `data-theme` на `<html>`. До загрузки React её выставляет инлайн-скрипт в `public/index.html` (та же логика, без вспышки). Выбор хранится в localStorage (сбой доступа — try/catch) и при logout не сбрасывается.
-- UI переключателя — FE-28.
+- UI переключателя — `ThemeSwitch` в `UserMenu` (FE-28).

@@ -52,3 +52,4 @@
 - **FE-08 (P3)** Заполнить README: запуск, команды, структура, запуск с реальным бэкендом и вход при разработке. Подробности: `.ai/memory/backlog/FE-08.md`
 - **FE-134 (P2, харнес)** `check-memory.sh`: `grep | grep -q` при `pipefail` даёт ложный сбой по SIGPIPE под нагрузкой (ревью FE-132). Подробности: `.ai/memory/backlog/FE-134.md`
 - **FE-135 (P3)** Сверка после реконнекта: `unreadExtra` завышает unread, если открытый чат сменили во время сверки (ревью FE-42). Подробности: `.ai/memory/backlog/FE-135.md`
+- **FE-139 (P3)** Предупреждение консоли «WebSocket closed before the connection is established» на каждый вход (QA FE-27, NIT). Подробности: `.ai/memory/backlog/FE-139.md`

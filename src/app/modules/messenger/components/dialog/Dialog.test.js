@@ -126,6 +126,78 @@ describe('Dialog: сообщения', () => {
   });
 });
 
+describe('Dialog: разметка, пустые состояния, прокрутка, фокус (FE-27)', () => {
+  it('без выбранного чата — «Чат не выбран», «Сообщений пока нет» нет', () => {
+    renderDialog({ withActiveChat: false });
+
+    expect(screen.getByText('Чат не выбран')).toBeInTheDocument();
+    expect(screen.queryByText('Сообщений пока нет')).not.toBeInTheDocument();
+  });
+
+  it('в пустом чате — «Сообщений пока нет», после отправки текст пропадает', async () => {
+    renderDialog();
+
+    expect(screen.getByText('Сообщений пока нет')).toBeInTheDocument();
+    expect(screen.queryByText('Чат не выбран')).not.toBeInTheDocument();
+    userEvent.type(input(), 'Привет{enter}');
+
+    expect(await screen.findByText('Привет')).toBeInTheDocument();
+    expect(screen.queryByText('Сообщений пока нет')).not.toBeInTheDocument();
+  });
+
+  it('сообщения — article внутри log «Сообщения»', async () => {
+    const { store, chatId } = renderDialog();
+    act(() => {
+      store.dispatch(sendMessage({ chatId, senderId: 'u1', body: 'моё' }));
+    });
+
+    const log = screen.getByRole('log', { name: 'Сообщения' });
+    expect(within(log).getByRole('article')).toHaveTextContent('моё');
+  });
+
+  it('после клика Send фокус в поле ввода', async () => {
+    renderDialog();
+
+    userEvent.type(input(), 'Привет');
+    userEvent.click(sendButton());
+
+    await waitFor(() => expect(input()).toHaveValue(''));
+    expect(input()).toHaveFocus();
+  });
+
+  it('после отказа в отправке по клику Send (пусто, слишком длинно) фокус возвращается в поле', async () => {
+    renderDialog();
+
+    sendButton().focus();
+    userEvent.click(sendButton());
+    await waitFor(() => expect(input()).toHaveFocus());
+
+    sendButton().focus();
+    fireEvent.change(input(), { target: { value: 'а'.repeat(4001) } });
+    fireEvent.click(sendButton());
+    await waitFor(() => expect(input()).toHaveFocus());
+  });
+
+  it('при новом сообщении лента прокручивается вниз', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 500 });
+    try {
+      const { store, chatId } = renderDialog();
+      const log = screen.getByRole('log', { name: 'Сообщения' });
+      expect(log.scrollTop).toBe(500);
+      log.scrollTop = 0;
+      act(() => {
+        store.dispatch(sendMessage({ chatId, senderId: 'u2', body: 'новое' }));
+      });
+
+      expect(log.scrollTop).toBe(500);
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', descriptor);
+      else delete HTMLElement.prototype.scrollHeight;
+    }
+  });
+});
+
 describe('Dialog: история серверного чата', () => {
   const msg = (seq, senderId, body) => ({ chatId: 'g1', seq, senderId, clientId: `k${seq}`, body, createdAt: '2026-10-15T10:00:00.000Z' });
   const listGroup = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 2, lastMessage: null, unreadCount: 0 };
@@ -179,6 +251,23 @@ describe('Dialog: история серверного чата', () => {
     expect(await screen.findByText('привет')).toBeInTheDocument();
     expect(screen.getByText('здорово')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('служебные статусы загрузки и ошибки лежат вне контейнера log', async () => {
+    let release;
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve([]); }));
+
+    renderServerChat();
+
+    const status = await screen.findByRole('status');
+    const log = screen.getByRole('log', { name: 'Сообщения' });
+    expect(log).not.toContainElement(status);
+    expect(log).toHaveAttribute('aria-busy', 'true');
+    await act(async () => {
+      release();
+    });
+    await waitFor(() => expect(log).toHaveAttribute('aria-busy', 'false'));
   });
 
   it('у direct-чата заголовок — имя собеседника', async () => {
@@ -245,6 +334,28 @@ describe('Dialog: история серверного чата', () => {
 
     expect(await screen.findByText('привет')).toBeInTheDocument();
     expect(chatsApi.fetchMessages.mock.calls.filter(([id]) => id === 'g1')).toHaveLength(1);
+  });
+
+  it('во время загрузки и после сбоя «Сообщений пока нет» не показывается; после пустой истории — показывается', async () => {
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    let release;
+    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((_, reject) => { release = () => reject(new Error('network')); }));
+
+    renderServerChat();
+
+    expect(await screen.findByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('Сообщений пока нет')).not.toBeInTheDocument();
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Сообщений пока нет')).not.toBeInTheDocument();
+
+    chatsApi.fetchMessages.mockResolvedValueOnce([]);
+    await act(async () => {
+      screen.getByRole('button', { name: 'Повторить' }).click();
+    });
+    expect(await screen.findByText('Сообщений пока нет')).toBeInTheDocument();
   });
 
   it('локальный чат из Join: запросов нет, индикатор загрузки не показывается', () => {

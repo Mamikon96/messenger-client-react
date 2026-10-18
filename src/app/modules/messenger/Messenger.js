@@ -11,13 +11,13 @@ function Messenger() {
     useRealtime();
 
     return (
-        <div className="messenger">
+        <main className="messenger">
             <RealtimeBanner></RealtimeBanner>
             <div className="messenger__panels">
                 <Chats onRetry={loadChats}></Chats>
                 <Dialog></Dialog>
             </div>
-        </div>
+        </main>
     );
 }
 

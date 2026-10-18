@@ -1,21 +1,26 @@
 import { useSelector } from "react-redux";
 import { selectActiveChatId } from "../../../../reducers/activeChatId";
 import { selectChatName } from "../../../../reducers/chats";
+import { selectUserById } from "../../../../reducers/users";
+import { Avatar } from "../../../ui/avatar/Avatar";
 import "./Chat.css";
 
-export const Chat = ({chat, onClick}) => {
-    const activeChatId = useSelector(selectActiveChatId);
+export const Chat = ({ chat, onClick }) => {
+    const active = useSelector(selectActiveChatId) === chat.id;
     const name = useSelector((state) => selectChatName(state, chat.id));
+    // У direct аватар — собеседника; у группы своего изображения нет, показываются инициалы названия.
+    const avatarUrl = useSelector((state) => (chat.peerId ? selectUserById(state, chat.peerId)?.avatarUrl : undefined));
 
     return (
-        <div className={`chat ${activeChatId === chat.id ? "_active" : ""}`} onClick={onClick}>
-            <div className="chat__title">{name}</div>
-            {chat.lastMessage && <div className="chat__last-message">{chat.lastMessage.body}</div>}
-            {chat.unreadCount > 0 && <div className="chat__unread" data-testid="chat-unread">{chat.unreadCount}</div>}
-            <div className="chat__members">
-                <div className="chat__members-label">Members:</div>
-                <div className="chat__members-count">{0}</div>
-            </div>
-        </div>
+        <button type="button" className={`chat ${active ? "_active" : ""}`.trim()} aria-current={active ? "true" : undefined} onClick={onClick}>
+            <span className="chat__avatar" aria-hidden="true">
+                <Avatar src={avatarUrl} name={name} id={chat.peerId ?? chat.id} />
+            </span>
+            <span className="chat__body">
+                <span className="chat__title">{name}</span>
+                {chat.lastMessage && <span className="chat__last-message">{chat.lastMessage.body}</span>}
+            </span>
+            {chat.unreadCount > 0 && <span className="chat__unread" aria-label={`${chat.unreadCount} непрочитанных`} data-testid="chat-unread">{chat.unreadCount}</span>}
+        </button>
     );
 }

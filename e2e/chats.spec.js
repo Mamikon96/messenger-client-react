@@ -113,3 +113,20 @@ test('[UC-CHAT-03] пустой список: «Чатов пока нет»', a
   await expect(page.getByText('Чатов пока нет')).toBeVisible();
   await expect(page.locator('.chat')).toHaveCount(0);
 });
+
+test('[UC-CHAT-02] карточка чата без блока «Members» и доступна с клавиатуры: фокус и открытие по Enter', async ({ page }) => {
+  await page.route('**/api/chats', (route) => route.fulfill({ json: SERVER_CHATS }));
+  await login(page);
+
+  const first = page.getByRole('button', { name: /^Команда/ });
+  await expect(page.locator('button.chat')).toHaveCount(3);
+  await expect(page.getByText('Members')).toHaveCount(0);
+
+  await first.focus();
+  await expect(first).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(first).toHaveClass(/_active/);
+  await expect(first).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('.dialog__header-title')).toHaveText('Команда');
+});

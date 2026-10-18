@@ -54,3 +54,4 @@
 - **FE-135 (P3)** Сверка после реконнекта: `unreadExtra` завышает unread, если открытый чат сменили во время сверки (ревью FE-42). Подробности: `.ai/memory/backlog/FE-135.md`
 - **FE-139 (P3)** Предупреждение консоли «WebSocket closed before the connection is established» на каждый вход (QA FE-27, NIT). Подробности: `.ai/memory/backlog/FE-139.md`
 - **FE-140 (P3)** `UserMenu`: `aria-controls`, `ThemeSwitch.css`, e2e клика снаружи мышью (ревью FE-28, MINOR). Подробности: `.ai/memory/backlog/FE-140.md`
+- **FE-142 (P3)** Токены харнесса: число раундов ревью по `failures.md`/отчётам, чужие агенты и скиллы-пустышки в списке (пункты 6–7 FE-141). Подробности: `.ai/memory/backlog/FE-142.md`

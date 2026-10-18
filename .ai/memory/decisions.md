@@ -40,6 +40,7 @@
 |---|---|---|---|
 | FE-D41 | Экономия токенов: структура памяти и дисциплина сессий (2026-10-15) | действует | `decisions/session-context.md` |
 | FE-D49 | Стартовый контекст: функции claude.ai и листинг скиллов (2026-10-17) | действует | `decisions/session-context.md` |
+| FE-D54 | Отключить плагины chrome-devtools-mcp и context7 в проекте (2026-10-18) | действует | `decisions/session-context.md` |
 
 ## Git: PR и ветки
 | ID | Название | Статус | Файл |
@@ -74,7 +75,7 @@
 | FE-D17 | Агент-тестировщик `qa-tester` поверх Playwright e2e (2026-10-09) | действует | `decisions/qa-tester.md` |
 | FE-D36 | Отчёты qa-tester: файл на задачу в `.qa/runs/` (2026-10-13) | действует | `decisions/qa-tester.md` |
 | FE-D37 | Разрешения Playwright MCP и «Стенд: известное» для qa-tester (2026-10-13) | действует | `decisions/qa-tester.md` |
-| FE-D43 | qa-tester: Playwright MCP для прохода, Chrome DevTools MCP для диагностики (2026-10-15) | действует | `decisions/qa-tester.md` |
+| FE-D43 | qa-tester: Playwright MCP для прохода, Chrome DevTools MCP для диагностики (2026-10-15) | частично заменено FE-D54 | `decisions/qa-tester.md` |
 | FE-D47 | qa-tester: дешёвый режим прохода (2026-10-17) | действует | `decisions/qa-tester.md` |
 | FE-D48 | QA: кейсы про отказы и тайминги не проходятся в браузере (2026-10-17) | действует | `decisions/qa-tester.md` |
 

@@ -10,3 +10,4 @@
 - Состояние формы — `useState` + общий `handleChange` по `event.target.name`.
 - Стили — обычный CSS, один файл на компонент. JavaScript, без TypeScript.
 - Без `console.log` (проверяет ESLint, FE-D25; для ошибок — `console.error`).
+- Экономия контекста (FE-141): сначала `git diff --stat`, затем дифф нужных файлов; `grep` с `-m`/`| head`, `sed -n` с узким диапазоном; большие файлы не выводить целиком (`Read` с `offset`/`limit`).

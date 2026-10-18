@@ -12,3 +12,8 @@
 - **Почему:** первый ход интерактивной сессии вырос до 46–49K токенов (Claude Code 2.1.300): тул Artifact, коннектор Claude Docs и описания синхронизированных скиллов грузятся всегда, хотя в проекте не нужны. MCP-тулзы уже отложенные (ToolSearch), в контексте только их имена. Замер headless-сессии `claude -p` в проекте: 28 646 → 21 235 токенов первого хода.
 - **Ограничение:** `skillOverrides` не действует на скиллы плагинов («A plugin skill is managed with the plugin»): 7 скиллов `chrome-devtools-mcp:*` убираются только отключением плагина.
 - **Альтернативы (не выбраны):** отключить плагин `chrome-devtools-mcp` и перевести диагностику qa-tester на Playwright (меняет FE-D43); `disableBundledSkills` (убирает и нужные `/code-review`, `/simplify`); оставить Artifacts.
+
+## FE-D54 — Отключить плагины chrome-devtools-mcp и context7 в проекте (2026-10-18)
+- **Решение (выбор пользователя):** частично заменяет FE-D43 (диагностика), уточняет FE-D49. В `.claude/settings.json` проекта `enabledPlugins`: `chrome-devtools-mcp@claude-plugins-official` и `context7@anthropic-plugin-directory` — `false`. `qa-tester` проходит кейсы и снимает диагностику (консоль, сеть) только через Playwright MCP; инструменты Chrome DevTools убраны из его `tools`. Глобальные настройки пользователя не менялись.
+- **Почему:** аудит транскриптов 2026-10-09…18 (107 сессий): вызовов обоих плагинов в проекте 0, Playwright — 896. Плагины добавляют около 1,5–2K токенов к каждому ходу и 7 скиллов `chrome-devtools-mcp:*`, которые `skillOverrides` не убирает (FE-D49).
+- **Альтернативы (не выбраны):** оставить `chrome-devtools-mcp` для диагностики qa-tester (FE-D43); оставить `context7` для поиска актуальных доков; ничего не отключать.

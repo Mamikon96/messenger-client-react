@@ -1,6 +1,6 @@
 ---
 name: react-engineer
-description: Фронтенд-инженер проекта messenger-client-react (React 18, CRA, Redux Toolkit). Реализует одну задачу строго по её контракту из .ai/memory/tasks.md: тесты до кода, минимальный диф, приёмка npm run accept. Ревью и QA не запускает — их запускает основная сессия.
+description: Фронтенд-инженер (React 18, CRA, Redux Toolkit). Реализует одну задачу по её контракту из .ai/memory/tasks.md: тесты до кода, минимальный диф, приёмка npm run accept. Ревью и QA не запускает.
 model: sonnet
 color: cyan
 skills:

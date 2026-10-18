@@ -50,5 +50,4 @@
 - **FE-55 (P3)** ESLint `console.log`: закрыть обход через `console["log"](x)` селектором в `no-restricted-syntax` и тестом правила. Подробности: `.ai/memory/backlog/FE-55.md`
 - **FE-20 (P3)** Доработки по ревью FE-13/FE-14: убрать предупреждение `act` в `App.test.js`, фокус после «Повторить», `condition` для `checkSession`. Подробности: `.ai/memory/backlog/FE-20.md`
 - **FE-08 (P3)** Заполнить README: запуск, команды, структура, запуск с реальным бэкендом и вход при разработке. Подробности: `.ai/memory/backlog/FE-08.md`
-- **FE-133 (P2, харнес)** `git-task.sh start`: изменённый `queue.md` считается грязью дерева, блокирует перенос задачи из очереди (ревью FE-132). Подробности: `.ai/memory/backlog/FE-133.md`
 - **FE-134 (P2, харнес)** `check-memory.sh`: `grep | grep -q` при `pipefail` даёт ложный сбой по SIGPIPE под нагрузкой (ревью FE-132). Подробности: `.ai/memory/backlog/FE-134.md`

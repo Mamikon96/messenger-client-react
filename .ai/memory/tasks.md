@@ -1,5 +1,5 @@
 # Задачи frontend
-> Проверено: 2026-10-18 @ 1559249+dirty
+> Проверено: 2026-10-18 @ 0ecd1a1+dirty
 
 Формат: `FE-NN` — название. Приоритет P1 (важно) … P3. «Зависит от» — задачи другой стороны/контракты.
 Готовность — только после зелёного `npm run accept` И APPROVE ревьюера (см. `decisions.md` SH-D02, `CLAUDE.md`).
@@ -7,6 +7,7 @@
 ## В работе
 ## Бэклог
 > Контекст решений по бэклогу — `.ai/memory/backlog/README.md`; подробности задачи — файл .ai/memory/backlog/FE-NN.md (читать, когда задачу берут в работу).
+- **FE-127 (P3)** Память `architecture/`: нет описания реалтайма (`wsService.js`, `reducers/realtime.js`, `useRealtime`), найдено при FE-126. Подробности: `.ai/memory/backlog/FE-127.md`
 - **FE-118 (P2)** `message.new` неизвестного чата: недосчёт unread при нескольких кадрах подряд (ревью FE-41, m3); сверит FE-42. Подробности: `.ai/memory/backlog/FE-118.md`
 - **FE-119 (P3)** e2e realtime: хрупкая схема `routeWebSocket` с общим URL для HMR и приложения, предложение `?app=1` (ревью FE-41, m5). Подробности: `.ai/memory/backlog/FE-119.md`
 - **FE-120 (P3)** `removedChatIds` в модульной переменной `realtime.js` вместо store (ревью FE-41, m6). Подробности: `.ai/memory/backlog/FE-120.md`
@@ -34,7 +35,7 @@
 - **FE-42 (P1)** Догонка при реконнекте: сверка `GET /api/chats`, `since` с подкачкой, реакция на `online`/`visibilitychange`. Подробности: `.ai/memory/backlog/FE-42.md`
 - **FE-96 (P1)** apiClient: после `403 csrf_invalid` перечитать сессию (single-flight), повторить запрос раз, при смене `user.id` сбросить store. Подробности: `.ai/memory/backlog/FE-96.md`
 - **FE-98 (P1)** Перейти на итоговый контракт бэкенда: заменить `docs/client-integration.md`, сверить mock-BFF, пройти `qa-tester` на реальном сервере. Подробности: `.ai/memory/backlog/FE-98.md`
-- **FE-05 (P2)** Удалить пустой `modules/form/Form.js` и мёртвый код; исправить устаревшие ссылки на `auth-contract.md` в mock-BFF и e2e. Подробности: `.ai/memory/backlog/FE-05.md`
+- **FE-05 (P2)** Удалить пустой `modules/form/Form.js` и мёртвый код; исправить устаревшие ссылки на удалённый `auth-contract.md` в mock-BFF и e2e. Подробности: `.ai/memory/backlog/FE-05.md`
 - **FE-06 (P2)** Тесты на долг по существующему коду, не покрытому FE-26…FE-45 (`Chat`, `Popover`, `Overlay`, `Header`, `Messenger` и др.). Подробности: `.ai/memory/backlog/FE-06.md`
 - **FE-29 (P2)** `Popover`/`Overlay` в `ui/`: Esc, фокус внутрь и возврат, `role=dialog`, закрытие поповера после создания чата. Подробности: `.ai/memory/backlog/FE-29.md`
 - **FE-30 (P2)** Адаптив: ниже ~768px одна панель за раз (список чатов или диалог) и кнопка «назад» в заголовке диалога. Подробности: `.ai/memory/backlog/FE-30.md`
@@ -52,7 +53,7 @@
 - **FE-93 (P2)** Настройки профиля: имя и фамилия (`PATCH /api/me`) и логин только для чтения; ошибки по `details`, mock-BFF. Подробности: `.ai/memory/backlog/FE-93.md`
 - **FE-94 (P2)** Смена пароля в настройках (`POST /api/me/password`): проверка нового до отправки, `401`/`400`/`429`, mock-BFF. Подробности: `.ai/memory/backlog/FE-94.md`
 - **FE-95 (P2)** «Выйти на всех устройствах» в меню (`POST /api/auth/logout-all`): сброс store, mock-BFF, нужно ли подтверждение — вопрос. Подробности: `.ai/memory/backlog/FE-95.md`
-- **FE-97 (P2)** Память и правила после перехода на пароль: убрать OAuth/passkey из `auth-contract.md`, `architecture.md`, правил и `check-state.js`. Подробности: `.ai/memory/backlog/FE-97.md`
+- **FE-97 (P2)** Память и правила после перехода на пароль: убрать OAuth/passkey из `architecture/*.md`, правил и `check-state.js`. Подробности: `.ai/memory/backlog/FE-97.md`
 - **FE-70 (P2)** Админка: список пользователей, назначение админа и отключение/включение через `PATCH /api/admin/users/:id`, mock-BFF. Подробности: `.ai/memory/backlog/FE-70.md`
 - **FE-48 (P3)** `check-memory.sh`: проверять наличие обязательных разделов `state.md` (сначала тест на отсутствующий раздел). Подробности: `.ai/memory/backlog/FE-48.md`
 - **FE-53 (P3)** Контрактные тесты mock-BFF: убрать условный `test.skip` и устаревший комментарий в `e2e/mock-bff.contract.spec.js`. Подробности: `.ai/memory/backlog/FE-53.md`

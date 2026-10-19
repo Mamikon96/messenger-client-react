@@ -29,6 +29,25 @@ const submitCredentials = (type, request) =>
 export const login = submitCredentials('auth/login', loginRequest)
 export const register = submitCredentials('auth/register', registerRequest)
 
+// Перечитывание сессии после 403 csrf_invalid (хук apiClient, подключает src/index.js). Результат — можно ли повторять исходный запрос:
+// тот же пользователь → true (новый токен уже записан fetchSession); другой пользователь → userSwitched, false;
+// сессии нет (401) → sessionClosed, false. Сбой перечитывания отклоняет thunk.
+export const recoverCsrf = createAsyncThunk('auth/recoverCsrf', async (_, { dispatch, getState }) => {
+    const user = await fetchSession()
+    if (selectAuthStatus(getState()) !== 'authenticated') {
+        return false
+    }
+    if (!user) {
+        dispatch(sessionClosed())
+        return false
+    }
+    if (user.id !== selectAuthUserId(getState())) {
+        dispatch(userSwitched(user))
+        return false
+    }
+    return true
+})
+
 const setAuthenticated = (state, action) => {
     state.user = action.payload
     state.status = 'authenticated'
@@ -48,6 +67,12 @@ export const authSlice = createSlice({
             if (state.status !== 'authenticated') return
             state.user = null
             state.status = 'sessionClosed'
+        },
+        // Событие: после 403 csrf_invalid выяснилось, что в другой вкладке вошёл другой пользователь. Корневой редьюсер (store.js) сбрасывает остальные слайсы.
+        // Как и sessionClosed, имеет смысл только у вошедшего: в остальных статусах запоздавшее событие игнорируется.
+        userSwitched: (state, action) => {
+            if (state.status !== 'authenticated') return
+            state.user = action.payload
         }
     },
     extraReducers: (builder) => {
@@ -80,6 +105,6 @@ export const selectSessionClosed = (state) => state.auth.status === 'sessionClos
 export const selectAuthUser = (state) => state.auth.user
 export const selectAuthUserId = (state) => state.auth.user?.id
 
-export const { sessionClosed } = authSlice.actions
+export const { sessionClosed, userSwitched } = authSlice.actions
 
 export default authSlice.reducer

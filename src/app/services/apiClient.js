@@ -3,6 +3,8 @@ const UNSAFE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
 let csrfToken = null;
 let unauthorizedHandler = null;
+let csrfRecoveryHandler = null;
+let csrfRecovery = null;
 
 export class ApiError extends Error {
     constructor(status, data, { retryAfter = null } = {}) {
@@ -26,6 +28,12 @@ export function setUnauthorizedHandler(handler) {
     unauthorizedHandler = handler;
 }
 
+// Хук восстановления после 403 csrf_invalid: перечитывает сессию (обновляет токен через setCsrfToken)
+// и возвращает true, если исходный запрос можно повторить. Регистрирует src/index.js (apiClient не знает ни authApi, ни store).
+export function setCsrfRecoveryHandler(handler) {
+    csrfRecoveryHandler = handler;
+}
+
 async function parseBody(response) {
     const text = await response.text();
     if (!text) {
@@ -46,18 +54,30 @@ function parseRetryAfter(response) {
     return value !== null && /^\d+$/.test(value.trim()) ? Number(value.trim()) : null;
 }
 
-export async function apiRequest(path, { method = "GET", body, signal, skipUnauthorizedHandler = false } = {}) {
-    const httpMethod = method.toUpperCase();
+// Параллельные 403 ждут одно перечитывание сессии. Сбой перечитывания — «не повторять»: запрос завершится исходным 403.
+function awaitCsrfRecovery() {
+    if (!csrfRecovery) {
+        csrfRecovery = Promise.resolve()
+            .then(csrfRecoveryHandler)
+            .catch(() => false)
+            .finally(() => {
+                csrfRecovery = null;
+            });
+    }
+    return csrfRecovery;
+}
+
+async function send(path, { method, body, signal, skipUnauthorizedHandler }) {
     const headers = {};
     if (body !== undefined) {
         headers["Content-Type"] = "application/json";
     }
-    if (csrfToken && UNSAFE_METHODS.includes(httpMethod)) {
+    if (csrfToken && UNSAFE_METHODS.includes(method)) {
         headers[CSRF_HEADER] = csrfToken;
     }
 
     const response = await fetch(path, {
-        method: httpMethod,
+        method,
         headers,
         credentials: "same-origin",
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -77,4 +97,20 @@ export async function apiRequest(path, { method = "GET", body, signal, skipUnaut
         throw error;
     }
     return data;
+}
+
+// 403 csrf_invalid (токен устарел: в другой вкладке вошли заново, FE-D38) у небезопасного метода (CSRF-токен шлётся только им):
+// перечитать сессию и повторить запрос ровно один раз.
+export async function apiRequest(path, { method = "GET", body, signal, skipUnauthorizedHandler = false } = {}) {
+    const options = { method: method.toUpperCase(), body, signal, skipUnauthorizedHandler };
+    try {
+        return await send(path, options);
+    } catch (error) {
+        const recoverable = UNSAFE_METHODS.includes(options.method)
+            && error instanceof ApiError && error.status === 403 && error.code === "csrf_invalid" && csrfRecoveryHandler;
+        if (!recoverable || !(await awaitCsrfRecovery())) {
+            throw error;
+        }
+        return send(path, options);
+    }
 }

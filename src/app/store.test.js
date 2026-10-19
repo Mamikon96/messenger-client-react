@@ -9,7 +9,7 @@ import { selectUsers, usersReceived } from './reducers/users';
 import { selectChatMessages, sendMessage } from './reducers/messages';
 import { messageAdded } from './reducers/messageEvents';
 import { outboxEnqueued, selectChatOutbox } from './reducers/outbox';
-import { checkSession, logout, sessionClosed } from './reducers/auth';
+import { checkSession, logout, sessionClosed, userSwitched } from './reducers/auth';
 import { realtimeStatusChanged, selectRealtimeStatus } from './reducers/realtime';
 
 jest.mock('./services/chatsApi');
@@ -79,6 +79,17 @@ describe('rootReducer: сессия закрыта вне этой вкладк�
     expect(state).toEqual({
       ...emptyState,
       auth: { status: 'sessionClosed', user: null },
+    });
+  });
+
+  it('userSwitched сбрасывает все слайсы, auth — authenticated с новым пользователем', () => {
+    const other = { ...user, id: '2', login: 'bob', name: 'Bob' };
+
+    const state = rootReducer(filledState(), userSwitched(other));
+
+    expect(state).toEqual({
+      ...emptyState,
+      auth: { status: 'authenticated', user: other },
     });
   });
 

@@ -4,12 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import App from './App';
-import authReducer, { sessionClosed } from './app/reducers/auth';
+import authReducer, { sessionClosed, userSwitched } from './app/reducers/auth';
 import * as authApi from './app/services/authApi';
 
 jest.mock('./app/services/authApi');
 jest.mock('./app/modules/header/Header', () => () => <div>header</div>);
-jest.mock('./app/modules/messenger/Messenger', () => () => <div>messenger</div>);
+const mockMessengerMounts = jest.fn();
+jest.mock('./app/modules/messenger/Messenger', () => {
+  const { useEffect: useMockEffect } = require('react');
+  return function MessengerMock() {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useMockEffect(() => { mockMessengerMounts(); }, []);
+    return <div>messenger</div>;
+  };
+});
 
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
 
@@ -25,6 +33,25 @@ const renderApp = (wrapper = ({ children }) => children) => {
   );
   return { ...view, store };
 };
+
+describe('App: смена пользователя', () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('userSwitched перемонтирует Messenger (загрузка чатов и сокет — заново для нового пользователя)', async () => {
+    authApi.fetchSession.mockResolvedValue(user);
+    const { store } = renderApp();
+    expect(await screen.findByText('messenger')).toBeInTheDocument();
+    expect(mockMessengerMounts).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      store.dispatch(userSwitched({ ...user, id: '2', name: 'Bob' }));
+    });
+
+    await waitFor(() => expect(mockMessengerMounts).toHaveBeenCalledTimes(2));
+  });
+});
 
 describe('App: гейт входа', () => {
   afterEach(() => {

@@ -72,6 +72,16 @@ test('GET /api/chats: с сессией — 200 и пустой список', a
   expect(await res.json()).toEqual([]);
 });
 
+test('GET /api/chats/:id и GET /api/chats/:id/messages: без сессии — 401, с сессией — 404 not_found (чатов в mock нет)', async () => {
+  for (const path of ['/api/chats/c1', '/api/chats/c1/messages']) {
+    expect((await api.get(path)).status(), path).toBe(401);
+  }
+  await signIn();
+  for (const path of ['/api/chats/c1', '/api/chats/c1/messages']) {
+    await expectError(await api.get(path), 404, 'not_found');
+  }
+});
+
 test('POST /api/chats/:id/messages: невалидное тело — 400 validation_failed, валидное — 404 not_found', async () => {
   const { csrfToken } = await (await signIn()).json();
   const post = (data) => api.post('/api/chats/c1/messages', { data, headers: { 'X-CSRF-Token': csrfToken } });

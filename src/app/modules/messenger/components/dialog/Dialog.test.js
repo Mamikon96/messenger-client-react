@@ -8,6 +8,7 @@ import { ApiError } from '../../../../services/apiClient';
 import { checkSession } from '../../../../reducers/auth';
 import { chatSelected } from '../../../../reducers/activeChatId';
 import { chatCreated, fetchChats, selectChats } from '../../../../reducers/chats';
+import { messageAdded } from '../../../../reducers/messageEvents';
 import { selectChatMessages, sendMessage } from '../../../../reducers/messages';
 
 jest.mock('../../../../services/authApi');
@@ -178,7 +179,7 @@ describe('Dialog: разметка, пустые состояния, прокр�
     await waitFor(() => expect(input()).toHaveFocus());
   });
 
-  it('при новом сообщении лента прокручивается вниз', async () => {
+  it('при своём новом сообщении лента прокручивается вниз', async () => {
     const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
     Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 500 });
     try {
@@ -186,8 +187,9 @@ describe('Dialog: разметка, пустые состояния, прокр�
       const log = screen.getByRole('log', { name: 'Сообщения' });
       expect(log.scrollTop).toBe(500);
       log.scrollTop = 0;
+      fireEvent.scroll(log);
       act(() => {
-        store.dispatch(sendMessage({ chatId, senderId: 'u2', body: 'новое' }));
+        store.dispatch(sendMessage({ chatId, senderId: 'u1', body: 'новое' }));
       });
 
       expect(log.scrollTop).toBe(500);
@@ -489,5 +491,255 @@ describe('Dialog: отправка в серверном чате (FE-40)', () =
     expect(messagesOf()).toHaveLength(1);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(chatsApi.postMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('Dialog: подкачка старых сообщений и прокрутка (FE-138)', () => {
+  const PAGE = 50;
+  const msg = (seq, senderId = 'u2') => ({ chatId: 'g1', seq, senderId, clientId: `k${seq}`, body: `m${seq}`, createdAt: '2026-10-15T10:00:00.000Z' });
+  const page = (from, count) => Array.from({ length: count }, (_, i) => msg(from + i));
+  const listGroup = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 100, lastMessage: null, unreadCount: 0 };
+  const groupDto = {
+    id: 'g1',
+    type: 'group',
+    title: 'Команда',
+    lastSeq: 100,
+    members: [
+      { userId: 'u1', name: 'Ann', avatarUrl: '', role: 'owner' },
+      { userId: 'u2', name: 'Боб', avatarUrl: '', role: 'member' },
+    ],
+  };
+  const descriptors = {};
+  const log = () => screen.getByRole('log', { name: 'Сообщения' });
+
+  // jsdom не считает раскладку: высота ленты — 10px на сообщение, окно — 200px.
+  beforeEach(() => {
+    descriptors.scrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    descriptors.clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return this.getAttribute('role') === 'log' ? within(this).queryAllByRole('article').length * 10 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        return this.getAttribute('role') === 'log' ? 200 : 0;
+      },
+    });
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+    for (const key of ['scrollHeight', 'clientHeight']) {
+      if (descriptors[key]) Object.defineProperty(HTMLElement.prototype, key, descriptors[key]);
+      else delete HTMLElement.prototype[key];
+    }
+  });
+
+  const open = async (firstPage) => {
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    chatsApi.fetchMessages.mockResolvedValueOnce(firstPage);
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    store.dispatch(fetchChats.pending('req'));
+    store.dispatch(fetchChats.fulfilled([listGroup], 'req'));
+    render(
+      <Provider store={store}>
+        <Dialog />
+      </Provider>
+    );
+    act(() => {
+      store.dispatch(chatSelected('g1'));
+    });
+    await screen.findByText(`m${firstPage[firstPage.length - 1].seq}`);
+    return { store };
+  };
+
+  const scrollTo = (top) => {
+    log().scrollTop = top;
+    fireEvent.scroll(log());
+  };
+
+  it('после первой загрузки лента внизу', async () => {
+    await open(page(51, PAGE));
+
+    expect(log().scrollTop).toBe(500);
+  });
+
+  it('прокрутка к верху запрашивает старые сообщения до минимального seq; пока грузятся — индикатор', async () => {
+    await open(page(51, PAGE));
+    let release;
+    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(page(1, PAGE)); }));
+
+    scrollTo(0);
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Загрузка старых сообщений…');
+    expect(chatsApi.fetchMessages).toHaveBeenLastCalledWith('g1', expect.objectContaining({ before: 51, limit: PAGE }));
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByText('m1')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('после подкачки позиция прокрутки сохраняется: сдвиг на высоту добавленного', async () => {
+    await open(page(51, PAGE));
+    chatsApi.fetchMessages.mockResolvedValueOnce(page(1, PAGE));
+
+    scrollTo(0);
+
+    await screen.findByText('m1');
+    expect(log().scrollTop).toBe(500);
+  });
+
+  it('конец истории (меньше страницы): подкачка не запрашивается', async () => {
+    await open(page(1, 3));
+    chatsApi.fetchMessages.mockClear();
+
+    scrollTo(0);
+
+    expect(chatsApi.fetchMessages).not.toHaveBeenCalled();
+  });
+
+  it('конец истории: после подкачки неполной страницы повторная прокрутка вверх запроса не делает', async () => {
+    await open(page(51, PAGE));
+    chatsApi.fetchMessages.mockResolvedValueOnce(page(26, 25));
+    scrollTo(0);
+    await screen.findByText('m26');
+    chatsApi.fetchMessages.mockClear();
+
+    scrollTo(0);
+
+    expect(chatsApi.fetchMessages).not.toHaveBeenCalled();
+  });
+
+  it('сбой подкачки: сообщение и «Повторить», по нажатию подкачка повторяется', async () => {
+    await open(page(51, PAGE));
+    chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(page(1, PAGE));
+
+    scrollTo(0);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить старые сообщения.');
+    await act(async () => {
+      screen.getByRole('button', { name: 'Повторить' }).click();
+    });
+    expect(await screen.findByText('m1')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('чужое сообщение при чтении выше не прокручивает ленту', async () => {
+    const { store } = await open(page(51, PAGE));
+    scrollTo(100);
+
+    act(() => {
+      store.dispatch(messageAdded(msg(101)));
+    });
+
+    await screen.findByText('m101');
+    expect(log().scrollTop).toBe(100);
+  });
+
+  it('чужое сообщение у низа ленты прокручивает вниз', async () => {
+    const { store } = await open(page(51, PAGE));
+    scrollTo(290);
+
+    act(() => {
+      store.dispatch(messageAdded(msg(101)));
+    });
+
+    await screen.findByText('m101');
+    expect(log().scrollTop).toBe(510);
+  });
+
+  it('своё сообщение прокручивает вниз, даже если читаешь выше', async () => {
+    const { store } = await open(page(51, PAGE));
+    scrollTo(100);
+
+    act(() => {
+      store.dispatch(sendMessage({ chatId: 'g1', senderId: 'u1', body: 'моё' }));
+    });
+
+    await screen.findByText('моё');
+    expect(log().scrollTop).toBe(510);
+  });
+
+  describe('окно не заполнено историей', () => {
+    beforeEach(() => {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+        configurable: true,
+        get() {
+          return this.getAttribute('role') === 'log' ? 1000 : 0;
+        },
+      });
+    });
+
+    it('подкачивает без прокрутки, пока лента короче окна, и останавливается на неполной странице', async () => {
+      chatsApi.fetchMessages.mockResolvedValueOnce(page(51, PAGE)).mockResolvedValueOnce(page(1, PAGE));
+      chatsApi.fetchChat.mockResolvedValue(groupDto);
+      const store = configureStore({ reducer: rootReducer });
+      store.dispatch(checkSession.fulfilled(user, 'req'));
+      store.dispatch(fetchChats.pending('req'));
+      store.dispatch(fetchChats.fulfilled([listGroup], 'req'));
+      render(
+        <Provider store={store}>
+          <Dialog />
+        </Provider>
+      );
+      act(() => {
+        store.dispatch(chatSelected('g1'));
+      });
+
+      await screen.findByText('m1');
+      expect(chatsApi.fetchMessages).toHaveBeenCalledWith('g1', expect.objectContaining({ before: 51 }));
+      await waitFor(() => expect(chatsApi.fetchMessages).toHaveBeenLastCalledWith('g1', expect.objectContaining({ before: 1 })));
+    });
+
+    it('страница короче размера: новых запросов нет', async () => {
+      await open(page(1, 3));
+
+      expect(chatsApi.fetchMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it('при сбое подкачки цикл останавливается: повторных запросов нет', async () => {
+      chatsApi.fetchMessages.mockResolvedValueOnce(page(51, PAGE)).mockRejectedValueOnce(new Error('network'));
+      chatsApi.fetchChat.mockResolvedValue(groupDto);
+      const store = configureStore({ reducer: rootReducer });
+      store.dispatch(checkSession.fulfilled(user, 'req'));
+      store.dispatch(fetchChats.pending('req'));
+      store.dispatch(fetchChats.fulfilled([listGroup], 'req'));
+      render(
+        <Provider store={store}>
+          <Dialog />
+        </Provider>
+      );
+      act(() => {
+        store.dispatch(chatSelected('g1'));
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить старые сообщения.');
+      expect(chatsApi.fetchMessages).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('подтверждение своего сообщения сервером не прокручивает вниз, если пользователь ушёл вверх', async () => {
+    const { store } = await open(page(51, PAGE));
+    let confirm;
+    chatsApi.postMessage.mockImplementation((chatId, { clientId, body }) => new Promise((resolve) => {
+      confirm = () => resolve({ ...msg(101, 'u1'), clientId, body });
+    }));
+    act(() => {
+      store.dispatch(sendMessage({ chatId: 'g1', senderId: 'u1', body: 'моё' }));
+    });
+    await screen.findByText('моё');
+    scrollTo(100);
+
+    await act(async () => {
+      confirm();
+    });
+
+    await waitFor(() => expect(chatsApi.postMessage).toHaveBeenCalled());
+    expect(log().scrollTop).toBe(100);
   });
 });

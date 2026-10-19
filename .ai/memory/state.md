@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-19 @ 8e03fc7+dirty
+> Проверено: 2026-10-19 @ 4bdd045+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка и локальные чаты из Join — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -21,7 +21,7 @@
 ## Известные проблемы
 Каждая проблема — со ссылкой на задачу бэклога (→ FE-NN), где описано исправление; подробности — там, здесь не дублируются.
 1. `src/app/modules/form/join-form/JoinForm.js`: `<label htmlFor="name">` без соответствующего `id` у инпутов; поле `title` без подписи; форма не очищается и не закрывает popover после Join; нет валидации. → FE-44
-2. `src/app/modules/messenger/components/dialog/Dialog.js`: автор сообщения не показывается (имена — FE-04), нет автопрокрутки вниз. → FE-27
+2. `src/app/modules/messenger/components/dialog/Dialog.js`, `Dialog.css`: индикатор «Загрузка старых сообщений…» над лентой сдвигает текст на ~25 px; возможный двойной сдвиг из-за scroll anchoring (гипотеза). → FE-147
 3. `src/app/modules/form/Form.js` (+ css) — пустой файл. → FE-05
 4. `src/app/modules/header/components/action/Action.js`: `OVERLAY_OPACITY` объявлена внутри компонента; пустая ветка рендера `""`. → FE-29
 5. `README.md` пустой (одна строка). → FE-08

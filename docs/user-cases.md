@@ -39,7 +39,7 @@
 | UC-SESSION-05 | Данные прошлого пользователя не видны после выхода | active | docs/user-cases/session.md |
 | UC-SESSION-06 | Возврат на экран входа, когда сессия закрыта | active | docs/user-cases/session.md |
 | UC-SESSION-08 | Выйти на всех устройствах | planned | docs/user-cases/session.md |
-| UC-SESSION-09 | Несколько вкладок | planned | docs/user-cases/session.md |
+| UC-SESSION-09 | Несколько вкладок | active | docs/user-cases/session.md |
 
 ### Тема оформления (THEME)
 

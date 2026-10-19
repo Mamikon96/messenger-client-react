@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser, selectAuthUserId, selectSessionClosed, sessionClosed } from './auth';
+import reducer, { checkSession, login, logout, register, selectAuthStatus, selectAuthUser, selectAuthUserId, selectSessionClosed, sessionClosed, userSwitched, recoverCsrf } from './auth';
 import * as authApi from '../services/authApi';
 import { ApiError } from '../services/apiClient';
 
@@ -225,5 +225,79 @@ describe('auth slice', () => {
 
       expect(store.getState().auth.status).toBe('sessionClosed');
     });
+  });
+});
+
+describe('userSwitched (в другой вкладке вошёл другой пользователь)', () => {
+  const other = { ...user, id: '2', login: 'bob', name: 'Bob' };
+
+  it('делает auth authenticated с новым пользователем', () => {
+    expect(reducer({ status: 'authenticated', user }, userSwitched(other))).toEqual({ status: 'authenticated', user: other });
+  });
+});
+
+describe('userSwitched вне authenticated', () => {
+  it.each(['loading', 'anonymous', 'sessionClosed', 'error'])('в статусе %s игнорируется', (status) => {
+    const before = { status, user: null };
+    expect(reducer(before, userSwitched({ ...user, id: '2' }))).toBe(before);
+  });
+});
+
+describe('recoverCsrf (перечитывание сессии после 403 csrf_invalid)', () => {
+  const other = { ...user, id: '2', login: 'bob', name: 'Bob' };
+  const makeAuthenticated = () => {
+    const store = makeStore();
+    store.dispatch({ type: 'auth/login/fulfilled', payload: user });
+    return store;
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('тот же пользователь → true (запрос можно повторять), состояние не меняется', async () => {
+    authApi.fetchSession.mockResolvedValue({ ...user });
+    const store = makeAuthenticated();
+
+    await expect(store.dispatch(recoverCsrf()).unwrap()).resolves.toBe(true);
+
+    expect(store.getState().auth).toEqual({ status: 'authenticated', user });
+  });
+
+  it('другой пользователь → false, auth переключён на нового', async () => {
+    authApi.fetchSession.mockResolvedValue(other);
+    const store = makeAuthenticated();
+
+    await expect(store.dispatch(recoverCsrf()).unwrap()).resolves.toBe(false);
+
+    expect(store.getState().auth).toEqual({ status: 'authenticated', user: other });
+  });
+
+  it('сессии нет (401 → null) → false, сессия закрыта', async () => {
+    authApi.fetchSession.mockResolvedValue(null);
+    const store = makeAuthenticated();
+
+    await expect(store.dispatch(recoverCsrf()).unwrap()).resolves.toBe(false);
+
+    expect(store.getState().auth).toEqual({ status: 'sessionClosed', user: null });
+  });
+
+  it('не authenticated (вышли, пока шёл запрос) → false, без userSwitched', async () => {
+    authApi.fetchSession.mockResolvedValue(other);
+    const store = makeStore();
+    store.dispatch({ type: 'auth/logout/fulfilled' });
+
+    await expect(store.dispatch(recoverCsrf()).unwrap()).resolves.toBe(false);
+
+    expect(store.getState().auth).toEqual({ status: 'anonymous', user: null });
+  });
+
+  it('сбой перечитывания → thunk отклоняется, состояние не меняется', async () => {
+    authApi.fetchSession.mockRejectedValue(new ApiError(500, null));
+    const store = makeAuthenticated();
+
+    await expect(store.dispatch(recoverCsrf()).unwrap()).rejects.toBeDefined();
+
+    expect(store.getState().auth).toEqual({ status: 'authenticated', user });
   });
 });

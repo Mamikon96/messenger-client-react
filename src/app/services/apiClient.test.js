@@ -2,6 +2,7 @@ import {
     apiRequest,
     setCsrfToken,
     setUnauthorizedHandler,
+    setCsrfRecoveryHandler,
     ApiError,
 } from "./apiClient";
 
@@ -315,5 +316,121 @@ describe("apiClient: ApiError.code, details, retryAfter", () => {
         fetch.mockResolvedValue(reply(429, { error: { code: "rate_limited" } }, headers));
 
         await expect(apiRequest("/api/x")).rejects.toMatchObject({ status: 429, retryAfter: null });
+    });
+});
+
+describe("apiClient: восстановление после 403 csrf_invalid", () => {
+    const csrfBody = { error: { code: "csrf_invalid", message: "bad token" } };
+
+    beforeEach(() => {
+        global.fetch = jest.fn();
+        setCsrfToken("old");
+        setUnauthorizedHandler(null);
+        setCsrfRecoveryHandler(null);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+    });
+
+    it("вызывает перечитывание сессии и повторяет запрос один раз с новым токеном", async () => {
+        const recover = jest.fn(async () => {
+            setCsrfToken("new");
+            return true;
+        });
+        setCsrfRecoveryHandler(recover);
+        fetch.mockResolvedValueOnce(reply(403, csrfBody)).mockResolvedValueOnce(reply(201, { ok: 1 }));
+
+        const data = await apiRequest("/api/x", { method: "POST", body: { a: 1 } });
+
+        expect(data).toEqual({ ok: 1 });
+        expect(recover).toHaveBeenCalledTimes(1);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(fetch.mock.calls[0][1].headers["X-CSRF-Token"]).toBe("old");
+        expect(fetch.mock.calls[1][1].headers["X-CSRF-Token"]).toBe("new");
+        expect(fetch.mock.calls[1][1].body).toBe(JSON.stringify({ a: 1 }));
+    });
+
+    it("повторный 403 — обычный ApiError, без второго повтора и без хука 401", async () => {
+        const onUnauthorized = jest.fn();
+        setUnauthorizedHandler(onUnauthorized);
+        const recover = jest.fn(async () => true);
+        setCsrfRecoveryHandler(recover);
+        fetch.mockResolvedValue(reply(403, csrfBody));
+
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403, code: "csrf_invalid" });
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(recover).toHaveBeenCalledTimes(1);
+        expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it("параллельные 403 ждут одно перечитывание, каждый запрос повторяется", async () => {
+        let release;
+        const recover = jest.fn(
+            () => new Promise((resolve) => {
+                release = () => resolve(true);
+            })
+        );
+        setCsrfRecoveryHandler(recover);
+        fetch.mockImplementation((url, options) =>
+            Promise.resolve(options.headers["X-CSRF-Token"] === "old" ? reply(403, csrfBody) : reply(200, { url }))
+        );
+
+        const first = apiRequest("/api/a", { method: "POST" });
+        const second = apiRequest("/api/b", { method: "DELETE" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        setCsrfToken("new");
+        release();
+
+        await expect(Promise.all([first, second])).resolves.toEqual([{ url: "/api/a" }, { url: "/api/b" }]);
+        expect(recover).toHaveBeenCalledTimes(1);
+    });
+
+    it("если перечитывание сообщило «не повторять» (другой пользователь, закрытая сессия), запрос завершается исходным 403", async () => {
+        setCsrfRecoveryHandler(jest.fn(async () => false));
+        fetch.mockResolvedValue(reply(403, csrfBody));
+
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403, code: "csrf_invalid" });
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("если перечитывание упало, запрос завершается исходным 403", async () => {
+        setCsrfRecoveryHandler(jest.fn(async () => {
+            throw new TypeError("Failed to fetch");
+        }));
+        fetch.mockResolvedValue(reply(403, csrfBody));
+
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403, code: "csrf_invalid" });
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("403 с другим кодом или без кода не запускает перечитывание", async () => {
+        const recover = jest.fn(async () => true);
+        setCsrfRecoveryHandler(recover);
+        fetch.mockResolvedValueOnce(reply(403, { error: { code: "user_disabled" } })).mockResolvedValueOnce(reply(403));
+
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403 });
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403 });
+
+        expect(recover).not.toHaveBeenCalled();
+    });
+
+    it("403 csrf_invalid на GET не запускает перечитывание", async () => {
+        const recover = jest.fn(async () => true);
+        setCsrfRecoveryHandler(recover);
+        fetch.mockResolvedValue(reply(403, csrfBody));
+
+        await expect(apiRequest("/api/x")).rejects.toMatchObject({ status: 403, code: "csrf_invalid" });
+
+        expect(recover).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("без хука 403 csrf_invalid — обычный ApiError", async () => {
+        fetch.mockResolvedValue(reply(403, csrfBody));
+
+        await expect(apiRequest("/api/x", { method: "POST" })).rejects.toMatchObject({ status: 403, code: "csrf_invalid" });
+        expect(fetch).toHaveBeenCalledTimes(1);
     });
 });

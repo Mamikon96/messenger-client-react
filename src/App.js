@@ -5,11 +5,12 @@ import Header from './app/modules/header/Header';
 import Login from './app/modules/login/Login';
 import Messenger from './app/modules/messenger/Messenger';
 import { Button } from './app/modules/ui/button/Button';
-import { checkSession, selectAuthStatus } from './app/reducers/auth';
+import { checkSession, selectAuthStatus, selectAuthUserId } from './app/reducers/auth';
 
 function App() {
   const dispatch = useDispatch();
   const status = useSelector(selectAuthStatus);
+  const userId = useSelector(selectAuthUserId);
   useEffect(() => {
     const request = dispatch(checkSession());
     return () => request.abort();
@@ -25,7 +26,7 @@ function App() {
         return (
           <>
             <Header/>
-            <Messenger/>
+            <Messenger key={userId}/>
           </>
         );
       case 'anonymous':

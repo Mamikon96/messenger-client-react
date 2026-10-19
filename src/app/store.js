@@ -5,7 +5,7 @@ import messagesSlice from './reducers/messages'
 import outboxSlice from './reducers/outbox'
 import usersSlice from './reducers/users'
 import realtimeSlice from './reducers/realtime'
-import authSlice, { logout, selectAuthStatus, sessionClosed } from './reducers/auth'
+import authSlice, { logout, selectAuthStatus, sessionClosed, userSwitched } from './reducers/auth'
 
 const appReducer = combineReducers({
   chats: chatsSlice,
@@ -23,6 +23,11 @@ const appReducer = combineReducers({
 // Слайс auth сам решает, принять ли событие, поэтому его новое состояние берётся из редьюсера, а остальные слайсы — начальные.
 export const rootReducer = (state, action) => {
   if (sessionClosed.match(action)) {
+    if (!state || selectAuthStatus(state) !== 'authenticated') return state
+    return { ...appReducer(undefined, action), auth: appReducer(state, action).auth }
+  }
+  // Другой пользователь в другой вкладке: все слайсы начальные, auth — authenticated с новым user; не у вошедшего — игнорируется.
+  if (userSwitched.match(action)) {
     if (!state || selectAuthStatus(state) !== 'authenticated') return state
     return { ...appReducer(undefined, action), auth: appReducer(state, action).auth }
   }

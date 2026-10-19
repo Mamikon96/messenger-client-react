@@ -38,8 +38,8 @@ test('logout: без сессии — 401 unauthorized', async () => {
 
 test('logout: без CSRF-заголовка или с неверным — 403, сессия жива', async () => {
   await signIn();
-  expect((await api.post('/api/auth/logout')).status()).toBe(403);
-  expect((await api.post('/api/auth/logout', { headers: { 'X-CSRF-Token': 'wrong' } })).status()).toBe(403);
+  await expectError(await api.post('/api/auth/logout'), 403, 'csrf_invalid');
+  await expectError(await api.post('/api/auth/logout', { headers: { 'X-CSRF-Token': 'wrong' } }), 403, 'csrf_invalid');
   expect((await api.get('/api/auth/session')).status()).toBe(200);
 });
 
@@ -89,13 +89,13 @@ test('POST /api/chats/:id/messages: невалидное тело — 400 valida
 test('POST /api/chats/:id/messages: без сессии — 401, без CSRF — 403', async () => {
   expect((await api.post('/api/chats/c1/messages', { data: { clientId: 'c1', body: 'x' } })).status()).toBe(401);
   await signIn();
-  expect((await api.post('/api/chats/c1/messages', { data: { clientId: 'c1', body: 'x' } })).status()).toBe(403);
+  await expectError(await api.post('/api/chats/c1/messages', { data: { clientId: 'c1', body: 'x' } }), 403, 'csrf_invalid');
 });
 
 test('прочие изменяющие /api/*: с сессией без CSRF — 403', async () => {
   await signIn();
   for (const method of ['post', 'put', 'patch', 'delete']) {
-    expect((await api[method]('/api/chats')).status()).toBe(403);
+    await expectError(await api[method]('/api/chats'), 403, 'csrf_invalid');
   }
 });
 

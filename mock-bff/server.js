@@ -172,7 +172,7 @@ function createServer() {
     if (parts[2] === 'logout' && req.method === 'POST') {
       const session = getSession(req);
       if (!session) return error(res, 401, 'unauthorized', 'Требуется вход');
-      if (req.headers['x-csrf-token'] !== session.csrfToken) return empty(res, 403);
+      if (req.headers['x-csrf-token'] !== session.csrfToken) return error(res, 403, 'csrf_invalid', 'Неверный CSRF-токен');
       sessions.delete(session.sid);
       return empty(res, 204, { 'Set-Cookie': sessionCookie('', 0) });
     }
@@ -198,7 +198,7 @@ function createServer() {
     // Прочие /api/*: нужна сессия, изменяющие запросы — ещё и CSRF-заголовок.
     const session = getSession(req);
     if (!session) return error(res, 401, 'unauthorized', 'Требуется вход');
-    if (MUTATING.includes(req.method) && req.headers['x-csrf-token'] !== session.csrfToken) return empty(res, 403);
+    if (MUTATING.includes(req.method) && req.headers['x-csrf-token'] !== session.csrfToken) return error(res, 403, 'csrf_invalid', 'Неверный CSRF-токен');
     // GET /api/chats (пока всегда пустой список)
     if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
     // POST /api/chats/:id/messages (чатов в mock нет: валидное тело -> 404)

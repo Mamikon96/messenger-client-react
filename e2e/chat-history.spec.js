@@ -160,3 +160,68 @@ test('[UC-MSG-01] отправка в серверном чате после з�
   await expect(page.locator('.dialog__message').last()).toHaveText('Моё');
   await expect(page.locator('.dialog__message').last().getByRole('img', { name: 'Отправлено' })).toBeVisible();
 });
+
+// Длинная история группы g1: сообщения 1..100, страница — 50; сервер отдаёт последние до `before` (не включая).
+const longHistoryHandler = ({ failOlder = () => false, total = 100 } = {}) => (route) => {
+  const before = Number(new URL(route.request().url()).searchParams.get('before') ?? total + 1);
+  if (before <= 51 && failOlder()) return route.fulfill({ status: 500, json: { error: { code: 'internal' } } });
+  const seqs = Array.from({ length: total }, (_, i) => i + 1).filter((seq) => seq < before).slice(-50);
+  return route.fulfill({ json: seqs.map((seq) => message('g1', seq, 'u-bob', `Сообщение ${seq}`)) });
+};
+
+// Пузырь сообщения по номеру (в группе внутри ещё имя автора, поэтому точное совпадение текста не подходит).
+const bubble = (page, seq) => page.locator('.dialog__message').filter({ hasText: new RegExp(`Сообщение ${seq}$`) });
+
+const openLongHistory = async (page, options = {}) => {
+  const requests = await mockServer(page, { messagesHandler: longHistoryHandler(options) });
+  await login(page);
+  await page.locator('.chat', { hasText: 'Команда' }).click();
+  await expect(bubble(page, options.total ?? 100)).toBeVisible();
+  return requests;
+};
+
+test('[UC-MSG-04] длинная история: лента открывается внизу, прокрутка вверх подгружает старые без прыжка позиции', async ({ page }) => {
+  await openLongHistory(page);
+  const log = page.getByRole('log', { name: 'Сообщения' });
+  await expect(page.locator('.dialog__message')).toHaveCount(50);
+
+  await log.evaluate((el) => { el.scrollTop = 0; });
+
+  await expect(page.locator('.dialog__message')).toHaveCount(100);
+  const anchor = bubble(page, 51);
+  // Сообщение 51 было самым верхним: после подкачки остаётся у верхнего края окна, а не уезжает в начало истории.
+  const offset = await anchor.evaluate((el) => el.getBoundingClientRect().top - el.closest('[role="log"]').getBoundingClientRect().top);
+  expect(Math.abs(offset)).toBeLessThan(80);
+  expect(await log.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
+test('[UC-MSG-04] конец истории: после подкачки неполной страницы новых запросов при прокрутке вверх нет', async ({ page }) => {
+  const requests = await openLongHistory(page, { total: 75 });
+  const log = page.getByRole('log', { name: 'Сообщения' });
+
+  await log.evaluate((el) => { el.scrollTop = 0; });
+  await expect(page.locator('.dialog__message')).toHaveCount(75);
+  const calls = requests.messages.length;
+  await log.evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
+
+  // Дымовая проверка: отрицательный результат нельзя дождаться; точная проверка остановки — в unit-тестах Dialog.
+  await page.waitForTimeout(300);
+  expect(requests.messages).toHaveLength(calls);
+  await expect(page.getByText('Загрузка старых сообщений…')).toHaveCount(0);
+});
+
+test('[UC-MSG-04] сбой подкачки: сообщение и «Повторить», после которого старые сообщения появляются', async ({ page }) => {
+  let fail = true;
+  await openLongHistory(page, { failOlder: () => fail });
+  const log = page.getByRole('log', { name: 'Сообщения' });
+
+  await log.evaluate((el) => { el.scrollTop = 0; });
+  await expect(page.getByText('Не удалось загрузить старые сообщения.')).toBeVisible();
+  await expect(page.locator('.dialog__message')).toHaveCount(50);
+
+  fail = false;
+  await page.getByRole('button', { name: 'Повторить' }).click();
+
+  await expect(page.locator('.dialog__message')).toHaveCount(100);
+  await expect(page.getByText('Не удалось загрузить старые сообщения.')).toHaveCount(0);
+});

@@ -26,6 +26,7 @@ React 18, react-scripts 5 (CRA), JavaScript (без TypeScript), Redux Toolkit 2
 | Закрытие задачи (приёмка, ревью, проход qa-tester) | `.ai/rules/acceptance.md` (+ `.ai/memory/failures.md` при REJECT/FAIL) |
 | Любая git-операция (коммит, ветка, слияние, push, PR) | `.ai/rules/git-flow.md` |
 | Финальный отчёт | `.ai/rules/report-format.md` |
+| Аудит расхода токенов (`/token-audit`, периодически) | `.ai/rules/token-audit.md`, `node scripts/token-audit.js` |
 | Сомнение / не хватает данных (любая задача) | `.ai/rules/ask-user.md` |
 | История закрытых задач | `.ai/memory/done.md` — роутер (таблица по ID) → файл из `done/` |
 | Взять задачу из бэклога / заменённые решения | .ai/memory/backlog/FE-NN.md · `.ai/memory/queue.md` (только при пополнении бэклога) · `.ai/memory/decisions-archive.md` (поиском по ID) |

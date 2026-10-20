@@ -200,10 +200,10 @@ function loadCaseSet(root) {
 
 function checkLock(text, lock) {
   if (lock === null || lock === undefined) {
-    return [`${CASES_SET} не утверждён: нет ${LOCK_FILE}. Утверждает пользователь: bash scripts/approve-usecases.sh`];
+    return [`${CASES_SET} не утверждён: нет ${LOCK_FILE}. Утверждает пользователь: bash scripts/approve-usecases.sh --yes`];
   }
   if (hashText(text) !== String(lock).trim()) {
-    return [`${CASES_SET} изменён без утверждения (хэш не совпадает с ${LOCK_FILE}). Менять кейсы можно только с разрешения пользователя; утверждает он сам: bash scripts/approve-usecases.sh`];
+    return [`${CASES_SET} изменён без утверждения (хэш не совпадает с ${LOCK_FILE}). Менять кейсы можно только с разрешения пользователя; утверждает он сам: bash scripts/approve-usecases.sh --yes`];
   }
   return [];
 }

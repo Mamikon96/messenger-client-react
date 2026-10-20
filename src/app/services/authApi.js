@@ -2,7 +2,7 @@ import { apiRequest, setCsrfToken, ApiError } from "./apiClient";
 
 const isNonEmptyString = (value) => typeof value === "string" && value !== "";
 
-// Сырой user ответа → клиентская модель SessionUser (спека docs/auth-password-spec.md §3).
+// Сырой user ответа → клиентская модель SessionUser (docs/client-integration.md §2.3 и §4, SessionUser).
 // Обязательны все шесть полей; lastName и avatarUrl могут быть "". Лишние поля сервера отбрасываются. Некорректный user — null.
 function toSessionUser(raw) {
     if (typeof raw !== "object" || raw === null) {

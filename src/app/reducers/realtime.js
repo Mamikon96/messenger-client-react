@@ -83,15 +83,15 @@ const loadChat = (chatId, signal) => async (dispatch, getState) => {
     dispatch(chatReceived(toChatFromDto(dto, selectAuthUserId(getState()))))
 }
 
-// Догонка пропущенных сообщений: since = последний известный seq, страницами по CATCH_UP_LIMIT.
+// Догонка пропущенных сообщений: since = последний известный seq, страницами по CATCH_UP_LIMIT, пока сервер сообщает hasMore (§3.9).
 const catchUp = (chatId, signal) => async (dispatch, getState) => {
     let since = selectChatById(getState(), chatId).lastSeq
     for (;;) {
-        const page = await fetchMessages(chatId, { since, limit: CATCH_UP_LIMIT, signal })
+        const { messages, hasMore } = await fetchMessages(chatId, { since, limit: CATCH_UP_LIMIT, signal })
         if (!canContinue(getState, chatId, signal)) return
-        page.forEach((message) => dispatch(addMessage(message)))
-        if (page.length < CATCH_UP_LIMIT) return
-        since = page[page.length - 1].seq
+        messages.forEach((message) => dispatch(addMessage(message)))
+        if (!hasMore || messages.length === 0) return
+        since = messages[messages.length - 1].seq
     }
 }
 

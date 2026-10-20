@@ -15,7 +15,7 @@ const mockServer = async (page) => {
   await page.route('**/api/chats', async (route) => route.fulfill({ json: (await sessionLogin()) === 'alice' ? [CHAT] : [] }));
   await page.route('**/api/chats/g1', (route) => route.fulfill({ json: CHAT_DTO }));
   await page.route('**/api/chats/g1/messages**', async (route) => {
-    if (route.request().method() !== 'POST') return route.fulfill({ json: [] });
+    if (route.request().method() !== 'POST') return route.fulfill({ json: { messages: [], hasMore: false } });
     const response = await route.fetch();
     if (response.status() === 403) return route.fulfill({ response });
     const data = route.request().postDataJSON();

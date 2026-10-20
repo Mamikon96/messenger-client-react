@@ -24,7 +24,7 @@ const mockRest = async (page, server) => {
     const url = new URL(route.request().url());
     const chatId = url.pathname.split('/')[3];
     const since = Number(url.searchParams.get('since') ?? 0);
-    route.fulfill({ json: server.messages[chatId].filter((m) => m.seq > since) });
+    route.fulfill({ json: { messages: server.messages[chatId].filter((m) => m.seq > since), hasMore: false } });
   });
 };
 

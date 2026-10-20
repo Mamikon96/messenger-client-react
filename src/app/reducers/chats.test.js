@@ -6,6 +6,9 @@ import messages from './messages';
 import users from './users';
 import * as chatsApi from '../services/chatsApi';
 
+// Ответ GET /api/chats/:id/messages: { messages, hasMore } (docs/client-integration.md, §3.9); hasMore задаёт сервер.
+const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
+
 jest.mock('../services/chatsApi');
 
 jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
@@ -383,7 +386,7 @@ describe('chats reducer', () => {
     it('запрашивает чат и последние PAGE_SIZE (50) сообщений с signal', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValue(chatDto());
-      chatsApi.fetchMessages.mockResolvedValue([]);
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
 
       await store.dispatch(loadChatHistory('g1'));
 
@@ -395,7 +398,7 @@ describe('chats reducer', () => {
     it('статус: нет → loading → succeeded; title, lastSeq и участники (userId, role) попадают в чат', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValue(chatDto());
-      chatsApi.fetchMessages.mockResolvedValue(seqs(1, 3));
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore(seqs(1, 3)));
       expect(selectChatHistory(store.getState(), 'g1')).toBeUndefined();
 
       const promise = store.dispatch(loadChatHistory('g1'));
@@ -413,7 +416,7 @@ describe('chats reducer', () => {
     it('участники кладутся в users как { id, name, avatarUrl }, сообщения — в messages', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValue(chatDto());
-      chatsApi.fetchMessages.mockResolvedValue(seqs(1, 3));
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore(seqs(1, 3)));
 
       await store.dispatch(loadChatHistory('g1'));
 
@@ -429,27 +432,37 @@ describe('chats reducer', () => {
       const store = makeStore();
       await store.dispatch(fetchChats());
       chatsApi.fetchChat.mockResolvedValue(chatDto({ lastSeq: 3 }));
-      chatsApi.fetchMessages.mockResolvedValue([]);
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
 
       await store.dispatch(loadChatHistory('g1'));
 
       expect(selectChatById(store.getState(), 'g1').lastSeq).toBe(9);
     });
 
-    it('пришло ровно 50 — есть ещё (hasMore), меньше 50 — истории больше нет', async () => {
+    it('hasMore первой страницы берётся из ответа сервера, а не из длины страницы', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValue(chatDto());
-      chatsApi.fetchMessages.mockResolvedValue(seqs(1, 50));
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore(seqs(1, 3), true));
 
       await store.dispatch(loadChatHistory('g1'));
 
       expect(selectChatHistory(store.getState(), 'g1').hasMore).toBe(true);
     });
 
+    it('полная страница с hasMore: false — истории больше нет', async () => {
+      const store = await storeWithChat();
+      chatsApi.fetchChat.mockResolvedValue(chatDto());
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore(seqs(1, 50), false));
+
+      await store.dispatch(loadChatHistory('g1'));
+
+      expect(selectChatHistory(store.getState(), 'g1').hasMore).toBe(false);
+    });
+
     it('ошибка чата или сообщений → failed, ничего не записано; повторный вызов грузит снова', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValueOnce(chatDto()).mockResolvedValueOnce(chatDto());
-      chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(seqs(1, 2));
+      chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(withHasMore(seqs(1, 2)));
 
       await store.dispatch(loadChatHistory('g1'));
       expect(selectChatHistory(store.getState(), 'g1').status).toBe('failed');
@@ -464,7 +477,7 @@ describe('chats reducer', () => {
     it('загруженный чат и идущая загрузка не запрашиваются повторно', async () => {
       const store = await storeWithChat();
       chatsApi.fetchChat.mockResolvedValue(chatDto());
-      chatsApi.fetchMessages.mockResolvedValue([]);
+      chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
 
       const first = store.dispatch(loadChatHistory('g1'));
       await store.dispatch(loadChatHistory('g1'));
@@ -506,10 +519,10 @@ describe('chats reducer', () => {
     const seqs = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => msg(from + i));
     const chatDto = { id: 'g1', type: 'group', title: 'Team', lastSeq: 120, members: [] };
 
-    const openedStore = async (firstPage = seqs(71, 120)) => {
+    const openedStore = async (firstPage = seqs(71, 120), hasMore = firstPage.length >= PAGE_SIZE) => {
       chatsApi.fetchChats.mockResolvedValue([group]);
       chatsApi.fetchChat.mockResolvedValue(chatDto);
-      chatsApi.fetchMessages.mockResolvedValueOnce(firstPage);
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(firstPage, hasMore));
       const store = makeStore();
       await store.dispatch(fetchChats());
       await store.dispatch(loadChatHistory('g1'));
@@ -522,7 +535,7 @@ describe('chats reducer', () => {
 
     it('запрашивает before = минимальный seq и limit 50, добавляет сообщения к уже загруженным', async () => {
       const store = await openedStore();
-      chatsApi.fetchMessages.mockResolvedValueOnce(seqs(21, 70));
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(seqs(21, 70), true));
 
       await store.dispatch(loadOlderMessages('g1'));
 
@@ -532,9 +545,9 @@ describe('chats reducer', () => {
       expect(selectChatHistory(store.getState(), 'g1').hasMore).toBe(true);
     });
 
-    it('пришло меньше 50 — история кончилась, дальше запросов нет', async () => {
+    it('hasMore: false в ответе подкачки — история кончилась, дальше запросов нет', async () => {
       const store = await openedStore();
-      chatsApi.fetchMessages.mockResolvedValueOnce(seqs(51, 70));
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(seqs(51, 70)));
 
       await store.dispatch(loadOlderMessages('g1'));
       expect(selectChatHistory(store.getState(), 'g1').hasMore).toBe(false);
@@ -553,7 +566,7 @@ describe('chats reducer', () => {
 
     it('пока идёт подкачка, повторный вызов запроса не делает', async () => {
       const store = await openedStore();
-      chatsApi.fetchMessages.mockResolvedValueOnce(seqs(21, 70));
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(seqs(21, 70), true));
 
       const first = store.dispatch(loadOlderMessages('g1'));
       await store.dispatch(loadOlderMessages('g1'));
@@ -564,7 +577,7 @@ describe('chats reducer', () => {
 
     it('сбой подкачки не ломает загруженную историю; повторный вызов пробует снова', async () => {
       const store = await openedStore();
-      chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(seqs(21, 70));
+      chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(withHasMore(seqs(21, 70), true));
 
       await store.dispatch(loadOlderMessages('g1'));
       expect(selectChatHistory(store.getState(), 'g1')).toMatchObject({ status: 'succeeded', olderStatus: 'failed', hasMore: true });

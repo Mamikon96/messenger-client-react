@@ -13,13 +13,13 @@ const chatHistory = (getState, chatId) => getState().chats.entities[chatId]?.his
 export const loadChatHistory = createAsyncThunk(
     'chats/loadChatHistory',
     async (chatId, { signal, requestId, getState, rejectWithValue }) => {
-        const [chat, messages] = await Promise.all([
+        const [chat, page] = await Promise.all([
             fetchChat(chatId, { signal }),
             fetchMessages(chatId, { limit: PAGE_SIZE, signal }),
         ])
         // Store могли сбросить или запустить новую загрузку, пока шёл запрос: устаревший ответ не записывается.
         if (chatHistory(getState, chatId)?.requestId !== requestId) return rejectWithValue('stale')
-        return { chat, messages, hasMore: messages.length >= PAGE_SIZE }
+        return { chat, messages: page.messages, hasMore: page.hasMore }
     },
     {
         condition: (chatId, { getState }) => {
@@ -30,13 +30,13 @@ export const loadChatHistory = createAsyncThunk(
     }
 )
 
-// Подкачка старых сообщений: `before` — минимальный загруженный seq. Конец истории — пришло меньше PAGE_SIZE.
+// Подкачка старых сообщений: `before` — минимальный загруженный seq. Конец истории — hasMore: false в ответе сервера.
 export const fetchOlderMessages = createAsyncThunk(
     'chats/fetchOlderMessages',
     async ({ chatId, before }, { signal, requestId, getState, rejectWithValue }) => {
-        const messages = await fetchMessages(chatId, { before, limit: PAGE_SIZE, signal })
+        const page = await fetchMessages(chatId, { before, limit: PAGE_SIZE, signal })
         if (chatHistory(getState, chatId)?.olderRequestId !== requestId) return rejectWithValue('stale')
-        return { messages, hasMore: messages.length >= PAGE_SIZE }
+        return { messages: page.messages, hasMore: page.hasMore }
     },
     {
         condition: ({ chatId }, { getState }) => {

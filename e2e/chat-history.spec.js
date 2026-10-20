@@ -62,9 +62,12 @@ const mockServer = async (page, { messagesHandler } = {}) => {
     requests.messages.push(id);
     if (messagesHandler) return messagesHandler(route, id);
     return route.fulfill({
-      json: id === 'g1'
-        ? [message('g1', 1, 'u-bob', 'Привет, команда'), message('g1', 2, 'u-bob', 'Как дела')]
-        : [message('d1', 1, 'u-bob', 'Привет, личка')],
+      json: {
+        messages: id === 'g1'
+          ? [message('g1', 1, 'u-bob', 'Привет, команда'), message('g1', 2, 'u-bob', 'Как дела')]
+          : [message('d1', 1, 'u-bob', 'Привет, личка')],
+        hasMore: false,
+      },
     });
   });
   return requests;
@@ -99,7 +102,7 @@ test('[UC-CHAT-02] пока история грузится, виден инди
   await mockServer(page, {
     messagesHandler: async (route) => {
       await released;
-      await route.fulfill({ json: [message('g1', 1, 'u-bob', 'Привет, команда')] });
+      await route.fulfill({ json: { messages: [message('g1', 1, 'u-bob', 'Привет, команда')], hasMore: false } });
     },
   });
   await login(page);
@@ -117,7 +120,7 @@ test('[UC-CHAT-02] сбой загрузки истории: сообщение 
   await mockServer(page, {
     messagesHandler: (route) => (fail
       ? route.fulfill({ status: 500, json: { error: { code: 'internal' } } })
-      : route.fulfill({ json: [message('g1', 1, 'u-bob', 'Привет, команда')] })),
+      : route.fulfill({ json: { messages: [message('g1', 1, 'u-bob', 'Привет, команда')], hasMore: false } })),
   });
   await login(page);
 
@@ -165,8 +168,9 @@ test('[UC-MSG-01] отправка в серверном чате после з�
 const longHistoryHandler = ({ failOlder = () => false, total = 100 } = {}) => (route) => {
   const before = Number(new URL(route.request().url()).searchParams.get('before') ?? total + 1);
   if (before <= 51 && failOlder()) return route.fulfill({ status: 500, json: { error: { code: 'internal' } } });
-  const seqs = Array.from({ length: total }, (_, i) => i + 1).filter((seq) => seq < before).slice(-50);
-  return route.fulfill({ json: seqs.map((seq) => message('g1', seq, 'u-bob', `Сообщение ${seq}`)) });
+  const older = Array.from({ length: total }, (_, i) => i + 1).filter((seq) => seq < before);
+  const seqs = older.slice(-50);
+  return route.fulfill({ json: { messages: seqs.map((seq) => message('g1', seq, 'u-bob', `Сообщение ${seq}`)), hasMore: older.length > seqs.length } });
 };
 
 // Пузырь сообщения по номеру (в группе внутри ещё имя автора, поэтому точное совпадение текста не подходит).

@@ -1,6 +1,6 @@
 import { ApiError } from "./apiClient";
 
-// Известные пары поле + код формы входа (спека §5); единственное место, где они перечислены.
+// Известные пары поле + код формы входа (docs/client-integration.md §1.3); единственное место, где они перечислены.
 const KNOWN_FIELD_CODES = {
     login: ["required", "invalid_format", "too_long"],
     password: ["required", "too_short", "too_long", "too_common"],
@@ -20,7 +20,7 @@ function fieldsFromDetails(details) {
     return fields;
 }
 
-// Ошибка входа или регистрации → сериализуемая модель для формы (спека §2.1, §2.2, §5).
+// Ошибка входа или регистрации → сериализуемая модель для формы (docs/client-integration.md §1.3, §2.1).
 // Решает только код ответа (error.code, details, Retry-After), message сервера не используется.
 // kind: fields — ошибки полей по details, credentials — 401 auth_failed, login_taken — 409,
 // disabled — 403 user_disabled, rate_limited — 429, unavailable — сеть, 5xx и 403 forbidden (UC-AUTH-20),

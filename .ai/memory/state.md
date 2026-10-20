@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-19 @ 4bdd045+dirty
+> Проверено: 2026-10-20 @ 974f22b+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка и локальные чаты из Join — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -15,7 +15,7 @@
 - Тема light/dark/system: `useTheme`, `data-theme` на `<html>` до отрисовки, выбор в localStorage (FE-23); переключатель в меню пользователя (FE-28)
 - Экран входа: вкладки «Вход» / «Регистрация», форма логина и пароля, ошибки сервера по кодам: поля — по `details` (`field` + `code`), «Неверный логин или пароль», «Этот логин уже занят» у поля, отключение, `429` с секундами из `Retry-After` (секунды или минуты), «Не удалось войти. Проверьте соединение…» для сети, `5xx`, `403 forbidden` (FE-91); неожиданные ответы — «Не удалось войти. Попробуйте ещё раз.», `429` от минуты — в минутах (FE-89, FE-91); OAuth и задел passkey удалены (FE-90)
 - UI-примитивы `Button`/`IconButton`/`Input`/`Avatar` в `src/app/modules/ui/`; кнопки и поля приложения на них (FE-24)
-- mock-BFF (`mock-bff/server.js`, `npm run mock-bff`): вход и регистрация по паролю по `docs/auth-password-spec.md` (`POST /api/auth/register`, `/login`, засеянные `alice`, `bob`, `admin`, `disabled`, пароль `correct-horse-1`; FE-88); OAuth-маршрутов нет (FE-90); `logout-all`, `PATCH /api/me`, `me/password` ещё нет (FE-93…FE-95); dev-сервер и e2e проксируют на него `/api` (FE-11)
+- mock-BFF (`mock-bff/server.js`, `npm run mock-bff`): вход и регистрация по паролю по `docs/client-integration.md` (`POST /api/auth/register`, `/login`, засеянные `alice`, `bob`, `admin`, `disabled`, пароль `correct-horse-1`; FE-88); OAuth-маршрутов нет (FE-90); `logout-all`, `PATCH /api/me`, `me/password` ещё нет (FE-93…FE-95); dev-сервер и e2e проксируют на него `/api` (FE-11)
 - Гейт входа в `src/App.js` по `auth.status`: «Загрузка…» / экран `Login` (форма логина и пароля) / мессенджер / ошибка с кнопкой «Повторить»
 
 ## Известные проблемы
@@ -35,5 +35,5 @@
 
 ## Фокус сейчас
 Эпик входа по логину/паролю (FE-D38, SH-D18) и экран чатов закрыты по FE-28 (`Header`, `UserMenu`) включительно; история — `done.md`. Дальше FE-29 …
-Копия `docs/auth-password-spec.md` (§1–11) синхронизирована с бэкендом в FE-91; при новых правках спеки бэкенда сверять снова.
+Копия `docs/client-integration.md` — итоговая версия бэкенда (develop, без неслитого BE-20; FE-98); спека `docs/auth-password-spec.md` удалена; при новых правках контракта бэкенда сверять снова.
 Проверка харнесса после FE-105 (замер первого хода, `context-guard.sh` в субагентах) — `done/FE-105.md`.

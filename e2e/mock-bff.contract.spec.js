@@ -1,6 +1,6 @@
 const { test, expect, request } = require('@playwright/test');
 
-// Контракт auth API (docs/auth-password-spec.md) против mock-BFF.
+// Контракт auth API (docs/client-integration.md) против mock-BFF.
 // Ручной запуск: `npm run mock-bff` и `MOCK_BFF_URL=http://localhost:3334 npx playwright test e2e/mock-bff.contract.spec.js`.
 // Без MOCK_BFF_URL пропускается: в приёмку mock-BFF подключает FE-11.
 const baseURL = process.env.MOCK_BFF_URL;
@@ -109,7 +109,7 @@ test('прочие изменяющие /api/*: с сессией без CSRF �
   }
 });
 
-// ---- Вход и регистрация по паролю (docs/auth-password-spec.md §2.1–2.3, §3, §4.1–4.2, §5) ----
+// ---- Вход и регистрация по паролю (docs/client-integration.md §1.3, §2.1–2.3, §4) ----
 
 const PASSWORD = 'correct-horse-1';
 const SESSION_KEYS = ['avatarUrl', 'firstName', 'id', 'lastName', 'login', 'name'];
@@ -221,7 +221,7 @@ test('register и login: битый JSON — 400 validation_failed без detail
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });
 
-test('register и login: пустое тело — как {}, required по обоим полям (спека §5)', async () => {
+test('register и login: пустое тело — как {}, required по обоим полям (client-integration.md §1.3, «Коды details»)', async () => {
   const both = [{ field: 'login', code: 'required' }, { field: 'password', code: 'required' }];
   for (const path of ['/api/auth/register', '/api/auth/login']) {
     await expectError(await api.post(path), 400, 'validation_failed', both, path);

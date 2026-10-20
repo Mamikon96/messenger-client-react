@@ -14,6 +14,8 @@ import { realtimeStatusChanged, selectRealtimeStatus } from './reducers/realtime
 
 jest.mock('./services/chatsApi');
 
+// Ответ GET /api/chats/:id/messages: { messages, hasMore } (docs/client-integration.md, §3.9); hasMore задаёт сервер.
+const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const emptyState = {
@@ -173,7 +175,7 @@ describe('rootReducer: запоздавший ответ истории посл
     const store = await storeWithChat();
     let release;
     chatsApi.fetchChat.mockImplementation(() => new Promise((resolve) => { release = () => resolve(chatDto); }));
-    chatsApi.fetchMessages.mockResolvedValue(page(1, 3));
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore(page(1, 3)));
 
     const promise = store.dispatch(loadChatHistory('g1'));
     store.dispatch(logout.fulfilled(undefined, 'req'));
@@ -188,10 +190,10 @@ describe('rootReducer: запоздавший ответ истории посл
   it('loadOlderMessages: ответ после выхода ничего не записывает', async () => {
     const store = await storeWithChat();
     chatsApi.fetchChat.mockResolvedValue(chatDto);
-    chatsApi.fetchMessages.mockResolvedValueOnce(page(71, 120));
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(71, 120), true));
     await store.dispatch(loadChatHistory('g1'));
     let release;
-    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(page(21, 70)); }));
+    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(withHasMore(page(21, 70), true)); }));
 
     const promise = store.dispatch(loadOlderMessages('g1'));
     store.dispatch(logout.fulfilled(undefined, 'req'));

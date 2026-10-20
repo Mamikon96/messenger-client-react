@@ -16,6 +16,8 @@ import * as chatsApi from '../services/chatsApi';
 jest.mock('../services/wsService', () => ({ createWsService: jest.fn() }));
 jest.mock('../services/chatsApi');
 
+// Ответ GET /api/chats/:id/messages: { messages, hasMore } (docs/client-integration.md, §3.9); hasMore задаёт сервер.
+const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const me = { id: 'me', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
 const chat = { id: 'c1', type: 'group', title: 'Team', lastSeq: 2, lastMessage: null, unreadCount: 0 };
 const msg = (seq, extra = {}) => ({ chatId: 'c1', seq, senderId: 'u2', clientId: `k${seq}`, body: `m${seq}`, createdAt: '2026-10-17T10:00:00.000Z', ...extra });
@@ -186,7 +188,7 @@ describe('message.new', () => {
 
   it('разрыв seq: догонка since=lastSeq, сообщения добавляются по порядку', async () => {
     setup();
-    chatsApi.fetchMessages.mockResolvedValue([msg(3), msg(4), msg(5)]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(3), msg(4), msg(5)]));
 
     await receive(frame(5));
 
@@ -196,10 +198,10 @@ describe('message.new', () => {
     expect(selectChatById(state, 'c1')).toMatchObject({ lastSeq: 5, unreadCount: 3 });
   });
 
-  it('догонка листает страницами по 100, пока не придёт короче 100', async () => {
+  it('догонка листает страницами по 100, пока сервер сообщает hasMore', async () => {
     setup();
     const page = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => msg(from + i));
-    chatsApi.fetchMessages.mockResolvedValueOnce(page(3, 102)).mockResolvedValueOnce(page(103, 110));
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(3, 102), true)).mockResolvedValueOnce(withHasMore(page(103, 110)));
 
     await receive(frame(110));
 
@@ -208,9 +210,29 @@ describe('message.new', () => {
     expect(selectChatMessages(store.getState(), 'c1')).toHaveLength(108);
   });
 
+  it('догонка не листает дальше при hasMore: false, даже если страница полная', async () => {
+    setup();
+    const page = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => msg(from + i));
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore(page(3, 102), false));
+
+    await receive(frame(102));
+
+    expect(chatsApi.fetchMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('догонка листает дальше при hasMore: true, даже если страница короче лимита', async () => {
+    setup();
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore([msg(3), msg(4)], true)).mockResolvedValueOnce(withHasMore([msg(5)]));
+
+    await receive(frame(5));
+
+    expect(chatsApi.fetchMessages).toHaveBeenNthCalledWith(2, 'c1', { since: 4, limit: 100, signal: expect.any(AbortSignal) });
+    expect(selectChatMessages(store.getState(), 'c1').map((m) => m.seq)).toEqual([3, 4, 5]);
+  });
+
   it('если догонка не вернула сообщение кадра, оно всё равно добавляется', async () => {
     setup();
-    chatsApi.fetchMessages.mockResolvedValue([msg(3)]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(3)]));
 
     await receive(frame(5));
 
@@ -230,7 +252,7 @@ describe('message.new', () => {
   it('параллельные кадры одного чата не запускают две догонки', async () => {
     setup();
     let release;
-    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve([msg(3), msg(4), msg(5), msg(6)]); }));
+    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve(withHasMore([msg(3), msg(4), msg(5), msg(6)])); }));
 
     options.onFrame(frame(5));
     options.onFrame(frame(6));
@@ -319,7 +341,7 @@ describe('message.new', () => {
   it('ответ догонки от прежнего сервиса не попадает в store, signal передан в запрос', async () => {
     setup();
     let release;
-    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve([msg(3), msg(4)]); }));
+    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve(withHasMore([msg(3), msg(4)])); }));
 
     options.onFrame(frame(4));
     await flush();
@@ -490,7 +512,7 @@ describe('сверка после переподключения', () => {
   it('повторный open: догонка since=lastSeq, сообщения по порядку без дублей, последнее сообщение и счётчик как у сервера, history цела', async () => {
     setupOpened();
     chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 4, lastMessage: msg(4), unreadCount: 3, title: 'Новое имя' })]);
-    chatsApi.fetchMessages.mockResolvedValue([msg(2), msg(3), msg(4)]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(2), msg(3), msg(4)]));
 
     await reopen();
 
@@ -514,7 +536,7 @@ describe('сверка после переподключения', () => {
     setupOpened();
     store.dispatch(chatSelected('c1'));
     chatsApi.fetchChats.mockResolvedValue([item({ lastSeq: 3, lastMessage: msg(3), unreadCount: 7 })]);
-    chatsApi.fetchMessages.mockResolvedValue([msg(3)]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(3)]));
 
     await reopen();
 
@@ -681,7 +703,7 @@ describe('сверка и живые события во время неё', () 
     await openTwice();
 
     await receive({ type: 'chat.created', payload: chatDto('c9', 0) });
-    page.resolve([msg(3), msg(4)]);
+    page.resolve(withHasMore([msg(3), msg(4)]));
     await flush();
 
     expect(selectChatById(store.getState(), 'c9')).toBeDefined();
@@ -709,7 +731,7 @@ describe('сверка и живые события во время неё', () 
     await flush();
 
     expect(selectChatById(store.getState(), 'c1')).toBeDefined();
-    chatsApi.fetchMessages.mockResolvedValue([]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
     await receive(frame(3));
     expect(selectChatMessages(store.getState(), 'c1').map((m) => m.seq)).toContain(3);
   });

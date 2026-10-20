@@ -1,4 +1,4 @@
-// Локальный mock-BFF: вход и регистрация по паролю по docs/auth-password-spec.md.
+// Локальный mock-BFF: вход и регистрация по паролю по docs/client-integration.md (§1.3, §2.1–2.5).
 // Только для разработки и e2e: пользователи и сессии живут в памяти процесса.
 const http = require('http');
 const crypto = require('crypto');
@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const SESSION_COOKIE = 'mock_session';
 const MUTATING = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
-const PASSWORD_SESSION_MAX_AGE = 400 * 24 * 60 * 60; // скользящий срок сессии по паролю, спека §7
+const PASSWORD_SESSION_MAX_AGE = 400 * 24 * 60 * 60; // скользящий срок сессии по паролю, §2.2 и §7 client-integration.md
 const LOGIN_PATTERN = /^[a-z0-9._-]{3,32}$/;
 const SEED_PASSWORD = 'correct-horse-1';
 const SEED_USERS = [
@@ -15,7 +15,7 @@ const SEED_USERS = [
   { login: 'admin', firstName: 'Admin', lastName: 'Tester', isAdmin: true },
   { login: 'disabled', firstName: 'Disabled', lastName: 'Tester', disabled: true },
 ];
-// Пары имени для регистрации выдаются по кругу, спека §4.3 (там случайные; в mock-BFF детерминированно).
+// Пары имени для регистрации выдаются по кругу, §2.1 client-integration.md (там случайные; в mock-BFF детерминированно).
 const GENERATED_NAMES = [
   ['Сонный', 'Енот'],
   ['Дерзкая', 'Выдра'],
@@ -52,7 +52,7 @@ function createServer() {
     return sid && sessions.has(sid) ? { sid, ...sessions.get(sid) } : null;
   }
 
-  // Без Secure: вход по паролю работает и по http://localhost (спека §12.2).
+  // Без Secure: вход по паролю работает и по http://localhost (§2.2 client-integration.md: Secure только на https).
   function sessionCookie(value, maxAge) {
     return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
   }
@@ -115,7 +115,7 @@ function createServer() {
     return details;
   }
 
-  // Новая сессия браузера: прежняя (из cookie запроса) уничтожается, спека §2.1, §2.2.
+  // Новая сессия браузера: прежняя (из cookie запроса) уничтожается, §2.1 client-integration.md.
   function startSession(req, res, status, user) {
     const previous = getSession(req);
     if (previous) sessions.delete(previous.sid);

@@ -13,7 +13,7 @@ const mockServer = async (page, postHandler, messagesList = history) => {
   await page.route('**/api/chats', (route) => route.fulfill({ json: [CHAT] }));
   await page.route('**/api/chats/*', (route) => route.fulfill({ json: CHAT_DTO }));
   await page.route('**/api/chats/*/messages**', (route) => {
-    if (route.request().method() !== 'POST') return route.fulfill({ json: messagesList });
+    if (route.request().method() !== 'POST') return route.fulfill({ json: { messages: messagesList, hasMore: false } });
     const data = route.request().postDataJSON();
     posts.push(data);
     return postHandler(route, data);

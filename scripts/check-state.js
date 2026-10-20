@@ -12,8 +12,6 @@ const CASES_DIR = 'docs/user-cases'; // файлы кейсов по облас�
 const CASES_SET = `набор user-кейсов (${CASES_FILE} и ${CASES_DIR}/*.md)`;
 const LOCK_FILE = '.ai/user-cases.sha256';
 const CONTRACT_FILE = 'docs/client-integration.md';
-// Временно (FE-86, FE-D39): до BE-42 эндпоинты входа по паролю берутся ещё и из спеки; удаляется в FE-98.
-const SPEC_FILE = 'docs/auth-password-spec.md';
 const MOCK_FILE = 'mock-bff/server.js';
 const QA_RUNS_DIR = '.qa/runs';
 const TASKS_FILE = '.ai/memory/tasks.md';
@@ -289,26 +287,6 @@ function parseContract(md) {
   const set = new Set();
   const re = new RegExp(`\\b(${METHODS}) (/api/[^\\s\`)'"]*)`, 'g');
   for (const m of md.matchAll(re)) set.add(normalizeEndpoint(m[1], m[2].replace(/[.,;:]+$/, '')));
-  return set;
-}
-
-// Временно (FE-86, удаляется в FE-98): контрактные эндпоинты из §2.1–§2.8 спеки.
-// §2.9 «Удаляются», остальные разделы и шаблоны со звёздочкой («/api/admin/invites*») не учитываются.
-function parseSpecContract(md) {
-  let inSection = false;
-  const body = [];
-  for (const line of md.split('\n')) {
-    const h = line.match(/^###\s+2\.(\d+)\./);
-    if (h) inSection = Number(h[1]) >= 1 && Number(h[1]) <= 8;
-    else if (/^#{1,3}\s/.test(line)) inSection = false;
-    if (inSection) body.push(line);
-  }
-  const set = new Set();
-  const re = new RegExp(`\\b(${METHODS}) (/api/[^\\s\`)'"]*)`, 'g');
-  for (const m of body.join('\n').matchAll(re)) {
-    const raw = m[2].replace(/[.,;:]+$/, '');
-    if (!raw.includes('*')) set.add(normalizeEndpoint(m[1], raw));
-  }
   return set;
 }
 
@@ -606,7 +584,7 @@ function main(argv) {
     const srcFiles = walk(at('src'), (n) => /\.jsx?$/.test(n) && !/\.(test|spec)\.jsx?$/.test(n) && n !== 'setupTests.js', args.root);
     errors.push(
       ...checkApi({
-        contract: new Set([...parseContract(contractText), ...parseSpecContract(readIf(at(SPEC_FILE)) || '')]),
+        contract: parseContract(contractText),
         clientPaths: scanClientPaths(srcFiles),
         mockRoutes: scanMockRoutes(readIf(at(MOCK_FILE)) || ''),
         cases,
@@ -673,7 +651,6 @@ module.exports = {
   checkCoverage,
   normalizeEndpoint,
   parseContract,
-  parseSpecContract,
   scanClientPaths,
   scanMockRoutes,
   checkApi,

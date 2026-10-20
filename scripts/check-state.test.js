@@ -557,48 +557,6 @@ test.describe('API ↔ код', () => {
   });
 });
 
-test.describe('parseSpecContract (спека входа по паролю, временно, FE-86)', () => {
-  const specMd = [
-    '# Спека',
-    '## 1. Что меняется',
-    'Не меняется: `GET /api/chats`.',
-    '## 2. Эндпоинты',
-    '### 2.1. `POST /api/auth/register`',
-    '### 2.6. `PATCH /api/me`',
-    '### 2.8. Админка',
-    '- `GET /api/admin/users`, `PATCH /api/admin/users/:id` — без изменений.',
-    '- `POST/GET/DELETE /api/admin/invites*` удаляются.',
-    '### 2.9. Удаляются',
-    '- `POST /api/auth/passkey/login/options`, `POST /api/invites/inspect`.',
-    '###   2.7.   ',
-    '- `POST /api/me/password`',
-    '### 2.10. Будущее',
-    '- `GET /api/future`',
-    '## 3. Модели',
-    'Пример: `GET /api/models-only`.',
-  ].join('\n');
-
-  test('берёт эндпоинты из §2.1–§2.8 и нормализует параметры', () => {
-    const set = S.parseSpecContract(specMd);
-    assert.ok(set.has('POST /api/auth/register'));
-    assert.ok(set.has('PATCH /api/me'));
-    assert.ok(set.has('GET /api/admin/users'));
-    assert.ok(set.has('PATCH /api/admin/users/:p'));
-  });
-
-  test('не берёт §2.9 «Удаляются», шаблоны со звёздочкой и другие разделы', () => {
-    const set = S.parseSpecContract(specMd);
-    assert.ok(![...set].some((e) => e.includes('passkey') || e.includes('invites')));
-    assert.ok(!set.has('GET /api/chats'));
-    assert.ok(!set.has('GET /api/models-only'));
-    assert.ok(!set.has('GET /api/future'));
-  });
-
-  test('заголовок с лишними пробелами распознаётся', () => {
-    assert.ok(S.parseSpecContract(specMd).has('POST /api/me/password'));
-  });
-});
-
 test.describe('behaviorMatrix', () => {
   const report = (specs) => ({ suites: [{ title: 'a.spec.js', suites: [{ title: 'группа', specs, suites: [] }], specs: [] }] });
   const spec = (title, status) => ({
@@ -1009,55 +967,6 @@ test.describe('CLI на фикстурном репозитории', () => {
     const r = run(root, ['--behavior-report', bad]);
     assert.equal(r.status, 1);
     assert.match(r.stdout + r.stderr, /UC-AUTH-01/);
-  });
-
-  test.describe('спека входа по паролю (временный источник контракта, FE-86)', () => {
-    const SPEC = 'docs/auth-password-spec.md';
-    const spec = '## 2. Эндпоинты\n### 2.1. `POST /api/auth/register`\n### 2.6. `PATCH /api/me`\n### 2.9. Удаляются\n- `POST /api/invites/inspect`\n## 3. Модели\n';
-    const caseWithApi = (api) =>
-      doc(caseBlock({ api: ['GET /api/auth/session', api] }), caseBlock({ id: 'UC-AUTH-02', status: 'planned', api: [] }));
-    const withCases = (md, extra = {}) => makeRoot({ ...casesFiles(md), [SPEC]: spec, ...extra });
-
-    test('вызов клиента на эндпоинт из §2.1–§2.8 принимается', () => {
-      const r = run(makeRoot({ [SPEC]: spec, 'src/app/api.js': 'fetch("/api/auth/session"); fetch("/api/auth/register"); fetch("/api/me");\n' }));
-      assert.equal(r.status, 0, r.stdout + r.stderr);
-    });
-
-    test('маршрут mock-BFF из спеки принимается', () => {
-      const r = run(makeRoot({ [SPEC]: spec, 'mock-bff/server.js': '// GET /api/auth/session\n// POST /api/auth/register\n' }));
-      assert.equal(r.status, 0, r.stdout + r.stderr);
-    });
-
-    test('строка API: кейса с эндпоинтом из спеки принимается', () => {
-      const r = run(withCases(caseWithApi('POST /api/auth/register'), { 'mock-bff/server.js': '// GET /api/auth/session\n// POST /api/auth/register\n' }));
-      assert.equal(r.status, 0, r.stdout + r.stderr);
-    });
-
-    test('эндпоинт из §2.9 «Удаляются» остаётся вне контракта', () => {
-      const r = run(makeRoot({ [SPEC]: spec, 'src/app/api.js': 'fetch("/api/invites/inspect");\n' }));
-      assert.equal(r.status, 1);
-      assert.match(r.stdout + r.stderr, /\/api\/invites\/inspect/);
-    });
-
-    test('без спеки эндпоинт из неё вне контракта, ошибок и предупреждений сверх прежних нет', () => {
-      const r = run(makeRoot({ 'src/app/api.js': 'fetch("/api/auth/register");\n' }));
-      assert.equal(r.status, 1);
-      assert.match(r.stdout + r.stderr, /\/api\/auth\/register/);
-      const ok = run(makeRoot());
-      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-      assert.doesNotMatch(ok.stdout + ok.stderr, /auth-password-spec|⚠/);
-    });
-
-    test('эндпоинты client-integration.md принимаются и при наличии спеки', () => {
-      const r = run(makeRoot({ [SPEC]: spec }));
-      assert.equal(r.status, 0, r.stdout + r.stderr);
-    });
-
-    test('спека есть, а client-integration.md нет — прежнее предупреждение, код 0', () => {
-      const r = run(makeRoot({ [SPEC]: spec, 'docs/client-integration.md': null }));
-      assert.equal(r.status, 0, r.stdout + r.stderr);
-      assert.match(r.stdout + r.stderr, /client-integration\.md/);
-    });
   });
 
   test.describe('--require-qa', () => {

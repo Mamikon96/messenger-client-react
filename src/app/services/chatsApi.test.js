@@ -78,9 +78,10 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("fetchMessages без параметров шлёт GET без query", async () => {
-        fetch.mockResolvedValueOnce(reply(200, []));
+        const page = { messages: [{ chatId: "c1", seq: 1 }], hasMore: true };
+        fetch.mockResolvedValueOnce(reply(200, page));
 
-        await expect(fetchMessages("c1")).resolves.toEqual([]);
+        await expect(fetchMessages("c1")).resolves.toEqual(page);
 
         expect(fetch.mock.calls[0][0]).toBe("/api/chats/c1/messages");
     });

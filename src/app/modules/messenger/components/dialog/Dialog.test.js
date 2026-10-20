@@ -16,6 +16,8 @@ jest.mock('../../../../services/chatsApi');
 
 const chatsApi = require('../../../../services/chatsApi');
 
+// Ответ GET /api/chats/:id/messages: { messages, hasMore } (docs/client-integration.md, §3.9); hasMore задаёт сервер.
+const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const renderDialog = ({ withActiveChat = true, authorized = true } = {}) => {
@@ -240,7 +242,7 @@ describe('Dialog: история серверного чата', () => {
   it('при выборе чата грузит его; пока идёт загрузка — «Загрузка сообщений…», затем сообщения и заголовок', async () => {
     let release;
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve([msg(1, 'u2', 'привет'), msg(2, 'u1', 'здорово')]); }));
+    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve(withHasMore([msg(1, 'u2', 'привет'), msg(2, 'u1', 'здорово')])); }));
 
     renderServerChat();
 
@@ -258,7 +260,7 @@ describe('Dialog: история серверного чата', () => {
   it('служебные статусы загрузки и ошибки лежат вне контейнера log', async () => {
     let release;
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve([]); }));
+    chatsApi.fetchMessages.mockImplementation(() => new Promise((resolve) => { release = () => resolve(withHasMore([])); }));
 
     renderServerChat();
 
@@ -274,7 +276,7 @@ describe('Dialog: история серверного чата', () => {
 
   it('у direct-чата заголовок — имя собеседника', async () => {
     chatsApi.fetchChat.mockResolvedValue(directDto);
-    chatsApi.fetchMessages.mockResolvedValue([{ ...msg(1, 'u2', 'привет'), chatId: 'd1' }]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([{ ...msg(1, 'u2', 'привет'), chatId: 'd1' }]));
 
     renderServerChat('d1');
 
@@ -284,7 +286,7 @@ describe('Dialog: история серверного чата', () => {
 
   it('в группе у чужих сообщений есть имя автора, у своих — нет', async () => {
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockResolvedValue([msg(1, 'u2', 'привет'), msg(2, 'u1', 'здорово')]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(1, 'u2', 'привет'), msg(2, 'u1', 'здорово')]));
 
     renderServerChat();
 
@@ -295,7 +297,7 @@ describe('Dialog: история серверного чата', () => {
 
   it('в direct-чате имя автора у сообщений не показывается', async () => {
     chatsApi.fetchChat.mockResolvedValue({ id: 'd1', type: 'direct', title: null, lastSeq: 1, members: [{ userId: 'u2', name: 'Боб', avatarUrl: '', role: 'member' }] });
-    chatsApi.fetchMessages.mockResolvedValue([{ ...msg(1, 'u2', 'привет'), chatId: 'd1' }]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([{ ...msg(1, 'u2', 'привет'), chatId: 'd1' }]));
 
     renderServerChat('d1');
 
@@ -305,7 +307,7 @@ describe('Dialog: история серверного чата', () => {
 
   it('сбой: «Не удалось загрузить сообщения.» и «Повторить», по нажатию история грузится', async () => {
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce([msg(1, 'u2', 'привет')]);
+    chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(withHasMore([msg(1, 'u2', 'привет')]));
 
     renderServerChat();
 
@@ -321,7 +323,7 @@ describe('Dialog: история серверного чата', () => {
 
   it('повторное открытие загруженного чата запроса не делает', async () => {
     chatsApi.fetchChat.mockImplementation(async (id) => (id === 'g1' ? groupDto : directDto));
-    chatsApi.fetchMessages.mockImplementation(async (id) => (id === 'g1' ? [msg(1, 'u2', 'привет')] : [{ ...msg(1, 'u2', 'привет в личке'), chatId: 'd1' }]));
+    chatsApi.fetchMessages.mockImplementation(async (id) => withHasMore(id === 'g1' ? [msg(1, 'u2', 'привет')] : [{ ...msg(1, 'u2', 'привет в личке'), chatId: 'd1' }]));
 
     const { store } = renderServerChat();
     expect(await screen.findByText('привет')).toBeInTheDocument();
@@ -353,7 +355,7 @@ describe('Dialog: история серверного чата', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByText('Сообщений пока нет')).not.toBeInTheDocument();
 
-    chatsApi.fetchMessages.mockResolvedValueOnce([]);
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore([]));
     await act(async () => {
       screen.getByRole('button', { name: 'Повторить' }).click();
     });
@@ -376,7 +378,7 @@ describe('Dialog: отправка в серверном чате (FE-40)', () =
 
   const renderServerChat = async () => {
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockResolvedValue([]);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
     const store = configureStore({ reducer: rootReducer });
     store.dispatch(checkSession.fulfilled(user, 'req'));
     store.dispatch(fetchChats.pending('req'));
@@ -538,9 +540,9 @@ describe('Dialog: подкачка старых сообщений и прокр
     }
   });
 
-  const open = async (firstPage) => {
+  const open = async (firstPage, hasMore = firstPage.length >= PAGE) => {
     chatsApi.fetchChat.mockResolvedValue(groupDto);
-    chatsApi.fetchMessages.mockResolvedValueOnce(firstPage);
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(firstPage, hasMore));
     const store = configureStore({ reducer: rootReducer });
     store.dispatch(checkSession.fulfilled(user, 'req'));
     store.dispatch(fetchChats.pending('req'));
@@ -571,7 +573,7 @@ describe('Dialog: подкачка старых сообщений и прокр
   it('прокрутка к верху запрашивает старые сообщения до минимального seq; пока грузятся — индикатор', async () => {
     await open(page(51, PAGE));
     let release;
-    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(page(1, PAGE)); }));
+    chatsApi.fetchMessages.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(withHasMore(page(1, PAGE), true)); }));
 
     scrollTo(0);
 
@@ -586,7 +588,7 @@ describe('Dialog: подкачка старых сообщений и прокр
 
   it('после подкачки позиция прокрутки сохраняется: сдвиг на высоту добавленного', async () => {
     await open(page(51, PAGE));
-    chatsApi.fetchMessages.mockResolvedValueOnce(page(1, PAGE));
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(1, PAGE), true));
 
     scrollTo(0);
 
@@ -605,7 +607,7 @@ describe('Dialog: подкачка старых сообщений и прокр
 
   it('конец истории: после подкачки неполной страницы повторная прокрутка вверх запроса не делает', async () => {
     await open(page(51, PAGE));
-    chatsApi.fetchMessages.mockResolvedValueOnce(page(26, 25));
+    chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(26, 25)));
     scrollTo(0);
     await screen.findByText('m26');
     chatsApi.fetchMessages.mockClear();
@@ -617,7 +619,7 @@ describe('Dialog: подкачка старых сообщений и прокр
 
   it('сбой подкачки: сообщение и «Повторить», по нажатию подкачка повторяется', async () => {
     await open(page(51, PAGE));
-    chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(page(1, PAGE));
+    chatsApi.fetchMessages.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(withHasMore(page(1, PAGE), true));
 
     scrollTo(0);
 
@@ -676,7 +678,7 @@ describe('Dialog: подкачка старых сообщений и прокр
     });
 
     it('подкачивает без прокрутки, пока лента короче окна, и останавливается на неполной странице', async () => {
-      chatsApi.fetchMessages.mockResolvedValueOnce(page(51, PAGE)).mockResolvedValueOnce(page(1, PAGE));
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(51, PAGE), true)).mockResolvedValueOnce(withHasMore(page(1, PAGE), true));
       chatsApi.fetchChat.mockResolvedValue(groupDto);
       const store = configureStore({ reducer: rootReducer });
       store.dispatch(checkSession.fulfilled(user, 'req'));
@@ -703,7 +705,7 @@ describe('Dialog: подкачка старых сообщений и прокр
     });
 
     it('при сбое подкачки цикл останавливается: повторных запросов нет', async () => {
-      chatsApi.fetchMessages.mockResolvedValueOnce(page(51, PAGE)).mockRejectedValueOnce(new Error('network'));
+      chatsApi.fetchMessages.mockResolvedValueOnce(withHasMore(page(51, PAGE), true)).mockRejectedValueOnce(new Error('network'));
       chatsApi.fetchChat.mockResolvedValue(groupDto);
       const store = configureStore({ reducer: rootReducer });
       store.dispatch(checkSession.fulfilled(user, 'req'));

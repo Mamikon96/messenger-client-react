@@ -12,7 +12,7 @@ export function fetchChat(chatId, { signal } = {}) {
 }
 
 // Сообщения чата по возрастанию seq: без курсора — последние `limit`, с `before` — ближайшие к курсору `seq < before`, с `since` — следующие за `seq > since` (§3.9).
-// Ответ — голый массив ChatMessageDto, признака «есть ещё» нет.
+// Ответ как есть: { messages: ChatMessageDto[], hasMore: boolean }; hasMore — есть ли ещё сообщения за страницей в направлении запроса.
 export function fetchMessages(chatId, { before, since, limit, signal } = {}) {
     const query = new URLSearchParams();
     if (before !== undefined) query.set("before", before);

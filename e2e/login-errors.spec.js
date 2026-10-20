@@ -10,7 +10,7 @@ const uniqueLogin = () => `e2e-${Date.now().toString(36)}-${Math.random().toStri
 const LOGIN_API = '**/api/auth/login';
 const UNAVAILABLE = 'Не удалось войти. Проверьте соединение и попробуйте снова.';
 
-// Подменяет ответ сервера на время теста; тело ошибки — в формате спеки §5.
+// Подменяет ответ сервера на время теста; тело ошибки — в формате docs/client-integration.md §1.3.
 const fulfillError = (status, code, headers = {}) => (route) =>
   route.fulfill({
     status,

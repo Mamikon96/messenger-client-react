@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Утверждение набора user-кейсов (индекс docs/user-cases.md и файлы docs/user-cases/*.md): записывает хэш набора в .ai/user-cases.sha256.
-# Запускает ТОЛЬКО пользователь (в сессии Claude Code: `! bash scripts/approve-usecases.sh`); агентам запрещено (.claude/settings.json).
-# Без --yes спрашивает подтверждение.
+# Запускает ТОЛЬКО пользователь (в сессии Claude Code: `! bash scripts/approve-usecases.sh --yes`); агентам запрещено (.claude/settings.json).
+# Без --yes спрашивает подтверждение; без терминала (например, через `!` в Claude Code) без --yes завершается ошибкой.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,6 +15,10 @@ console.log("Кейсов: " + cases.length + " (active " + n("active") + ", pla
 '
 
 if [ "${1:-}" != "--yes" ]; then
+  if [ ! -t 0 ]; then
+    echo "Ошибка: stdin не терминал, подтвердить нельзя. Запусти с --yes: bash scripts/approve-usecases.sh --yes" >&2
+    exit 1
+  fi
   read -r -p "Утвердить набор user-кейсов (docs/user-cases.md и docs/user-cases/) в текущем виде? [y/N] " ans
   [ "$ans" = "y" ] || { echo "Отменено"; exit 1; }
 fi

@@ -30,7 +30,6 @@
 - **FE-111 (P3)** Повторный `fetchChats` (`setAll`) теряет у чатов `history` из FE-39 и признак `local`: сохранять клиентские поля. Подробности: `.ai/memory/backlog/FE-111.md`
 - **FE-106 (P3)** `fetchChats`: поздний `fulfilled` в узком окне после сброса store может записать собеседников в `users` (NIT ревью FE-38). Подробности: `.ai/memory/backlog/FE-106.md`
 - **FE-102 (P3)** Удалить ветку `href` из `Button` и её тесты: после FE-90 нигде не используется. Подробности: `.ai/memory/backlog/FE-102.md`
-- **FE-100 (P3, харнес)** `approve-usecases.sh` без TTY молча завершается: выдавать ошибку с подсказкой `--yes` и поправить подсказки. Подробности: `.ai/memory/backlog/FE-100.md`
 - **FE-99 (P3, харнес)** `git-task.sh commit`: добавлять футер `Co-Authored-By` без дублирования, как в бэкенде (BE-28). Подробности: `.ai/memory/backlog/FE-99.md`
 - **FE-103 (P3)** `Button`: пробрасывать `ref` (`forwardRef`) и использовать его в `Login` для фокуса на кнопку отправки. Подробности: `.ai/memory/backlog/FE-103.md`
 - **FE-104 (P3)** `Input`: у ошибки поля `role="alert"` вместе с `aria-describedby` озвучивается дважды; решить с пользователем. Подробности: `.ai/memory/backlog/FE-104.md`

@@ -57,6 +57,5 @@
 - **FE-150 (P3)** Расхождения mock-BFF с контрактом: `Origin` (403), `429` с `Retry-After`, тело `404`, `413`, UUID (сверка FE-98). Подробности: `.ai/memory/backlog/FE-150.md`
 - **FE-155 (P3)** Подкачка истории: защита от пустой страницы при `hasMore: true`, тесты Dialog/realtime по ревью FE-148. Подробности: `.ai/memory/backlog/FE-155.md`
 - **FE-156 (P3)** Dev: предупреждение WebSocket при входе (StrictMode?) и порядок чатов после `message.new` (QA FE-98). Подробности: `.ai/memory/backlog/FE-156.md`
-- **FE-152 (P2, харнес)** Облегчить `qa-tester`: определение 19,8 KB, ~38 вызовов и ~1,8M cache read на запуск (аудит токенов). Подробности: `.ai/memory/backlog/FE-152.md`
 - **FE-153 (P2, харнес)** Политика модели и порога контекста: Opus дал 18% cache read, проверить `context-guard.sh`. Подробности: `.ai/memory/backlog/FE-153.md`
 - **FE-154 (P3, харнес)** Разбивка префикса первого хода по `/context` (26–39K токенов на каждый вызов) и что из него убрать (аудит токенов). Подробности: `.ai/memory/backlog/FE-154.md`

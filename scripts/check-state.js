@@ -16,9 +16,21 @@ const MOCK_FILE = 'mock-bff/server.js';
 const QA_RUNS_DIR = '.qa/runs';
 const TASKS_FILE = '.ai/memory/tasks.md';
 const DONE_DIR = '.ai/memory/done';
-// Smoke-кейсы, которые qa-tester проходит в каждой задаче вдобавок к кейсам контракта (FE-D35).
-// Без явного входа: вход меняется эпиком passkey, а эти кейсы проходят через него неявно.
-const QA_SMOKE = ['UC-SESSION-01', 'UC-CHAT-02', 'UC-MSG-01'];
+// Триггеры полного прохода QA (FE-D56): дифф задачи правит общую инфраструктуру, набор user-кейсов или зависимости,
+// либо ветка release/*, hotfix/*. Путь с «/» на конце — каталог целиком.
+const QA_TRIGGER_PATHS = [
+  'src/app/store.js',
+  'src/app/reducers/auth.js',
+  'src/app/services/apiClient.js',
+  'src/app/services/authApi.js',
+  'src/app/services/wsService.js',
+  'mock-bff/',
+  CASES_FILE,
+  `${CASES_DIR}/`,
+  'package.json',
+  'package-lock.json',
+];
+const QA_TRIGGER_BRANCH_RE = /^(release|hotfix)\//;
 // Пути, изменение которых делает QA-отчёт устаревшим (код и тесты приложения, не память и не документы).
 const CODE_PATHS = ['src', 'e2e', 'mock-bff', 'package.json', 'playwright.config.js'];
 
@@ -428,13 +440,19 @@ function taskCaseIds({ tasksMd, doneMd, taskId }) {
   return { ids: done.ids, errors: [] };
 }
 
-// Обязательный объём прохода qa-tester: smoke + active-кейсы контракта (FE-D35). Кейсы контракта не из active (удаляемые, planned) не требуются.
-function qaScope({ smoke, contractIds, activeIds }) {
-  const errors = smoke
-    .filter((id) => !activeIds.includes(id))
-    .map((id) => `smoke-кейс ${id} не active в наборе user-кейсов — обнови QA_SMOKE в scripts/check-state.js`);
-  const ids = uniq([...smoke, ...contractIds.filter((id) => activeIds.includes(id))]);
-  return { ids, errors };
+// Причины полного прохода QA (FE-D56): пути диффа задачи и имя ветки. Пустой массив — триггеров нет.
+function qaTriggers({ paths, branch }) {
+  const reasons = uniq(paths)
+    .filter((p) => QA_TRIGGER_PATHS.some((t) => (t.endsWith('/') ? p.startsWith(t) : p === t)))
+    .map((p) => `изменён ${p}`);
+  if (QA_TRIGGER_BRANCH_RE.test(branch || '')) reasons.push(`ветка ${branch}`);
+  return reasons;
+}
+
+// Обязательный объём прохода qa-tester (FE-D35, FE-D56): active-кейсы контракта; при full (триггер или --full) — все active-кейсы.
+// Кейсы контракта не из active (удаляемые, planned) не требуются.
+function qaScope({ contractIds, activeIds, full = false }) {
+  return { ids: full ? uniq(activeIds) : uniq(contractIds.filter((id) => activeIds.includes(id))), errors: [] };
 }
 
 // taggedIds — кейсы с e2e-тестом с тегом [UC-…]: только им разрешена отметка `pass (e2e)` (FE-D48).
@@ -461,7 +479,7 @@ function checkQaReport(text, { casesHash, activeIds, requiredIds, treeHash, tagg
 
   const rows = new Map([...text.matchAll(/^\|\s*(UC-[A-Z]+-\d+)\s*\|\s*(\w+(?:\s*\(e2e\))?)\s*\|/gm)].map((m) => [m[1], m[2].replace(/\s+/g, ' ')]));
   for (const id of requiredIds) {
-    if (!scope.includes(id)) errors.push(`QA-отчёт: кейс ${id} обязателен (контракт или smoke), но не вошёл в «Объём»`);
+    if (!scope.includes(id)) errors.push(`QA-отчёт: кейс ${id} обязателен (контракт задачи или полный проход), но не вошёл в «Объём»`);
   }
   for (const id of scope) {
     if (!activeIds.includes(id)) errors.push(`QA-отчёт: кейс ${id} из «Объёма» не active в наборе user-кейсов`);
@@ -502,6 +520,33 @@ function currentBranch(root) {
   }
 }
 
+// Пути диффа задачи: рабочее дерево + индекс + коммиты ветки относительно merge-base с develop (иначе main), плюс неотслеживаемые.
+// Нет ни develop, ни main — от HEAD. Не git-репозиторий — пустой список.
+function changedPaths(root) {
+  const { execFileSync } = require('node:child_process');
+  const git = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const lines = (out) => out.split('\n').filter(Boolean);
+  try {
+    let base = null;
+    for (const ref of ['develop', 'main']) {
+      try {
+        base = git('merge-base', 'HEAD', ref).trim();
+        break;
+      } catch {
+        // ветки нет — пробуем следующую
+      }
+    }
+    if (!base) {
+      base = 'HEAD';
+      console.error('  ⚠ нет общего предка с develop и main — триггеры полного прохода считаются только по незакоммиченным правкам');
+    }
+    return uniq([...lines(git('diff', '--name-only', base)), ...lines(git('ls-files', '--others', '--exclude-standard'))]);
+  } catch (e) {
+    console.error(`  ⚠ не удалось получить дифф задачи, триггеры полного прохода не определены: ${String(e.message).split('\n')[0]}`);
+    return [];
+  }
+}
+
 function walk(dir, filter, base = dir, out = {}) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -518,7 +563,7 @@ const readIf = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : 
 const readDoneFile = (root, taskId) => (taskId ? readIf(path.join(root, doneFileOf(taskId))) : null);
 
 function main(argv) {
-  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false, qaReportPath: false };
+  const args = { root: path.resolve(__dirname, '..'), requireContract: false, behaviorReport: null, requireQa: false, treeHash: false, qaScope: false, qaReportPath: false, full: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--root') args.root = path.resolve(argv[++i]);
     else if (argv[i] === '--require-contract') args.requireContract = true;
@@ -528,6 +573,7 @@ function main(argv) {
     else if (argv[i] === '--cases-hash') args.casesHash = true;
     else if (argv[i] === '--qa-scope') args.qaScope = true;
     else if (argv[i] === '--qa-report-path') args.qaReportPath = true;
+    else if (argv[i] === '--full') args.full = true;
   }
   const at = (rel) => path.join(args.root, rel);
   if (args.treeHash) {
@@ -560,11 +606,16 @@ function main(argv) {
   errors.push(...loaded.errors);
   const { cases } = loaded;
   const activeIds = cases.filter((c) => c.status === 'active').map((c) => c.id);
-  const taskId = taskIdFromBranch(currentBranch(args.root));
+  const branch = currentBranch(args.root);
+  const taskId = taskIdFromBranch(branch);
   const contract = taskCaseIds({ tasksMd: readIf(at(TASKS_FILE)), doneMd: readDoneFile(args.root, taskId), taskId });
-  const scope = qaScope({ smoke: QA_SMOKE, contractIds: contract.ids, activeIds });
+  // Полный проход нужен только если объём запрошен (--qa-scope, --require-qa): дифф считается не для каждой проверки
+  const triggers = args.qaScope || args.requireQa ? qaTriggers({ paths: changedPaths(args.root), branch }) : [];
+  const scope = qaScope({ contractIds: contract.ids, activeIds, full: args.full || triggers.length > 0 });
   scope.errors.unshift(...contract.errors);
   if (args.qaScope) {
+    if (args.full) console.error('  ℹ полный проход: флаг --full');
+    for (const t of triggers) console.error(`  ℹ полный проход: ${t}`);
     // Объём прохода qa-tester: строка «Объём:» его отчёта
     for (const e of scope.errors) console.error(`  ✗ ${e}`);
     console.log(scope.ids.join(', '));
@@ -656,7 +707,8 @@ module.exports = {
   checkApi,
   behaviorMatrix,
   formatMatrix,
-  QA_SMOKE,
+  qaTriggers,
+  changedPaths,
   currentBranch,
   taskIdFromBranch,
   readDoneFile,

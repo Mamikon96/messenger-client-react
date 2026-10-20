@@ -706,7 +706,7 @@ test.describe('checkQaReport', () => {
     assert.ok(errors.some((e) => e.includes('Объём')));
   });
 
-  test('обязательный кейс (контракт или smoke) не вошёл в объём — ошибка', () => {
+  test('обязательный кейс (контракт или полный проход) не вошёл в объём — ошибка', () => {
     const errors = S.checkQaReport(
       report({ scope: 'UC-A-02', rows: [['UC-A-02', 'pass']] }),
       ctx({ requiredIds: ['UC-A-01', 'UC-A-02'] })
@@ -834,20 +834,61 @@ test.describe('задача ветки', () => {
 });
 
 test.describe('qaScope', () => {
-  test('smoke плюс active-кейсы контракта, без дублей, smoke первыми', () => {
-    const r = S.qaScope({ smoke: ['UC-S-01', 'UC-S-02'], contractIds: ['UC-A-01', 'UC-S-01'], activeIds: ['UC-S-01', 'UC-S-02', 'UC-A-01'] });
-    assert.deepEqual(r, { ids: ['UC-S-01', 'UC-S-02', 'UC-A-01'], errors: [] });
+  test('обычная задача: только active-кейсы контракта, без дублей', () => {
+    const r = S.qaScope({ contractIds: ['UC-A-01', 'UC-A-01', 'UC-A-02'], activeIds: ['UC-A-01', 'UC-A-02', 'UC-B-01'] });
+    assert.deepEqual(r, { ids: ['UC-A-01', 'UC-A-02'], errors: [] });
   });
 
   test('кейсы контракта, которых нет среди active (удаляемые, planned), пропускаются', () => {
-    const r = S.qaScope({ smoke: [], contractIds: ['UC-A-01', 'UC-GONE-01'], activeIds: ['UC-A-01'] });
+    const r = S.qaScope({ contractIds: ['UC-A-01', 'UC-GONE-01'], activeIds: ['UC-A-01'] });
     assert.deepEqual(r, { ids: ['UC-A-01'], errors: [] });
   });
 
-  test('smoke-кейс не active — ошибка с подсказкой обновить QA_SMOKE', () => {
-    const r = S.qaScope({ smoke: ['UC-S-01'], contractIds: [], activeIds: ['UC-A-01'] });
-    assert.equal(r.errors.length, 1);
-    assert.match(r.errors[0], /UC-S-01.*QA_SMOKE/);
+  test('контракт без кейсов — пустой объём', () => {
+    assert.deepEqual(S.qaScope({ contractIds: [], activeIds: ['UC-A-01'] }), { ids: [], errors: [] });
+  });
+
+  test('полный проход (триггер или --full): все active-кейсы набора', () => {
+    const r = S.qaScope({ contractIds: ['UC-A-01'], activeIds: ['UC-A-01', 'UC-B-01', 'UC-C-01'], full: true });
+    assert.deepEqual(r, { ids: ['UC-A-01', 'UC-B-01', 'UC-C-01'], errors: [] });
+  });
+});
+
+test.describe('qaTriggers', () => {
+  test('обычные файлы задачи — триггеров нет', () => {
+    const paths = ['src/app/modules/Dialog/Dialog.jsx', 'src/app/reducers/chats.js', 'e2e/chats.spec.js', 'scripts/check-state.js', '.ai/memory/tasks.md'];
+    assert.deepEqual(S.qaTriggers({ paths, branch: 'feature/FE-1-x' }), []);
+  });
+
+  test('общая инфраструктура: store, auth, API-клиент, сокет, mock-bff', () => {
+    for (const p of ['src/app/store.js', 'src/app/reducers/auth.js', 'src/app/services/apiClient.js', 'src/app/services/authApi.js', 'src/app/services/wsService.js', 'mock-bff/server.js', 'mock-bff/lib/users.js']) {
+      const r = S.qaTriggers({ paths: [p], branch: 'feature/FE-1-x' });
+      assert.equal(r.length, 1, p);
+      assert.ok(r[0].includes(p), r[0]);
+    }
+  });
+
+  test('набор user-кейсов и зависимости', () => {
+    for (const p of ['docs/user-cases.md', 'docs/user-cases/auth.md', 'package.json', 'package-lock.json']) {
+      assert.equal(S.qaTriggers({ paths: [p], branch: 'feature/FE-1-x' }).length, 1, p);
+    }
+  });
+
+  test('похожие, но не общие пути не срабатывают', () => {
+    const paths = ['src/app/reducers/chats.js', 'src/app/services/chatsApi.js', 'mock-bff-notes.md', 'docs/user-cases-notes.md', 'docs/client-integration.md'];
+    assert.deepEqual(S.qaTriggers({ paths, branch: 'feature/FE-1-x' }), []);
+  });
+
+  test('ветка release/* и hotfix/* — триггер, остальные ветки и null — нет', () => {
+    assert.equal(S.qaTriggers({ paths: [], branch: 'release/1.2.0' }).length, 1);
+    assert.equal(S.qaTriggers({ paths: [], branch: 'hotfix/fix-login' }).length, 1);
+    assert.deepEqual(S.qaTriggers({ paths: [], branch: 'feature/FE-1-release-notes' }), []);
+    assert.deepEqual(S.qaTriggers({ paths: [], branch: null }), []);
+  });
+
+  test('несколько путей — по причине на каждый совпавший, без дублей', () => {
+    const r = S.qaTriggers({ paths: ['package.json', 'package.json', 'src/app/store.js', 'src/x.js'], branch: 'release/1' });
+    assert.equal(r.length, 3);
   });
 });
 
@@ -973,12 +1014,12 @@ test.describe('CLI на фикстурном репозитории', () => {
     const { execFileSync } = require('node:child_process');
     const git = (root, ...a) =>
       execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: root, encoding: 'utf8' }).trim();
-    // Фикстура с настоящими smoke-кейсами (QA_SMOKE) и вторым кейсом для контракта: подмены smoke через окружение нет
-    const qaIds = ['UC-AUTH-02', ...S.QA_SMOKE];
+    // Фикстура: кейс UC-AUTH-02 нужен для контракта задачи, UC-AUTH-03 — для полного прохода
+    const qaIds = ['UC-AUTH-02', 'UC-AUTH-03'];
     const qaCases = doc(caseBlock(), ...qaIds.map((id) => caseBlock({ id, title: id })));
     const qaSpec = goodSpec + qaIds.map((id) => `test('[${id}] x', async () => { expect(1).toBe(1); });\n`).join('');
     const wip = (body) => `# Задачи\n\n## В работе\n${body}\n## Бэклог\n`;
-    const qaReport = (tree, hash, verdict = 'PASS', ids = S.QA_SMOKE) =>
+    const qaReport = (tree, hash, verdict = 'PASS', ids = []) =>
       `# QA-отчёт\n\nДерево: ${tree}\nКейсы: ${hash}\nОбъём: ${ids.join(', ')}\nВердикт: ${verdict}\n\n## Матрица\n| Кейс | Результат | Комментарий |\n|---|---|---|\n` +
       ids.map((id) => `| ${id} | pass | — |\n`).join('') +
       '\n## Проблемы\n';
@@ -1005,7 +1046,7 @@ test.describe('CLI на фикстурном репозитории', () => {
       return root;
     };
 
-    test('свежий отчёт PASS по smoke — код 0', () => {
+    test('свежий отчёт PASS без обязательных кейсов — код 0', () => {
       const r = runQa(makeGitRoot('PASS'));
       assert.equal(r.status, 0, r.stdout + r.stderr);
     });
@@ -1040,20 +1081,12 @@ test.describe('CLI на фикстурном репозитории', () => {
       assert.equal(runQa(root).status, 1);
     });
 
-    test('переменная окружения QA_SMOKE не сужает обязательный объём', () => {
-      const root = makeGitRoot();
-      writeReport(root, 'PASS', []);
-      const r = run(root, ['--require-qa'], { QA_SMOKE: ',' });
-      assert.equal(r.status, 1);
-      assert.match(r.stdout + r.stderr, new RegExp(S.QA_SMOKE[0]));
-    });
-
     test('кейс контракта задачи ветки («В работе») не вошёл в объём отчёта — код 1', () => {
       const root = makeGitRoot('PASS', { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: UC-AUTH-02\n') }, 'feature/FE-1-a');
       const r = runQa(root);
       assert.equal(r.status, 1);
       assert.match(r.stdout + r.stderr, /UC-AUTH-02/);
-      writeReport(root, 'PASS', [...S.QA_SMOKE, 'UC-AUTH-02']);
+      writeReport(root, 'PASS', ['UC-AUTH-02']);
       assert.equal(runQa(root).status, 0, runQa(root).stdout);
     });
 
@@ -1069,7 +1102,7 @@ test.describe('CLI на фикстурном репозитории', () => {
       const r = runQa(root);
       assert.equal(r.status, 1);
       assert.match(r.stdout + r.stderr, /UC-AUTH-02/);
-      writeReport(root, 'PASS', [...S.QA_SMOKE, 'UC-AUTH-02']);
+      writeReport(root, 'PASS', ['UC-AUTH-02']);
       assert.equal(runQa(root).status, 0, runQa(root).stdout);
     });
 
@@ -1091,7 +1124,7 @@ test.describe('CLI на фикстурном репозитории', () => {
       assert.match(r.stdout + r.stderr, /done\/FE-1\.md/);
     });
 
-    test('--qa-scope печатает smoke и active-кейсы контракта только задачи ветки', () => {
+    test('--qa-scope печатает только active-кейсы контракта задачи ветки', () => {
       const root = makeGitRoot(
         'PASS',
         { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: UC-AUTH-02\n- **FE-2 (P1)** b\n  - Кейсы: UC-AUTH-01\n') },
@@ -1099,7 +1132,90 @@ test.describe('CLI на фикстурном репозитории', () => {
       );
       const r = run(root, ['--qa-scope']);
       assert.equal(r.status, 0, r.stderr);
-      assert.equal(r.stdout.trim(), [...S.QA_SMOKE, 'UC-AUTH-02'].join(', '));
+      assert.equal(r.stdout.trim(), 'UC-AUTH-02');
+    });
+
+    test.describe('триггеры полного прохода', () => {
+      const ALL = 'UC-AUTH-01, UC-AUTH-02, UC-AUTH-03';
+      const withTask = { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: UC-AUTH-02\n') };
+
+      test('без триггеров на ветке от develop — только кейсы контракта', () => {
+        const root = makeGitRoot('PASS', withTask);
+        git(root, 'branch', 'develop');
+        git(root, 'checkout', '-q', '-b', 'feature/FE-1-a');
+        assert.equal(run(root, ['--qa-scope']).stdout.trim(), 'UC-AUTH-02');
+      });
+
+      test('--full: все active-кейсы независимо от триггеров', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        const r = run(root, ['--qa-scope', '--full']);
+        assert.equal(r.status, 0, r.stderr);
+        assert.equal(r.stdout.trim(), ALL);
+      });
+
+      test('неотслеживаемый package.json — полный проход, причина в stderr', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        fs.writeFileSync(path.join(root, 'package.json'), '{}\n');
+        const r = run(root, ['--qa-scope']);
+        assert.equal(r.stdout.trim(), ALL);
+        assert.match(r.stderr, /package\.json/);
+      });
+
+      test('правка в рабочем дереве (не в индексе) общего файла — полный проход', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        fs.appendFileSync(path.join(root, 'mock-bff/server.js'), '// правка\n');
+        assert.equal(run(root, ['--qa-scope']).stdout.trim(), ALL);
+      });
+
+      test('закоммиченная в ветке правка общего файла (относительно develop) — полный проход', () => {
+        const root = makeGitRoot('PASS', withTask);
+        git(root, 'branch', 'develop');
+        git(root, 'checkout', '-q', '-b', 'feature/FE-1-a');
+        fs.appendFileSync(path.join(root, 'mock-bff/server.js'), '// правка\n');
+        git(root, 'add', '-A');
+        git(root, 'commit', '-q', '-m', 'task');
+        assert.equal(run(root, ['--qa-scope']).stdout.trim(), ALL);
+      });
+
+      test('нет develop и main — предупреждение в stderr, дифф от HEAD', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        const r = run(root, ['--qa-scope']);
+        assert.equal(r.stdout.trim(), 'UC-AUTH-02');
+        assert.match(r.stderr, /develop и main/);
+      });
+
+      test('не git-репозиторий — предупреждение, объём по контракту', () => {
+        const r = run(makeRoot(withTask), ['--qa-scope']);
+        assert.match(r.stderr, /не удалось получить дифф/);
+      });
+
+      test('пустой объём: отчёт с пустым «Объём:» и PASS принимается', () => {
+        const root = makeGitRoot('PASS', { '.ai/memory/tasks.md': wip('- **FE-1 (P1)** a\n  - Кейсы: нет\n') }, 'feature/FE-1-a');
+        assert.equal(run(root, ['--qa-scope']).stdout.trim(), '');
+        assert.equal(runQa(root).status, 0, runQa(root).stdout);
+      });
+
+      test('ветка release/* — полный проход', () => {
+        const root = makeGitRoot('PASS', {}, 'release/1.0.0');
+        assert.equal(run(root, ['--qa-scope']).stdout.trim(), ALL);
+      });
+
+      test('--require-qa: триггер требует отчёт с полным объёмом, объём-надмножество принимается', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        fs.writeFileSync(path.join(root, 'package.json'), '{}\n');
+        writeReport(root, 'PASS', ['UC-AUTH-02']);
+        const r = runQa(root);
+        assert.equal(r.status, 1);
+        assert.match(r.stdout + r.stderr, /UC-AUTH-01/);
+        writeReport(root, 'PASS', ['UC-AUTH-01', 'UC-AUTH-02', 'UC-AUTH-03']);
+        assert.equal(runQa(root).status, 0, runQa(root).stdout);
+      });
+
+      test('--require-qa без триггера: полный отчёт тоже принимается', () => {
+        const root = makeGitRoot('PASS', withTask, 'feature/FE-1-a');
+        writeReport(root, 'PASS', ['UC-AUTH-01', 'UC-AUTH-02', 'UC-AUTH-03']);
+        assert.equal(runQa(root).status, 0, runQa(root).stdout);
+      });
     });
 
     test('--qa-report-path печатает путь отчёта задачи ветки', () => {

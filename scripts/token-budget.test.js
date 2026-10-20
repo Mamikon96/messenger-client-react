@@ -51,3 +51,15 @@ test('code-style.md требует экономить вывод больших 
   assert.match(text, /git diff --stat/);
   assert.match(text, /\| head|-m\b/);
 });
+
+test('token-audit.md содержит разбивку префикса первого хода с таблицей компонентов', () => {
+  const text = read('.ai/rules/token-audit.md');
+  const i = text.indexOf('## Разбивка префикса первого хода');
+  assert.notEqual(i, -1, 'нет раздела');
+  const section = text.slice(i).split(/\n## /)[0];
+  assert.match(section, /\| Компонент \|/);
+  assert.match(section, /CLAUDE\.md/);
+  assert.match(section, /SessionStart/);
+  assert.match(section, /MEMORY\.md/);
+  assert.match(section, /Кандидаты/);
+});

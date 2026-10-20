@@ -104,3 +104,4 @@
 | 2026-10-20 | FE-112 | check-contract.sh: проверки сиротских подпунктов и дубля «В работе»/«Бэклог» | `done/FE-112.md` |
 | 2026-10-20 | FE-100 | approve-usecases.sh без TTY: ошибка с подсказкой `--yes`, подсказки обновлены | `done/FE-100.md` |
 | 2026-10-20 | FE-99 | git-task.sh commit: футер Co-Authored-By с переопределением `GIT_TASK_COAUTHOR`, без дублей | `done/FE-99.md` |
+| 2026-10-20 | FE-144 | Исключение из правила 9 для мелких правок scripts/.ai (FE-D57) | `done/FE-144.md` |

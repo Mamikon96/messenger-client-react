@@ -42,6 +42,7 @@
 | FE-D49 | Стартовый контекст: функции claude.ai и листинг скиллов (2026-10-17) | действует | `decisions/session-context.md` |
 | FE-D54 | Отключить плагины chrome-devtools-mcp и context7 в проекте (2026-10-18) | действует | `decisions/session-context.md` |
 | FE-D55 | Модель основной сессии и пороги контекста (2026-10-20) | действует | `decisions/session-context.md` |
+| FE-D57 | Исключение из правила 9: мелкие правки scripts/ и .ai/ (2026-10-20) | действует | `decisions/session-context.md` |
 
 ## Git: PR и ветки
 | ID | Название | Статус | Файл |

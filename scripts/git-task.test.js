@@ -67,3 +67,47 @@ test('start: чужой изменённый файл — отказ, ветка
     r.cleanup();
   }
 });
+
+// Футер Co-Authored-By в `commit` (FE-99)
+const DEFAULT_COAUTHOR = 'Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>';
+
+const commitIn = (env, msg) => {
+  const r = makeRepo();
+  try {
+    const started = r.start();
+    assert.equal(started.status, 0, started.stdout + started.stderr);
+    fs.writeFileSync(path.join(r.dir, 'scripts/qa-required.sh'), 'exit 1\n');
+    fs.writeFileSync(path.join(r.dir, 'note.txt'), 'x\n');
+    const childEnv = { ...process.env };
+    delete childEnv.GIT_TASK_COAUTHOR;
+    const res = spawnSync('bash', ['scripts/git-task.sh', 'commit', msg, '--', 'note.txt'], {
+      cwd: r.dir,
+      encoding: 'utf8',
+      env: { ...childEnv, ...env },
+    });
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    return spawnSync('git', ['log', '-1', '--format=%B'], { cwd: r.dir, encoding: 'utf8' }).stdout.trimEnd();
+  } finally {
+    r.cleanup();
+  }
+};
+
+test('commit: по умолчанию добавляет футер Co-Authored-By отдельной последней строкой', () => {
+  assert.equal(commitIn({}, 'chore: тест'), `chore: тест\n\n${DEFAULT_COAUTHOR}`);
+});
+
+test('commit: уже есть Co-Authored-By — не дублируется', () => {
+  const msg = 'chore: тест\n\nCo-Authored-By: Другой <o@example.com>';
+  assert.equal(commitIn({}, msg), msg);
+});
+
+test('commit: пустой GIT_TASK_COAUTHOR — без футера', () => {
+  assert.equal(commitIn({ GIT_TASK_COAUTHOR: '' }, 'chore: тест'), 'chore: тест');
+});
+
+test('commit: GIT_TASK_COAUTHOR переопределяет значение', () => {
+  assert.equal(
+    commitIn({ GIT_TASK_COAUTHOR: 'Бот <bot@example.com>' }, 'chore: тест'),
+    'chore: тест\n\nCo-Authored-By: Бот <bot@example.com>',
+  );
+});

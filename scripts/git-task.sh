@@ -4,6 +4,8 @@
 #                                                                   проверить состояние, затем создать/выбрать ветку задачи
 #   bash scripts/git-task.sh start chore <slug>                     ветка для работы вне бэклога (процесс, конфиги, доки)
 #   bash scripts/git-task.sh commit "<сообщение>" -- <файлы...>     закоммитить указанные файлы на ветке задачи
+#       последней строкой добавляется «Co-Authored-By: ${GIT_TASK_COAUTHOR}» (по умолчанию
+#       «Claude Sonnet 5.5 <noreply@anthropic.com>»; пустая переменная — без футера; строка уже есть — не дублируется)
 # Скрипт ничего не пушит и ничего не сливает.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -140,7 +142,7 @@ cmd_start() {
 }
 
 cmd_commit() {
-  local msg=${1:-} branch first
+  local msg=${1:-} branch first coauthor
   [ -n "$msg" ] || die 'usage: commit "<сообщение>" -- <файлы...>'
   shift
   [ "${1:-}" = "--" ] || die "перед списком файлов нужен '--'"
@@ -176,6 +178,10 @@ cmd_commit() {
   git add -- "$@"
   git diff --cached --quiet && die "нечего коммитить в указанных файлах"
   git diff --cached --stat
+  coauthor=${GIT_TASK_COAUTHOR-Claude Sonnet 5.5 <noreply@anthropic.com>}
+  if [ -n "$coauthor" ] && ! grep -q '^Co-Authored-By:' <<<"$msg"; then
+    msg=$(printf '%s\n\nCo-Authored-By: %s' "$msg" "$coauthor")
+  fi
   git commit -q -m "$msg"
   echo "  ✓ коммит $(git rev-parse --short HEAD) на $branch"
 }

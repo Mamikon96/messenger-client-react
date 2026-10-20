@@ -77,6 +77,39 @@ test('сообщение об ошибке подсказывает, где фо
   assert.match(r.out, /task-contract\.md/);
 });
 
+test('сиротские подпункты без заголовка задачи — код 1', () => {
+  const r = run(tasks(contract()));
+  assert.equal(r.code, 1);
+  assert.match(r.out, /без заголовка/);
+  assert.match(r.out, /WHY/);
+  assert.match(r.out, /FIX/);
+});
+
+test('сиротские подпункты после «—» (заголовок удалён) — код 1', () => {
+  assert.equal(run(tasks(`—\n${contract()}`)).code, 1);
+});
+
+test('задача и в «В работе», и в «Бэклоге» — код 1, в выводе ID', () => {
+  const content = tasks(`- **FE-51 (P1)** Процесс\n${contract()}`).replace(
+    '- **FE-90 (P3)** без контракта',
+    '- **FE-90 (P3)** без контракта\n- **FE-51 (P1)** Процесс (дубль)',
+  );
+  const r = run(content);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /FE-51/);
+  assert.match(r.out, /FE-51 есть и в «В работе», и в «Бэклоге»/);
+  assert.match(r.out, /WHY/);
+  assert.match(r.out, /FIX/);
+});
+
+test('ID с общим префиксом (FE-5 и FE-51) не считается дублем', () => {
+  const content = tasks(`- **FE-5 (P1)** Процесс\n${contract()}`).replace(
+    '- **FE-90 (P3)** без контракта',
+    '- **FE-51 (P3)** другая',
+  );
+  assert.equal(run(content).code, 0);
+});
+
 test('нет файла — код 2', () => {
   const r = spawnSync('bash', [SCRIPT, '/nonexistent/tasks.md'], { encoding: 'utf8' });
   assert.equal(r.status, 2);

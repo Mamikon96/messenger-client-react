@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAuthUserId } from "../../../../reducers/auth";
-import { selectActiveChat } from "../../../../reducers/activeChatId";
+import { chatSelected, selectActiveChat } from "../../../../reducers/activeChatId";
 import { selectChatHistory, selectChatMembersCount, selectChatName, selectChatReadSeq } from "../../../../reducers/chats";
 import { loadChatHistory, loadOlderMessages } from "../../../../reducers/chatHistory";
 import { selectChatOutbox } from "../../../../reducers/outbox";
@@ -127,6 +127,7 @@ function Dialog() {
     return (
         <div className="dialog">
             <div className="dialog__header">
+                <Button variant="ghost" className="dialog__back" onClick={() => dispatch(chatSelected(null))}>Назад</Button>
                 <div className="dialog__header-title">
                     {chatName}
                 </div>

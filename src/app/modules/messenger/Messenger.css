@@ -15,3 +15,16 @@
     display: flex;
     justify-content: space-around;
 }
+
+/* Ниже 768px показывается одна панель: список (чат не выбран) или диалог (чат выбран). */
+@media (max-width: 767px) {
+    .messenger__panels > .chats,
+    .messenger__panels > .dialog {
+        width: 100%;
+    }
+
+    .messenger__panels:not(._chat-open) > .dialog,
+    .messenger__panels._chat-open > .chats {
+        display: none;
+    }
+}

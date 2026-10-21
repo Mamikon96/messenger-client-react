@@ -108,3 +108,15 @@
     font-size: var(--font-size-sm);
     color: var(--color-danger);
 }
+
+/* Кнопка возврата к списку нужна только там, где панели показываются по одной. */
+.dialog__header .dialog__back {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .dialog__header .dialog__back {
+        display: inline-flex;
+        align-self: flex-start;
+    }
+}

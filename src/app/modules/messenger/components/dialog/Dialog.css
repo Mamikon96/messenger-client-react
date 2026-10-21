@@ -52,9 +52,20 @@
     padding: var(--space-2) var(--space-2) 76px;
 }
 
-.dialog__message {
+.dialog__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     align-self: flex-start;
     max-width: 70%;
+}
+
+.dialog__row._own {
+    align-self: flex-end;
+}
+
+.dialog__message {
+    min-width: 0;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     background-color: var(--color-surface-2);
@@ -63,8 +74,12 @@
     overflow-wrap: anywhere;
 }
 
+/* Статус внутри пузыря (часы, галки) отделён от текста; кнопка повтора стоит вне пузыря и отступ берёт у строки. */
+.dialog__message .message-status {
+    margin-left: 6px;
+}
+
 .dialog__message._own {
-    align-self: flex-end;
     background-color: var(--color-own-message);
     color: var(--color-text);
 }

@@ -74,6 +74,7 @@
 | UC-MSG-09 | Догрузка пропущенного после обрыва связи | active | docs/user-cases/msg.md |
 | UC-MSG-04 | История переписки | active | docs/user-cases/msg.md |
 | UC-MSG-07 | Отметка о прочтении | planned | docs/user-cases/msg.md |
+| UC-MSG-10 | Статус «прочитано собеседником» | planned | docs/user-cases/msg.md |
 
 ### Доступность и оформление (UI)
 

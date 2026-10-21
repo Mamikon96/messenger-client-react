@@ -65,6 +65,12 @@ const runRetryScenario = async (page, activate) => {
 
   const retry = await waitFailed(page);
   await expect(retry).toBeVisible();
+  // Красный треугольник стоит справа от пузыря, а не внутри него.
+  const bubble = own(page).locator('.dialog__message');
+  await expect(bubble.getByRole('button')).toHaveCount(0);
+  const bubbleBox = await bubble.boundingBox();
+  const retryBox = await retry.boundingBox();
+  expect(retryBox.x).toBeGreaterThanOrEqual(bubbleBox.x + bubbleBox.width);
   await expect(own(page).getByRole('img', { name: 'Отправляется' })).toHaveCount(0);
 
   online = true;
@@ -92,6 +98,7 @@ test('[UC-MSG-05] красный треугольник повторяет от�
     await page.keyboard.press('Enter');
   });
   await expect(own(page).getByRole('img', { name: 'Отправлено' })).toBeVisible();
+  await expect(page.getByLabel('Сообщение')).toBeFocused();
 });
 
 test('[UC-MSG-08] длиннее 4000 символов: счётчик «N / 4000», Send и Enter не отправляют, после сокращения уходит', async ({ page }) => {

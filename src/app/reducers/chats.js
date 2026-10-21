@@ -215,6 +215,9 @@ export const selectPendingUserId = (state) => state.chats.pendingUserId
 // Состояние загрузки истории чата или undefined, пока чат не открывали.
 export const selectChatHistory = (state, chatId) => state.chats.entities[chatId]?.history
 
+// Seq последнего своего сообщения, прочитанного собеседником (поле readSeq чата), или undefined, пока бэкенд его не присылает (FE-160).
+export const selectChatReadSeq = (state, chatId) => state.chats.entities[chatId]?.readSeq
+
 // Отображаемое имя чата: у группы — title, у direct — имя собеседника из users; нет данных — пустая строка.
 export const selectChatName = (state, chatId) => {
     const chat = state.chats.entities[chatId]

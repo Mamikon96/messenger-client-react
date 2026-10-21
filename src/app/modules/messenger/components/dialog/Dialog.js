@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAuthUserId } from "../../../../reducers/auth";
 import { selectActiveChat } from "../../../../reducers/activeChatId";
-import { selectChatHistory, selectChatMembersCount, selectChatName } from "../../../../reducers/chats";
+import { selectChatHistory, selectChatMembersCount, selectChatName, selectChatReadSeq } from "../../../../reducers/chats";
 import { loadChatHistory, loadOlderMessages } from "../../../../reducers/chatHistory";
 import { selectChatOutbox } from "../../../../reducers/outbox";
 import { MAX_MESSAGE_LENGTH, messageLength } from "../../../../services/messageLength";
@@ -35,6 +35,7 @@ function Dialog() {
     const outbox = useSelector((state) => selectChatOutbox(state, chatId));
     const chatName = useSelector((state) => selectChatName(state, chatId));
     const membersCount = useSelector((state) => selectChatMembersCount(state, chatId));
+    const readSeq = useSelector((state) => selectChatReadSeq(state, chatId));
     const history = useSelector((state) => selectChatHistory(state, chatId));
     const historyStatus = history?.status;
     const olderStatus = history?.olderStatus;
@@ -101,6 +102,12 @@ function Dialog() {
         if (canLoadOlder && scrollTop <= EDGE_THRESHOLD) dispatch(loadOlderMessages(chatId));
     }
 
+    // Повтор отправки с клавиатуры: кнопка исчезает вместе со статусом failed, фокус переводим в поле ввода, чтобы он не ушёл на body.
+    const retry = (clientId) => {
+        dispatch(retryMessage(clientId));
+        inputRef.current?.focus();
+    }
+
     const send = () => {
         const trimmed = text.trim();
         if (hasChat && trimmed && userId && !tooLong) {
@@ -142,25 +149,33 @@ function Dialog() {
             <div className="dialog__content" role="log" aria-label="Сообщения" aria-busy={historyStatus === "loading"} ref={contentRef} onScroll={handleScroll}>
                 {!hasChat && <div className="dialog__status">Чат не выбран</div>}
                 {isEmpty && <div className="dialog__status">Сообщений пока нет</div>}
-                {chatMessages.map((message) => (
-                    <div
-                        key={message.seq}
-                        role="article"
-                        className={`dialog__message${message.senderId === userId ? " _own" : ""}`}
-                    >
-                        {showAuthors && message.senderId !== userId && users[message.senderId]?.name && (
-                            <span className="dialog__message-author">{users[message.senderId]?.name}</span>
-                        )}
-                        {message.body}
-                        {showStatus && message.senderId === userId && <MessageStatus status="sent" />}
-                    </div>
-                ))}
-                {outbox.map((item) => (
-                    <div key={item.clientId} role="article" className="dialog__message _own">
-                        {item.body}
-                        <MessageStatus status={item.status} onRetry={() => dispatch(retryMessage(item.clientId))} />
-                    </div>
-                ))}
+                {chatMessages.map((message) => {
+                    const own = message.senderId === userId;
+                    return (
+                        <div key={message.seq} role="article" className={`dialog__row${own ? " _own" : ""}`}>
+                            <div className={`dialog__message${own ? " _own" : ""}`}>
+                                {showAuthors && !own && users[message.senderId]?.name && (
+                                    <span className="dialog__message-author">{users[message.senderId]?.name}</span>
+                                )}
+                                {message.body}
+                                {showStatus && own && <MessageStatus status={typeof readSeq === "number" && message.seq <= readSeq ? "read" : "sent"} />}
+                            </div>
+                        </div>
+                    );
+                })}
+                {outbox.map((item) => {
+                    const failed = item.status === "failed";
+                    const status = <MessageStatus status={item.status} onRetry={() => retry(item.clientId)} />;
+                    return (
+                        <div key={item.clientId} role="article" className="dialog__row _own">
+                            <div className="dialog__message _own">
+                                {item.body}
+                                {!failed && status}
+                            </div>
+                            {failed && status}
+                        </div>
+                    );
+                })}
             </div>
             <div className="dialog__footer">
                 {tooLong && <p id="dialog-counter" className="dialog__counter" role="alert">{length} / {MAX_MESSAGE_LENGTH}</p>}

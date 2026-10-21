@@ -291,6 +291,7 @@ describe('message.new', () => {
 
     expect(chatsApi.fetchChat).toHaveBeenCalledTimes(1);
     expect(selectChatMessages(store.getState(), 'c1').map((m) => m.seq)).toEqual([3, 4]);
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ lastSeq: 4, unreadCount: 2 });
   });
 
   it('ошибка загрузки чата глотается, сообщение не добавляется', async () => {

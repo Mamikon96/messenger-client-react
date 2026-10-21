@@ -12,6 +12,7 @@ import "./Dialog.css";
 import { Button } from "../../../ui/button/Button";
 import { Input } from "../../../ui/input/Input";
 import MessageStatus from "./MessageStatus";
+import InviteMembers from "../invite/InviteMembers";
 import { useReadReceipts } from "../../useReadReceipts";
 
 // Расстояние в пикселях от края ленты, в пределах которого пользователь считается «у края»: у низа — следуем за новыми, у верха — подкачиваем старые.
@@ -132,6 +133,7 @@ function Dialog() {
                     {chatName}
                 </div>
                 {membersCount !== null && <div className="dialog__header-meta">{membersLabel(membersCount)}</div>}
+                {hasChat && <InviteMembers chatId={chatId} />}
             </div>
             {historyStatus === "loading" && <div className="dialog__status" role="status">Загрузка сообщений…</div>}
             {historyStatus === "failed" && (

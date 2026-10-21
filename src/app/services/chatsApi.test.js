@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages, postDirectChat, postGroupChat, postMessage, postRead } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages, postChatMember, postDirectChat, postGroupChat, postMessage, postRead } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -152,6 +152,20 @@ describe("chatsApi: открытие чата", () => {
         expect(options.method).toBe("POST");
         expect(JSON.parse(options.body)).toEqual({ seq: 7 });
         expect(options.signal).toBe(signal);
+    });
+
+    it("postChatMember шлёт POST /api/chats/:id/members с userId и принимает 204; 409 приходит как ApiError", async () => {
+        fetch.mockResolvedValueOnce(reply(204)).mockResolvedValueOnce(reply(409, { error: { code: "already_member" } }));
+        const { signal } = new AbortController();
+
+        await postChatMember("c 1", "u2", { signal });
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201/members");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body)).toEqual({ userId: "u2" });
+        expect(options.signal).toBe(signal);
+        await expect(postChatMember("c1", "u2")).rejects.toMatchObject({ status: 409, code: "already_member" });
     });
 
     it("postDirectChat шлёт POST /api/chats с type direct и userId и возвращает ChatDto (201 и 200)", async () => {

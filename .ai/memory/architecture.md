@@ -8,7 +8,7 @@
 | Как стартует приложение, гейт `App` по `auth.status`, 401 | `architecture/data-flow.md` |
 | Слайсы, селекторы, thunk-и, `rootReducer`, события `messageAdded` | `architecture/store.md` |
 | Дерево компонентов, `Header`, `Messenger`, `Login` | `architecture/components.md` |
-| `Button`, `Input`, `Avatar`, `IconButton` | `architecture/ui-primitives.md` |
+| `Button`, `Input`, `Avatar`, `IconButton`, `Dialog` | `architecture/ui-primitives.md` |
 | Токены, светлая/тёмная тема, `useTheme` | `architecture/styles-theme.md` |
 | `apiClient`, `authApi`, `chatsApi`, ошибки и валидация форм | `architecture/services.md` |
 | mock-BFF, прокси dev-сервера, Playwright | `architecture/mock-bff.md` |

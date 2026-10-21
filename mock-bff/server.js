@@ -4,6 +4,7 @@ const http = require('http');
 const crypto = require('crypto');
 
 const SESSION_COOKIE = 'mock_session';
+const MAX_MEMBERS = 100;
 const MUTATING = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 const PASSWORD_SESSION_MAX_AGE = 400 * 24 * 60 * 60; // скользящий срок сессии по паролю, §2.2 и §7 client-integration.md
@@ -32,6 +33,7 @@ const isFilled = (value) => typeof value === 'string' && value.trim() !== '';
 function createServer() {
   const sessions = new Map(); // sid -> { user, csrfToken }
   const users = new Map(); // login -> { password, disabled, isAdmin, user: SessionUser }
+  const groupChats = new Map(); // chatId -> ChatDto группы (в списки не попадают; нужны для карточки и приглашений)
   const directChats = new Map(); // "idМеньший:idБольший" -> ChatDto (GET /api/chats их пока не отдаёт)
   let generatedNames = 0;
 
@@ -206,8 +208,10 @@ function createServer() {
     if (req.method === 'POST' && parts.length === 2 && parts[1] === 'chats') return postChat(req, res, session);
     // GET /api/chats (пока всегда пустой список)
     if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
-    // GET /api/chats/:id (чатов в mock нет: 404)
-    if (req.method === 'GET' && parts.length === 3 && parts[1] === 'chats') return error(res, 404, 'not_found', 'Чат не найден');
+    // GET /api/chats/:id (карточка группы, где я участник; прочих чатов в mock нет: 404)
+    if (req.method === 'GET' && parts.length === 3 && parts[1] === 'chats') return getChat(res, parts[2], session);
+    // POST /api/chats/:id/members
+    if (req.method === 'POST' && parts.length === 4 && parts[1] === 'chats' && parts[3] === 'members') return postMember(req, res, parts[2], session);
     // GET /api/chats/:id/messages (чатов в mock нет: 404)
     if (req.method === 'GET' && parts.length === 4 && parts[1] === 'chats' && parts[3] === 'messages') return error(res, 404, 'not_found', 'Чат не найден');
     // POST /api/chats/:id/messages (чатов в mock нет: валидное тело -> 404)
@@ -236,7 +240,9 @@ function createServer() {
     const noMembers = body.memberIds === undefined || (Array.isArray(body.memberIds) && body.memberIds.length === 0);
     if (title === '' || title.length > 100 || !noMembers) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
     const { id, name, avatarUrl } = session.user;
-    return json(res, 201, { id: crypto.randomUUID(), type: 'group', title, lastSeq: 0, members: [{ userId: id, name, avatarUrl, role: 'owner' }] });
+    const chat = { id: crypto.randomUUID(), type: 'group', title, lastSeq: 0, members: [{ userId: id, name, avatarUrl, role: 'owner' }] };
+    groupChats.set(chat.id, chat);
+    return json(res, 201, chat);
   }
 
   // direct и group, §3.3. direct: 201 — создан, 200 — уже есть, 404 — собеседник неизвестен или отключён.
@@ -252,6 +258,30 @@ function createServer() {
     const chat = { id: crypto.randomUUID(), type: 'direct', title: null, lastSeq: 0, members: members.map(toMember) };
     directChats.set(key, chat);
     return json(res, 201, chat);
+  }
+
+  function getChat(res, chatId, session) {
+    const chat = groupChats.get(chatId);
+    if (!chat || !chat.members.some(({ userId }) => userId === session.user.id)) return error(res, 404, 'not_found', 'Чат не найден');
+    return json(res, 200, chat);
+  }
+
+  // Добавление участника в группу, §3.5: 204; 400 — тело, direct или лимит 100; 403 — не owner; 404 — нет чата/не участник/цель; 409 — уже участник.
+  async function postMember(req, res, chatId, session) {
+    const body = await readBody(req);
+    if (!body || !isFilled(body.userId)) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
+    const group = groupChats.get(chatId);
+    const mine = group && group.members.find(({ userId }) => userId === session.user.id);
+    const isDirect = [...directChats.values()].some(({ id, members }) => id === chatId && members.some(({ userId }) => userId === session.user.id));
+    if (isDirect) return error(res, 400, 'validation_failed', 'В direct-чат участников не добавить');
+    if (!mine) return error(res, 404, 'not_found', 'Чат не найден');
+    if (mine.role !== 'owner') return error(res, 403, 'forbidden', 'Приглашать может только владелец');
+    const target = [...users.values()].find(({ user }) => user.id === body.userId);
+    if (!target || target.disabled) return error(res, 404, 'not_found', 'Пользователь не найден');
+    if (group.members.some(({ userId }) => userId === target.user.id)) return error(res, 409, 'already_member', 'Уже участник');
+    if (group.members.length >= MAX_MEMBERS) return error(res, 400, 'validation_failed', 'В группе не больше 100 участников');
+    group.members.push(toMember(target.user));
+    return empty(res, 204);
   }
 
   async function postMessage(req, res) {

@@ -37,6 +37,11 @@ export function postGroupChat(title, { signal } = {}) {
     return apiRequest("/api/chats", { method: "POST", body: { type: "group", title, memberIds: [] }, signal });
 }
 
+// Добавить участника в группу (204 без тела; §3.5). 400 — лимит участников, 403 — не owner, 404 — нет чата или человека, 409 already_member — уже в группе.
+export function postChatMember(chatId, userId, { signal } = {}) {
+    return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/members`, { method: "POST", body: { userId }, signal });
+}
+
 // Отметка о прочтении: last_read_seq = max(текущий, seq) (204 без тела; 400 — seq больше lastSeq чата; §3.10). Событий о прочтении нет.
 export function postRead(chatId, { seq, signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/read`, { method: "POST", body: { seq }, signal });

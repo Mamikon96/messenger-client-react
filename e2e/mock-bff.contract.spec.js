@@ -440,3 +440,81 @@ test('POST /api/chats: direct — 201 и ChatDto, повторный запро�
   expect(again.status()).toBe(200);
   expect((await again.json()).id).toBe(chat.id);
 });
+
+test('POST /api/chats/:id/members: без сессии — 401, без CSRF — 403', async () => {
+  expect((await api.post('/api/chats/c1/members', { data: { userId: 'x' } })).status()).toBe(401);
+  await signIn();
+  await expectError(await api.post('/api/chats/c1/members', { data: { userId: 'x' } }), 403, 'csrf_invalid');
+});
+
+test('POST /api/chats/:id/members: 204 и состав в GET, повтор — 409 already_member, ошибки 400/404', async () => {
+  const csrfToken = await signInWithCsrf();
+  const headers = { 'X-CSRF-Token': csrfToken };
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const group = await (await api.post('/api/chats', { data: { type: 'group', title: 'Team', memberIds: [] }, headers })).json();
+  const add = (chatId, data) => api.post(`/api/chats/${chatId}/members`, { data, headers });
+
+  const added = await add(group.id, { userId: bob.id });
+  expect(added.status()).toBe(204);
+  const card = await (await api.get(`/api/chats/${group.id}`)).json();
+  expect(card.members).toEqual([
+    expect.objectContaining({ role: 'owner' }),
+    { userId: bob.id, name: 'Bob Tester', avatarUrl: '', role: 'member' },
+  ]);
+
+  await expectError(await add(group.id, { userId: bob.id }), 409, 'already_member');
+  for (const data of [{}, { userId: 5 }, { userId: '' }]) {
+    await expectError(await add(group.id, data), 400, 'validation_failed', undefined, JSON.stringify(data));
+  }
+  await expectError(await add(group.id, { userId: 'no-such-user' }), 404, 'not_found');
+  await expectError(await add('no-such-chat', { userId: bob.id }), 404, 'not_found');
+
+  const direct = await (await api.post('/api/chats', { data: { type: 'direct', userId: bob.id }, headers })).json();
+  await expectError(await add(direct.id, { userId: bob.id }), 400, 'validation_failed');
+});
+
+test('POST /api/chats/:id/members: не owner — 403 forbidden', async () => {
+  const aliceSession = await (await signIn()).json();
+  const aliceCsrf = aliceSession.csrfToken;
+  const alice = aliceSession.user;
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const bobApi = await request.newContext({ baseURL, maxRedirects: 0 });
+  try {
+    const bobSignIn = await bobApi.post('/api/auth/login', { data: { login: 'bob', password: 'correct-horse-1' } });
+    expect(bobSignIn.status()).toBe(200);
+    const bobHeaders = { 'X-CSRF-Token': (await bobSignIn.json()).csrfToken };
+    const group = await (await bobApi.post('/api/chats', { data: { type: 'group', title: 'Bob group', memberIds: [] }, headers: bobHeaders })).json();
+    expect((await bobApi.post(`/api/chats/${group.id}/members`, { data: { userId: alice.id }, headers: bobHeaders })).status()).toBe(204);
+
+    await expectError(await api.post(`/api/chats/${group.id}/members`, { data: { userId: bob.id }, headers: { 'X-CSRF-Token': aliceCsrf } }), 403, 'forbidden');
+  } finally {
+    await bobApi.dispose();
+  }
+});
+
+test('POST /api/chats/:id/members: сто участников — лимит, следующий получает 400 validation_failed', async () => {
+  const csrfToken = await signInWithCsrf();
+  const headers = { 'X-CSRF-Token': csrfToken };
+  const group = await (await api.post('/api/chats', { data: { type: 'group', title: 'Big', memberIds: [] }, headers })).json();
+  const add = (userId) => api.post(`/api/chats/${group.id}/members`, { data: { userId }, headers });
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  expect((await add(bob.id)).status()).toBe(204);
+
+  // Создатель и Боб — двое, ещё 98 зарегистрированных доводят состав до 100; 99-й зарегистрированный — лишний.
+  const suffix = Date.now().toString(36);
+  const register = async (i) => {
+    const other = await request.newContext({ baseURL, maxRedirects: 0 });
+    try {
+      const registered = await other.post('/api/auth/register', { data: { login: `lim${suffix}${i}`, password: 'correct-horse-1' } });
+      expect(registered.status()).toBe(201);
+      return (await registered.json()).user;
+    } finally {
+      await other.dispose();
+    }
+  };
+  for (let i = 0; i < 98; i += 1) expect((await add((await register(i)).id)).status()).toBe(204);
+  expect((await (await api.get(`/api/chats/${group.id}`)).json()).members).toHaveLength(100);
+
+  const extra = await register(98);
+  await expectError(await add(extra.id), 400, 'validation_failed');
+});

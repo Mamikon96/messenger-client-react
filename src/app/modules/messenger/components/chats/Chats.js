@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Chat } from "../chat/Chat";
 import { Button } from "../../../ui/button/Button";
 import "./Chats.css";
+import CreateGroup from "../create-group/CreateGroup";
 import PeopleSearch from "../people-search/PeopleSearch";
 import { useUserSearch } from "../../useUserSearch";
 import { createDirectChat, selectChats, selectChatsStatus, selectPendingUserId } from "../../../../reducers/chats";
@@ -73,6 +74,7 @@ function Chats({ onRetry }) {
 
     return (
         <div className="chats">
+            <CreateGroup />
             <PeopleSearch
                 query={query}
                 onQueryChange={changeQuery}

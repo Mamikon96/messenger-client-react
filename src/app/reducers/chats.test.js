@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
+import reducer, { createDirectChat, createGroupChat, selectIsCreatingGroup, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
@@ -22,7 +22,7 @@ const localChat = (id, title) =>
 
 describe('chats reducer', () => {
   it('начальное состояние — пустая нормализованная коллекция', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] });
+    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] });
   });
 
   it('чаты хранятся в порядке добавления, без сортировки', () => {
@@ -388,6 +388,96 @@ describe('chats reducer', () => {
 
       expect(result.payload).toBe('failed');
       expect(selectPendingUserId(store.getState())).toBeNull();
+    });
+  });
+
+  describe('createGroupChat', () => {
+    const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+    const dto = {
+      id: 'g1', type: 'group', title: 'Team', lastSeq: 0,
+      members: [{ userId: 'u1', name: 'Ann', avatarUrl: '', role: 'owner' }],
+    };
+    const makeStore = () => {
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      return store;
+    };
+
+    it('группа, созданная пока грузился список, не затирается ответом fetchChats и остаётся активной', async () => {
+      const other = { id: 'other', type: 'group', title: 'Other', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+      let resolveList;
+      chatsApi.fetchChats.mockReturnValue(new Promise((res) => { resolveList = res; }));
+      chatsApi.postGroupChat.mockResolvedValue(dto);
+      const store = makeStore();
+
+      const list = store.dispatch(fetchChats());
+      await store.dispatch(createGroupChat('Team'));
+      resolveList([other]);
+      await list;
+
+      const state = store.getState();
+      expect(selectChats(state).map((chat) => chat.id)).toEqual(['other', 'g1']);
+      expect(state.activeChatId).toBe('g1');
+    });
+
+    it('шлёт POST group с названием и signal', async () => {
+      chatsApi.postGroupChat.mockResolvedValue(dto);
+
+      await makeStore().dispatch(createGroupChat('Team'));
+
+      expect(chatsApi.postGroupChat).toHaveBeenCalledWith('Team', { signal: expect.any(AbortSignal) });
+    });
+
+    it('201: группа добавляется (без peerId), владелец — в users, чат становится активным', async () => {
+      chatsApi.postGroupChat.mockResolvedValue(dto);
+      const store = makeStore();
+
+      await store.dispatch(createGroupChat('Team'));
+
+      const state = store.getState();
+      expect(selectChats(state)).toEqual([
+        { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0, members: [{ userId: 'u1', role: 'owner' }] },
+      ]);
+      expect(state.users.entities.u1).toEqual({ id: 'u1', name: 'Ann', avatarUrl: '' });
+      expect(state.activeChatId).toBe('g1');
+      expect(selectIsCreatingGroup(state)).toBe(false);
+    });
+
+    it('пока запрос идёт, второй запуск не шлёт запрос', async () => {
+      let resolve;
+      chatsApi.postGroupChat.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const store = makeStore();
+
+      const first = store.dispatch(createGroupChat('Team'));
+      expect(selectIsCreatingGroup(store.getState())).toBe(true);
+      await store.dispatch(createGroupChat('Team'));
+      resolve(dto);
+      await first;
+
+      expect(chatsApi.postGroupChat).toHaveBeenCalledTimes(1);
+      expect(selectChats(store.getState())).toHaveLength(1);
+    });
+
+    it('400: rejected с кодом invalid, чат не добавлен, флаг сброшен', async () => {
+      chatsApi.postGroupChat.mockRejectedValue(new ApiError(400, { error: { code: 'validation_failed' } }));
+      const store = makeStore();
+
+      const result = await store.dispatch(createGroupChat('Team'));
+
+      expect(result.payload).toBe('invalid');
+      expect(selectChats(store.getState())).toEqual([]);
+      expect(store.getState().activeChatId).toBeNull();
+      expect(selectIsCreatingGroup(store.getState())).toBe(false);
+    });
+
+    it('другая ошибка: rejected с кодом failed', async () => {
+      chatsApi.postGroupChat.mockRejectedValue(new Error('network'));
+      const store = makeStore();
+
+      const result = await store.dispatch(createGroupChat('Team'));
+
+      expect(result.payload).toBe('failed');
+      expect(selectIsCreatingGroup(store.getState())).toBe(false);
     });
   });
 

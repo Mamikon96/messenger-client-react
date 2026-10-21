@@ -32,6 +32,11 @@ export function postDirectChat(userId, { signal } = {}) {
     return apiRequest("/api/chats", { method: "POST", body: { type: "direct", userId }, signal });
 }
 
+// Группа без участников, кроме создателя (он owner): ChatDto (201; §3.3). 400 validation_failed — название не подходит (details у чатов нет).
+export function postGroupChat(title, { signal } = {}) {
+    return apiRequest("/api/chats", { method: "POST", body: { type: "group", title, memberIds: [] }, signal });
+}
+
 // Отметка о прочтении: last_read_seq = max(текущий, seq) (204 без тела; 400 — seq больше lastSeq чата; §3.10). Событий о прочтении нет.
 export function postRead(chatId, { seq, signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/read`, { method: "POST", body: { seq }, signal });

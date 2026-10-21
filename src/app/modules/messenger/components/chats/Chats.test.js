@@ -83,7 +83,8 @@ describe("Chats: загрузка и список", () => {
         const { store } = await renderChats(Promise.resolve([group, direct]));
         await load(store);
 
-        expect(await screen.findAllByRole("button")).toHaveLength(2);
+        // две кнопки чатов и «Новая группа»
+        expect(await screen.findAllByRole("button")).toHaveLength(3);
         expect(within(screen.getByRole("button", { name: "Bob привет, как дела 3 непрочитанных" })).getByText("B")).toBeInTheDocument();
         expect(within(screen.getByRole("button", { name: "Team" })).getByText("T")).toBeInTheDocument();
         expect(screen.queryByText(/Members/)).not.toBeInTheDocument();

@@ -230,9 +230,19 @@ function createServer() {
     return { userId: id, name, avatarUrl, role: 'member' };
   }
 
-  // Только direct, §3.3: 201 — создан, 200 — уже есть, 404 — собеседник неизвестен или отключён.
+  // Группа без участников, кроме создателя (owner), §3.3: title 1..100 единиц UTF-16 после trim -> 201. Чат в списки пока не попадает (как direct).
+  function postGroupChat(res, body, session) {
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    const noMembers = body.memberIds === undefined || (Array.isArray(body.memberIds) && body.memberIds.length === 0);
+    if (title === '' || title.length > 100 || !noMembers) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
+    const { id, name, avatarUrl } = session.user;
+    return json(res, 201, { id: crypto.randomUUID(), type: 'group', title, lastSeq: 0, members: [{ userId: id, name, avatarUrl, role: 'owner' }] });
+  }
+
+  // direct и group, §3.3. direct: 201 — создан, 200 — уже есть, 404 — собеседник неизвестен или отключён.
   async function postChat(req, res, session) {
     const body = await readBody(req);
+    if (body && body.type === 'group') return postGroupChat(res, body, session);
     if (!body || body.type !== 'direct' || !isFilled(body.userId)) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
     const peer = [...users.values()].find(({ user }) => user.id === body.userId);
     if (!peer || peer.disabled) return error(res, 404, 'not_found', 'Пользователь не найден');

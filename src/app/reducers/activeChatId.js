@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit'
-import { createDirectChat, selectChatById } from './chats'
+import { createDirectChat, createGroupChat, selectChatById } from './chats'
 import { chatRemoved } from './messageEvents'
 
 export const activeChatIdSlice = createSlice({
@@ -10,6 +10,7 @@ export const activeChatIdSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder.addCase(createDirectChat.fulfilled, (state, action) => action.payload.chat.id)
+        builder.addCase(createGroupChat.fulfilled, (state, action) => action.payload.chat.id)
         builder.addCase(chatRemoved, (state, action) => (state === action.payload ? null : state))
     },
 })

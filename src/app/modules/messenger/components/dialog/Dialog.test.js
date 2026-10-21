@@ -1025,3 +1025,14 @@ describe('Dialog: статус «прочитано» (FE-113)', () => {
     expect(screen.queryByRole('img', { name: 'Прочитано' })).not.toBeInTheDocument();
   });
 });
+
+describe('Dialog: возврат к списку', () => {
+  it('кнопка «Назад» снимает выбор чата (chatSelected(null))', () => {
+    const { store } = renderDialog();
+    expect(store.getState().activeChatId).not.toBeNull();
+
+    userEvent.click(screen.getByRole('button', { name: 'Назад' }));
+
+    expect(store.getState().activeChatId).toBeNull();
+  });
+});

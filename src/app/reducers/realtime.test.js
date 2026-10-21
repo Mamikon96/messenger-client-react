@@ -9,7 +9,7 @@ import { chatReceived, fetchChats, selectChatById } from './chats';
 import { chatSelected } from './activeChatId';
 import { selectChatMessages } from './messages';
 import { selectUserById } from './users';
-import reducer, { nudgeRealtime, pauseRealtime, realtimeStatusChanged, resumeRealtime, selectRealtimeStatus, startRealtime } from './realtime';
+import reducer, { nudgeRealtime, reconcileRealtime, pauseRealtime, realtimeStatusChanged, resumeRealtime, selectRealtimeStatus, startRealtime } from './realtime';
 import { createWsService } from '../services/wsService';
 import * as chatsApi from '../services/chatsApi';
 
@@ -634,6 +634,47 @@ describe('сверка после переподключения', () => {
     cleanup();
 
     expect(signal.aborted).toBe(true);
+  });
+});
+
+describe('reconcileRealtime (сверка списка при возвращении на вкладку)', () => {
+  const item = (extra = {}) => ({ ...chat, members: [{ userId: 'me', role: 'owner' }], ...extra });
+  const history = { status: 'succeeded', requestId: null, hasMore: false, olderStatus: 'idle', olderRequestId: null };
+
+  const setupLoaded = () => {
+    setup({ withChat: false });
+    store.dispatch(fetchChats.pending('req'));
+    store.dispatch(fetchChats.fulfilled([], 'req'));
+    store.dispatch(chatReceived({ ...chat, lastMessage: msg(2), unreadCount: 1, history }));
+  };
+
+  it('перечитывает список без переподключения; history и сообщения чата сохраняются', async () => {
+    setupLoaded();
+    chatsApi.fetchChats.mockResolvedValue([item({ unreadCount: 4, title: 'Новое имя' })]);
+
+    store.dispatch(reconcileRealtime());
+    await flush();
+
+    expect(chatsApi.fetchChats).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+    expect(selectChatById(store.getState(), 'c1')).toMatchObject({ title: 'Новое имя', unreadCount: 4, history });
+  });
+
+  it('пока список не загружен, ничего не делает', async () => {
+    setup({ withChat: false });
+    store.dispatch(reconcileRealtime());
+    await flush();
+
+    expect(chatsApi.fetchChats).not.toHaveBeenCalled();
+  });
+
+  it('после cleanup ничего не делает', async () => {
+    setupLoaded();
+    cleanup();
+
+    store.dispatch(reconcileRealtime());
+    await flush();
+
+    expect(chatsApi.fetchChats).not.toHaveBeenCalled();
   });
 });
 

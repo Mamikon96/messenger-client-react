@@ -12,6 +12,7 @@ import "./Dialog.css";
 import { Button } from "../../../ui/button/Button";
 import { Input } from "../../../ui/input/Input";
 import MessageStatus from "./MessageStatus";
+import { useReadReceipts } from "../../useReadReceipts";
 
 // Расстояние в пикселях от края ленты, в пределах которого пользователь считается «у края»: у низа — следуем за новыми, у верха — подкачиваем старые.
 const EDGE_THRESHOLD = 50;
@@ -65,6 +66,8 @@ function Dialog() {
     const lastIsOwn = lastMessage?.senderId === userId;
     const canLoadOlder = historyStatus === "succeeded" && hasMore && olderStatus !== "loading" && olderStatus !== "failed";
 
+    const notifyRead = useReadReceipts({ chatId, lastSeq, enabled: hasChat && !activeChat.local && historyStatus === "succeeded", atBottomRef });
+
     // Позиция ленты после изменения содержимого: вниз — при смене чата, первой загрузке, своём сообщении и если читали у низа;
     // подкачка старых сверху сдвигает scrollTop на добавленную высоту, чтобы прочитанное не уехало.
     useLayoutEffect(() => {
@@ -94,6 +97,7 @@ function Dialog() {
     const handleScroll = (event) => {
         const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
         atBottomRef.current = scrollHeight - scrollTop - clientHeight <= EDGE_THRESHOLD;
+        if (atBottomRef.current) notifyRead();
         if (canLoadOlder && scrollTop <= EDGE_THRESHOLD) dispatch(loadOlderMessages(chatId));
     }
 

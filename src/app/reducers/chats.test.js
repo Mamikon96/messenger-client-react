@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus } from './chats';
+import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
@@ -839,5 +839,64 @@ describe('chatsReconciled (сверка списка после переподк
     const state = { ...start(), status: 'succeeded' };
 
     expect(reconcile(state, [item('a')])).toMatchObject({ status: 'succeeded', requestId: null });
+  });
+});
+
+describe('markChatRead (прочтение чата)', () => {
+  const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 5, lastMessage: null, unreadCount: 3 };
+  const makeStore = async () => {
+    chatsApi.fetchChats.mockResolvedValue([group]);
+    const store = configureStore({ reducer: { chats: reducer, users, messages } });
+    await store.dispatch(fetchChats());
+    return store;
+  };
+  const unread = (store, id = 'g1') => selectChatById(store.getState(), id).unreadCount;
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('шлёт POST read с seq и signal; после успеха при seq >= lastSeq счётчик обнуляется', async () => {
+    const store = await makeStore();
+    chatsApi.postRead.mockResolvedValue(null);
+
+    await store.dispatch(markChatRead({ chatId: 'g1', seq: 5 }));
+
+    expect(chatsApi.postRead).toHaveBeenCalledWith('g1', { seq: 5, signal: expect.any(AbortSignal) });
+    expect(unread(store)).toBe(0);
+  });
+
+  it('seq меньше lastSeq (сообщение пришло, пока шёл запрос) — счётчик не трогается', async () => {
+    const store = await makeStore();
+    let release;
+    chatsApi.postRead.mockImplementation(() => new Promise((resolve) => { release = () => resolve(null); }));
+
+    const pending = store.dispatch(markChatRead({ chatId: 'g1', seq: 5 }));
+    store.dispatch(messageAdded({ chatId: 'g1', seq: 6, senderId: 'u2', clientId: 'k6', body: 'm6', createdAt: '2026-10-15T10:00:00.000Z' }));
+    release();
+    await pending;
+
+    expect(unread(store)).toBe(3);
+  });
+
+  it('ошибка запроса отклоняет thunk и не меняет счётчик', async () => {
+    const store = await makeStore();
+    chatsApi.postRead.mockRejectedValue(new ApiError(500, null));
+
+    const result = await store.dispatch(markChatRead({ chatId: 'g1', seq: 5 }));
+
+    expect(markChatRead.rejected.match(result)).toBe(true);
+    expect(unread(store)).toBe(3);
+  });
+
+  it('чат исчез, пока шёл запрос, — ничего не падает', async () => {
+    const store = await makeStore();
+    chatsApi.postRead.mockResolvedValue(null);
+
+    const pending = store.dispatch(markChatRead({ chatId: 'g1', seq: 5 }));
+    store.dispatch(chatRemoved('g1'));
+
+    await expect(pending).resolves.toBeDefined();
+    expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
   });
 });

@@ -7,7 +7,7 @@ import { rootReducer } from '../../../../store';
 import { ApiError } from '../../../../services/apiClient';
 import { checkSession } from '../../../../reducers/auth';
 import { chatSelected } from '../../../../reducers/activeChatId';
-import { chatReceived, fetchChats, selectChats } from '../../../../reducers/chats';
+import { chatReceived, fetchChats, selectChatById, selectChats } from '../../../../reducers/chats';
 import { messageAdded } from '../../../../reducers/messageEvents';
 import { selectChatMessages, sendMessage } from '../../../../reducers/messages';
 
@@ -792,5 +792,169 @@ describe('Dialog: подкачка старых сообщений и прокр
 
     await waitFor(() => expect(chatsApi.postMessage).toHaveBeenCalled());
     expect(log().scrollTop).toBe(100);
+  });
+});
+
+describe('Dialog: отметка о прочтении (FE-43)', () => {
+  const msg = (seq, senderId = 'u2') => ({ chatId: 'g1', seq, senderId, clientId: `k${seq}`, body: `m${seq}`, createdAt: '2026-10-15T10:00:00.000Z' });
+  const listGroup = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 3, lastMessage: null, unreadCount: 3 };
+  const groupDto = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 3, members: [{ userId: 'u2', name: 'Боб', avatarUrl: '', role: 'member' }] };
+  const descriptors = {};
+  const log = () => screen.getByRole('log', { name: 'Сообщения' });
+  const setVisibility = (state) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+  };
+  const unread = (store) => selectChatById(store.getState(), 'g1').unreadCount;
+  const settle = () => act(() => { jest.advanceTimersByTime(1000); });
+
+  // jsdom не считает раскладку: высота ленты — 100px на сообщение, окно — 200px.
+  beforeEach(() => {
+    jest.useFakeTimers();
+    setVisibility('visible');
+    descriptors.scrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    descriptors.clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return this.getAttribute('role') === 'log' ? within(this).queryAllByRole('article').length * 100 : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        return this.getAttribute('role') === 'log' ? 200 : 0;
+      },
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.resetAllMocks();
+    delete document.visibilityState;
+    for (const key of ['scrollHeight', 'clientHeight']) {
+      if (descriptors[key]) Object.defineProperty(HTMLElement.prototype, key, descriptors[key]);
+      else delete HTMLElement.prototype[key];
+    }
+  });
+
+  const open = async () => {
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(1), msg(2), msg(3)]));
+    chatsApi.postRead.mockResolvedValue(null);
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    store.dispatch(fetchChats.pending('req'));
+    store.dispatch(fetchChats.fulfilled([listGroup], 'req'));
+    render(
+      <Provider store={store}>
+        <Dialog />
+      </Provider>
+    );
+    act(() => {
+      store.dispatch(chatSelected('g1'));
+    });
+    await screen.findByText('m3');
+    return { store };
+  };
+
+  const scrollTo = (top) => {
+    log().scrollTop = top;
+    fireEvent.scroll(log());
+  };
+
+  it('чат открыт, лента внизу, вкладка видима: через debounce уходит POST read с max seq и счётчик обнуляется', async () => {
+    const { store } = await open();
+    expect(chatsApi.postRead).not.toHaveBeenCalled();
+
+    await settle();
+
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(1);
+    expect(chatsApi.postRead).toHaveBeenCalledWith('g1', { seq: 3, signal: expect.any(AbortSignal) });
+    await waitFor(() => expect(unread(store)).toBe(0));
+  });
+
+  it('лента не у низа: POST не уходит, пока пользователь не прокрутит вниз', async () => {
+    const { store } = await open();
+    scrollTo(0);
+
+    await settle();
+    expect(chatsApi.postRead).not.toHaveBeenCalled();
+    expect(unread(store)).toBe(3);
+
+    scrollTo(100);
+    await settle();
+    expect(chatsApi.postRead).toHaveBeenCalledWith('g1', { seq: 3, signal: expect.any(AbortSignal) });
+  });
+
+  it('вкладка скрыта: POST не уходит, при возвращении на вкладку уходит', async () => {
+    setVisibility('hidden');
+    await open();
+
+    await settle();
+    expect(chatsApi.postRead).not.toHaveBeenCalled();
+
+    setVisibility('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await settle();
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('несколько прокруток подряд дают один запрос (debounce)', async () => {
+    await open();
+
+    scrollTo(300);
+    scrollTo(310);
+    scrollTo(320);
+    await settle();
+
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('новое сообщение у низа открытого чата отправляется с новым seq', async () => {
+    const { store } = await open();
+    await settle();
+    chatsApi.postRead.mockClear();
+
+    act(() => {
+      store.dispatch(messageAdded(msg(4)));
+    });
+    await settle();
+
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(1);
+    expect(chatsApi.postRead).toHaveBeenCalledWith('g1', { seq: 4, signal: expect.any(AbortSignal) });
+  });
+
+  it('уже отправленный seq повторно не отправляется', async () => {
+    await open();
+    await settle();
+
+    scrollTo(300);
+    await settle();
+
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('ошибка запроса: счётчик не меняется, следующая прокрутка у низа повторяет отправку', async () => {
+    const { store } = await open();
+    chatsApi.postRead.mockRejectedValueOnce(new ApiError(500, null));
+    await settle();
+    await waitFor(() => expect(chatsApi.postRead).toHaveBeenCalledTimes(1));
+    expect(unread(store)).toBe(3);
+
+    scrollTo(300);
+    await settle();
+
+    expect(chatsApi.postRead).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(unread(store)).toBe(0));
+  });
+
+  it('локальный чат (без сервера): POST не уходит', async () => {
+    renderDialog();
+
+    await settle();
+
+    expect(chatsApi.postRead).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 # Состояние frontend
-> Проверено: 2026-10-21 @ 7cee71f+dirty
+> Проверено: 2026-10-21 @ 6456f81+dirty
 
 ## Общее
 Ранний прототип UI мессенджера (React 18, CRA, Redux Toolkit). Сетевой слой — auth (`src/app/services/apiClient.js`, `src/app/services/authApi.js`: проверка сессии, вход и регистрация по паролю, выход), список чатов, карточка чата и история сообщений (`src/app/services/chatsApi.js`, `src/app/reducers/chatHistory.js`, FE-38, FE-39: загрузка при открытии серверного чата, подкачка старых — thunk без триггера до FE-27); отправка — только в Redux; бэкенд — отдельный проект `messenger-server`. Тесты: unit (`chats`, `messages`, `Dialog`, `auth`, `store`, `UserMenu`, `apiClient`, `authApi`, `App`, `tokens`, `useTheme`, `Login`, `Button`, `IconButton`, `Input`, `Avatar`, `globalStyles`), e2e: `smoke`, `chats`, `tokens`, `theme`, `ui-primitives`, `messages`, `login` (сессия после перезагрузки, сбой проверки сессии, тёмная тема экрана входа), `password-auth` (вход и регистрация по паролю, FE-89), `login-errors`, `login-validation`, `logout`, `session-closed` (сессия закрыта вне вкладки, FE-35), mock-BFF proxy и контрактные (контрактные в приёмке пропускаются без `MOCK_BFF_URL` — FE-53); вход и имя пользователя в e2e — через общий хелпер `e2e/helpers/auth.js` (FE-58; с FE-89 — форма логина и пароля, засеянный `alice` mock-BFF).
@@ -29,7 +29,7 @@
 9. `mock-bff/server.js`: не отдаёт чаты и историю (`GET /api/chats` всегда `[]`, `GET /api/chats/:id`, `/messages`, `POST .../messages` — 404); созданный из поиска чат на стенде сразу с ошибкой загрузки сообщений, новый чат встаёт в конец списка, а не наверх. → FE-159
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-21) · ревью react-reviewer APPROVE (2 раунда), QA qa-tester PASS (`.qa/runs/FE-43.md`) · FE-43 · 2026-10-21
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-21) · ревью react-reviewer APPROVE, QA qa-tester PASS (`.qa/runs/FE-118.md`) · FE-118 · 2026-10-21
 
 ## Фокус сейчас
 Эпик входа по логину/паролю (FE-D38, SH-D18) и экран чатов закрыты по FE-28 (`Header`, `UserMenu`) включительно; история — `done.md`. Прочтение (FE-43) закрыто; дальше — по бэклогу (FE-30 …).

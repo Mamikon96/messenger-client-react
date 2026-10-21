@@ -99,6 +99,26 @@ describe('chats reducer', () => {
       expect(state.entities.c9).toMatchObject({ lastSeq: 4, unreadCount: 1 });
       expect(state.entities.c9.lastMessage.seq).toBe(4);
     });
+
+    it('чат с известным lastSeq и без lastMessage считает непрочитанным и сообщение с seq < lastSeq, не откатывая lastSeq', () => {
+      let state = reducer(undefined, chatReceived({ id: 'c9', type: 'group', title: 'T', lastSeq: 4, lastMessage: null, unreadCount: 0 }));
+
+      state = reducer(state, messageAdded({ ...message, chatId: 'c9', seq: 3 }, { unread: true }));
+      state = reducer(state, messageAdded({ ...message, chatId: 'c9', seq: 4 }, { unread: true }));
+
+      expect(state.entities.c9).toMatchObject({ lastSeq: 4, unreadCount: 2 });
+      expect(state.entities.c9.lastMessage.seq).toBe(4);
+    });
+
+    it('сообщение с seq < lastSeq без lastMessage не становится lastMessage и без флага unread не считается', () => {
+      let state = reducer(undefined, chatReceived({ id: 'c9', type: 'group', title: 'T', lastSeq: 4, lastMessage: null, unreadCount: 0 }));
+
+      state = reducer(state, messageAdded({ ...message, chatId: 'c9', seq: 3 }, { unread: true }));
+      expect(state.entities.c9).toMatchObject({ lastSeq: 4, lastMessage: null, unreadCount: 1 });
+
+      state = reducer(state, messageAdded({ ...message, chatId: 'c9', seq: 2 }));
+      expect(state.entities.c9.unreadCount).toBe(1);
+    });
   });
 
   describe('toChatFromDto', () => {

@@ -186,11 +186,13 @@ export const chatsSlice = createSlice({
         builder.addCase(messageAdded, (state, action) => {
             const chat = state.entities[action.payload.chatId]
             const { seq } = action.payload
-            // lastSeq мог быть известен заранее (карточка чата), а lastMessage — ещё нет: сверяем с последним сообщением.
-            if (!chat || (chat.lastMessage ? seq <= chat.lastMessage.seq : seq < chat.lastSeq)) return
+            if (!chat || (chat.lastMessage && seq <= chat.lastMessage.seq)) return
+            if (action.meta?.unread) chat.unreadCount += 1
+            // lastSeq мог быть известен заранее (карточка чата), а lastMessage — ещё нет: более старое сообщение
+            // считается непрочитанным, но не становится последним и не откатывает lastSeq.
+            if (!chat.lastMessage && seq < chat.lastSeq) return
             chat.lastSeq = Math.max(chat.lastSeq, seq)
             chat.lastMessage = action.payload
-            if (action.meta?.unread) chat.unreadCount += 1
         })
         // Сообщение, пришедшее после отправленного seq (lastSeq вырос), остаётся непрочитанным.
         builder.addCase(markChatRead.fulfilled, (state, action) => {

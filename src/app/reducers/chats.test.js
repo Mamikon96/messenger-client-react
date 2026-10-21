@@ -1,9 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { chatCreated, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
+import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
 import users from './users';
+import activeChatId from './activeChatId';
+import auth, { checkSession } from './auth';
+import { ApiError } from '../services/apiClient';
 import * as chatsApi from '../services/chatsApi';
 
 // Ответ GET /api/chats/:id/messages: { messages, hasMore } (docs/client-integration.md, §3.9); hasMore задаёт сервер.
@@ -11,42 +14,20 @@ const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 
 jest.mock('../services/chatsApi');
 
-jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
-const { createClientId } = require('../services/clientId');
-
 const wrap = (chats) => ({ chats });
 
+// Чат с флагом local (не из ответа сервера): фикстура вместо удалённого события chatCreated.
+const localChat = (id, title) =>
+  chatReceived({ id, type: 'group', title, lastSeq: 0, lastMessage: null, unreadCount: 0, local: true });
+
 describe('chats reducer', () => {
-  beforeEach(() => {
-    createClientId.mockReset();
-  });
-
   it('начальное состояние — пустая нормализованная коллекция', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null });
-  });
-
-  it('chatCreated создаёт ChatListItemDto группы с клиентским UUID и без поля name', () => {
-    createClientId.mockReturnValue('chat-1');
-
-    const state = reducer(undefined, chatCreated({ title: 'General', name: 'Ann' }));
-
-    expect(state.ids).toEqual(['chat-1']);
-    expect(state.entities['chat-1']).toEqual({
-      id: 'chat-1',
-      type: 'group',
-      title: 'General',
-      lastSeq: 0,
-      lastMessage: null,
-      unreadCount: 0,
-      local: true,
-    });
+    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] });
   });
 
   it('чаты хранятся в порядке добавления, без сортировки', () => {
-    createClientId.mockReturnValueOnce('b').mockReturnValueOnce('a');
-
-    let state = reducer(undefined, chatCreated({ title: 'Z' }));
-    state = reducer(state, chatCreated({ title: 'A' }));
+    let state = reducer(undefined, localChat('b', 'Z'));
+    state = reducer(state, localChat('a', 'A'));
 
     expect(selectChats(wrap(state)).map((chat) => chat.id)).toEqual(['b', 'a']);
   });
@@ -55,9 +36,8 @@ describe('chats reducer', () => {
     const message = { chatId: 'c1', seq: 1, senderId: 'u1', clientId: 'k1', body: 'hi', createdAt: '2026-10-15T10:00:00.000Z' };
 
     it('меняет только нужный чат', () => {
-      createClientId.mockReturnValueOnce('c1').mockReturnValueOnce('c2');
-      let state = reducer(undefined, chatCreated({ title: 'One' }));
-      state = reducer(state, chatCreated({ title: 'Two' }));
+      let state = reducer(undefined, localChat('c1', 'One'));
+      state = reducer(state, localChat('c2', 'Two'));
 
       state = reducer(state, messageAdded(message));
 
@@ -66,8 +46,7 @@ describe('chats reducer', () => {
     });
 
     it('сообщения не по порядку не откатывают lastSeq и lastMessage', () => {
-      createClientId.mockReturnValueOnce('c1');
-      let state = reducer(undefined, chatCreated({ title: 'One' }));
+      let state = reducer(undefined, localChat('c1', 'One'));
 
       state = reducer(state, messageAdded({ ...message, seq: 3 }));
       state = reducer(state, messageAdded({ ...message, seq: 1 }));
@@ -77,8 +56,7 @@ describe('chats reducer', () => {
     });
 
     it('дубль seq не меняет lastMessage', () => {
-      createClientId.mockReturnValueOnce('c1');
-      let state = reducer(undefined, chatCreated({ title: 'One' }));
+      let state = reducer(undefined, localChat('c1', 'One'));
       state = reducer(state, messageAdded(message));
 
       state = reducer(state, messageAdded({ ...message, body: 'дубль' }));
@@ -93,8 +71,7 @@ describe('chats reducer', () => {
     });
 
     it('unread: true увеличивает unreadCount, без флага — нет', () => {
-      createClientId.mockReturnValueOnce('c1');
-      let state = reducer(undefined, chatCreated({ title: 'One' }));
+      let state = reducer(undefined, localChat('c1', 'One'));
 
       state = reducer(state, messageAdded({ ...message, seq: 1 }));
       expect(state.entities.c1.unreadCount).toBe(0);
@@ -105,8 +82,7 @@ describe('chats reducer', () => {
     });
 
     it('дубль или более старое сообщение не увеличивает unreadCount', () => {
-      createClientId.mockReturnValueOnce('c1');
-      let state = reducer(undefined, chatCreated({ title: 'One' }));
+      let state = reducer(undefined, localChat('c1', 'One'));
       state = reducer(state, messageAdded({ ...message, seq: 2 }, { unread: true }));
 
       state = reducer(state, messageAdded({ ...message, seq: 2 }, { unread: true }));
@@ -256,9 +232,8 @@ describe('chats reducer', () => {
     });
 
     it('ответ заменяет список целиком, включая локальные Join-чаты', async () => {
-      createClientId.mockReturnValue('local-1');
       const store = makeStore();
-      store.dispatch(chatCreated({ title: 'Local' }));
+      store.dispatch(localChat('local-1', 'Local'));
       chatsApi.fetchChats.mockResolvedValue([group]);
 
       await store.dispatch(fetchChats());
@@ -299,6 +274,177 @@ describe('chats reducer', () => {
       await promise;
 
       expect(selectChatsStatus(store.getState())).toBe('loading');
+    });
+  });
+
+  describe('createDirectChat', () => {
+    const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+    const dto = {
+      id: 'd1', type: 'direct', title: null, lastSeq: 0,
+      members: [
+        { userId: 'u1', name: 'Ann', avatarUrl: '', role: 'member' },
+        { userId: 'u2', name: 'Bob', avatarUrl: 'http://a/b.png', role: 'member' },
+      ],
+    };
+    const makeStore = () => {
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      return store;
+    };
+
+    it('шлёт POST direct с userId и signal', async () => {
+      chatsApi.postDirectChat.mockResolvedValue(dto);
+
+      await makeStore().dispatch(createDirectChat('u2'));
+
+      expect(chatsApi.postDirectChat).toHaveBeenCalledWith('u2', { signal: expect.any(AbortSignal) });
+    });
+
+    it('201: чат добавляется (peerId — собеседник, без lastMessage), участники — в users, чат становится активным', async () => {
+      chatsApi.postDirectChat.mockResolvedValue(dto);
+      const store = makeStore();
+
+      await store.dispatch(createDirectChat('u2'));
+
+      const state = store.getState();
+      expect(selectChats(state)).toEqual([
+        {
+          id: 'd1', type: 'direct', title: null, lastSeq: 0, lastMessage: null, unreadCount: 0, peerId: 'u2',
+          members: [{ userId: 'u1', role: 'member' }, { userId: 'u2', role: 'member' }],
+        },
+      ]);
+      expect(state.users.entities.u2).toEqual({ id: 'u2', name: 'Bob', avatarUrl: 'http://a/b.png' });
+      expect(state.activeChatId).toBe('d1');
+    });
+
+    it('200 (чат уже есть): дубля нет, lastMessage и unreadCount существующего чата сохраняются, чат становится активным', async () => {
+      const lastMessage = { chatId: 'd1', seq: 4, senderId: 'u2', clientId: 'k', body: 'hi', createdAt: 't' };
+      chatsApi.fetchChats.mockResolvedValue([
+        { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 },
+        { id: 'd1', type: 'direct', title: null, lastSeq: 4, lastMessage, unreadCount: 2, peer: { id: 'u2', name: 'Bob', avatarUrl: '' } },
+      ]);
+      chatsApi.postDirectChat.mockResolvedValue({ ...dto, lastSeq: 4 });
+      const store = makeStore();
+      await store.dispatch(fetchChats());
+
+      await store.dispatch(createDirectChat('u2'));
+
+      const state = store.getState();
+      expect(selectChats(state).map((chat) => chat.id)).toEqual(['g1', 'd1']);
+      expect(selectChatById(state, 'd1')).toMatchObject({ lastMessage, unreadCount: 2, lastSeq: 4, peerId: 'u2' });
+      expect(state.activeChatId).toBe('d1');
+    });
+
+    it('pendingUserId выставлен на время запроса и сбрасывается после ответа', async () => {
+      let resolve;
+      chatsApi.postDirectChat.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const store = makeStore();
+
+      const promise = store.dispatch(createDirectChat('u2'));
+      expect(selectPendingUserId(store.getState())).toBe('u2');
+
+      resolve(dto);
+      await promise;
+      expect(selectPendingUserId(store.getState())).toBeNull();
+    });
+
+    it('404 (пользователь недоступен): rejected с кодом not_found, чат не добавлен и не активен, pendingUserId сброшен', async () => {
+      chatsApi.postDirectChat.mockRejectedValue(new ApiError(404, { error: { code: 'not_found' } }));
+      const store = makeStore();
+
+      const result = await store.dispatch(createDirectChat('u2'));
+
+      expect(result.payload).toBe('not_found');
+      expect(selectChats(store.getState())).toEqual([]);
+      expect(store.getState().activeChatId).toBeNull();
+      expect(selectPendingUserId(store.getState())).toBeNull();
+    });
+
+    it('другая ошибка: rejected с кодом failed', async () => {
+      chatsApi.postDirectChat.mockRejectedValue(new Error('network'));
+      const store = makeStore();
+
+      const result = await store.dispatch(createDirectChat('u2'));
+
+      expect(result.payload).toBe('failed');
+      expect(selectPendingUserId(store.getState())).toBeNull();
+    });
+  });
+
+  describe('createDirectChat во время загрузки списка', () => {
+    const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+    const dto = {
+      id: 'd1', type: 'direct', title: null, lastSeq: 0,
+      members: [
+        { userId: 'u1', name: 'Ann', avatarUrl: '', role: 'member' },
+        { userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' },
+      ],
+    };
+
+    it('чат, открытый, пока список грузился, не затирается ответом fetchChats и остаётся активным', async () => {
+      const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+      let resolveList;
+      chatsApi.fetchChats.mockReturnValue(new Promise((res) => { resolveList = res; }));
+      chatsApi.postDirectChat.mockResolvedValue(dto);
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+
+      const list = store.dispatch(fetchChats());
+      await store.dispatch(createDirectChat('u2'));
+      resolveList([group]);
+      await list;
+
+      const state = store.getState();
+      expect(selectChats(state).map((chat) => chat.id)).toEqual(['g1', 'd1']);
+      expect(state.activeChatId).toBe('d1');
+      expect(selectChatsStatus(state)).toBe('succeeded');
+    });
+
+    it('новый fetchChats очищает openedWhileLoadingIds: ответ сервера с этим чатом не даёт дубля', async () => {
+      const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };
+      const serverDirect = { id: 'd1', type: 'direct', title: null, lastSeq: 0, lastMessage: null, unreadCount: 0, members: dto.members };
+      let resolveFirst;
+      let resolveSecond;
+      chatsApi.fetchChats
+        .mockReturnValueOnce(new Promise((res) => { resolveFirst = res; }))
+        .mockReturnValueOnce(new Promise((res) => { resolveSecond = res; }));
+      chatsApi.postDirectChat.mockResolvedValue(dto);
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+
+      const first = store.dispatch(fetchChats());
+      await store.dispatch(createDirectChat('u2'));
+      first.abort();
+      const second = store.dispatch(fetchChats());
+      resolveFirst([group]);
+      resolveSecond([group, serverDirect]);
+      await Promise.allSettled([first, second]);
+
+      const ids = selectChats(store.getState()).map((chat) => chat.id);
+      expect(ids.filter((id) => id === 'd1')).toHaveLength(1);
+      expect(ids).toEqual(expect.arrayContaining(['g1', 'd1']));
+      expect(store.getState().chats.openedWhileLoadingIds).toEqual([]);
+    });
+
+    it('два createDirectChat подряд: устаревший ответ A игнорируется, pendingUserId B живёт до своего ответа', async () => {
+      let resolveA;
+      let resolveB;
+      chatsApi.postDirectChat
+        .mockReturnValueOnce(new Promise((res) => { resolveA = res; }))
+        .mockReturnValueOnce(new Promise((res) => { resolveB = res; }));
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+
+      const a = store.dispatch(createDirectChat('u2'));
+      const b = store.dispatch(createDirectChat('u3'));
+      resolveA(dto);
+      const resultA = await a;
+      expect(resultA.payload).toBe('stale');
+      expect(store.getState().chats.pendingUserId).toBe('u3');
+
+      resolveB({ ...dto, id: 'd2', members: [dto.members[0], { userId: 'u3', name: 'Cat', avatarUrl: '', role: 'member' }] });
+      await b;
+      expect(store.getState().chats.pendingUserId).toBeNull();
     });
   });
 
@@ -489,9 +635,8 @@ describe('chats reducer', () => {
     });
 
     it('локальный чат (Join) и неизвестный чат не запрашиваются', async () => {
-      createClientId.mockReturnValue('local-1');
       const store = makeStore();
-      store.dispatch(chatCreated({ title: 'Local' }));
+      store.dispatch(localChat('local-1', 'Local'));
 
       await store.dispatch(loadChatHistory('local-1'));
       await store.dispatch(loadChatHistory('nope'));
@@ -647,7 +792,7 @@ describe('chatsReconciled (сверка списка после переподк
 
   it('текущие чаты, которых нет в ответе (локальные, пришедшие событием), остаются после серверных', () => {
     let state = start();
-    state = reducer(state, { type: chatCreated.type, payload: item('loc', { local: true }) });
+    state = reducer(state, chatReceived(item('loc', { local: true })));
 
     const next = reconcile(state, [item('a', { lastSeq: 2 })]);
 

@@ -1,9 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './store';
-import { fetchChats, selectChatById } from './reducers/chats';
+import { createDirectChat, fetchChats, selectChatById } from './reducers/chats';
 import { loadChatHistory, loadOlderMessages } from './reducers/chatHistory';
 import * as chatsApi from './services/chatsApi';
-import { chatCreated, selectChats } from './reducers/chats';
+import { chatReceived, selectChats } from './reducers/chats';
 import { selectActiveChatId, chatSelected } from './reducers/activeChatId';
 import { selectUsers, usersReceived } from './reducers/users';
 import { selectChatMessages, sendMessage } from './reducers/messages';
@@ -19,7 +19,7 @@ const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const emptyState = {
-  chats: { ids: [], entities: {}, status: 'idle', requestId: null },
+  chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] },
   messages: {},
   outbox: { ids: [], entities: {} },
   users: { ids: [], entities: {} },
@@ -29,7 +29,7 @@ const emptyState = {
 
 const filledState = () => {
   let state = rootReducer(undefined, { type: '@@init' });
-  state = rootReducer(state, chatCreated({ title: 'Room' }));
+  state = rootReducer(state, chatReceived({ id: 'room', type: 'group', title: 'Room', lastSeq: 0, lastMessage: null, unreadCount: 0, local: true }));
   const chatId = selectChats(state)[0].id;
   state = rootReducer(state, usersReceived([{ id: '1', name: 'Ann', avatarUrl: '' }]));
   state = rootReducer(state, chatSelected(chatId));
@@ -149,8 +149,45 @@ describe('rootReducer: запоздавшие ответы fetchChats после
     resolveRequest([direct]);
     await request;
 
-    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null });
+    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] });
     expect(store.getState().users).toEqual({ ids: [], entities: {} });
+  });
+});
+
+describe('rootReducer: запоздавший ответ createDirectChat после сброса store', () => {
+  const dto = {
+    id: 'd1', type: 'direct', title: null, lastSeq: 0,
+    members: [
+      { userId: '1', name: 'Ann', avatarUrl: '', role: 'member' },
+      { userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' },
+    ],
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it.each([
+    ['logout', () => logout.fulfilled(undefined, 'req')],
+    ['sessionClosed', () => sessionClosed()],
+    ['userSwitched', () => userSwitched({ ...user, id: '2', login: 'bob' })],
+  ])('ответ после %s не пишет чат, собеседника и активный чат в сброшенный store', async (_, makeAction) => {
+    let resolveRequest;
+    chatsApi.postDirectChat.mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    const request = store.dispatch(createDirectChat('u2'));
+
+    store.dispatch(makeAction());
+    const after = store.getState();
+    resolveRequest(dto);
+    const result = await request;
+
+    expect(result.payload).toBe('stale');
+    expect(store.getState().chats).toEqual(after.chats);
+    expect(store.getState().chats.ids).toEqual([]);
+    expect(store.getState().users).toEqual({ ids: [], entities: {} });
+    expect(store.getState().activeChatId).toBeNull();
   });
 });
 

@@ -3,7 +3,7 @@
 
 | Слайс | Состояние | Actions / селекторы |
 |---|---|---|
-| chats | `createEntityAdapter`, элементы `ChatListItemDto` (раздел 4 `docs/client-integration.md`), порядок добавления | `chatCreated({title})` (локальный чат: id = `createClientId()`, `type: "group"`, `lastSeq: 0`); на `messageAdded` обновляет `lastSeq`/`lastMessage`, только если `seq` больше текущего `lastSeq` (дубль и сообщение не по порядку игнорируются); `selectChats`, `selectChatById` |
+| chats | `createEntityAdapter`, элементы `ChatListItemDto` (раздел 4 `docs/client-integration.md`), порядок добавления | `createDirectChat(userId)` (thunk: POST direct; fulfilled добавляет чат, только если его нет в списке; `pendingUserId` и `createRequestId` на время запроса, `selectPendingUserId`; ответ после сброса store отклоняется кодом `stale`; reject-коды `not_found` / `failed`; чат, открытый пока грузился список (`openedWhileLoadingIds`), `fetchChats.fulfilled` не затирает; на fulfilled подписаны `activeChatId` (открывает чат) и `users` (участники)); на `messageAdded` обновляет `lastSeq`/`lastMessage`, только если `seq` больше текущего `lastSeq` (дубль и сообщение не по порядку игнорируются); `selectChats`, `selectChatById` |
 | activeChatId | `string \| null` | `chatSelected`; `selectActiveChatId`, `selectActiveChat` |
 | messages | `{ [chatId]: EntityState }`, `ChatMessageDto`, ключ `seq`, сортировка по `seq` | обрабатывает `messageAdded`; thunk `sendMessage({chatId, senderId, body})` (в `messages.js`) считает `seq = lastSeq чата + 1` и диспатчит `messageAdded`; `selectChatMessages(state, chatId)` (мемоизирован) |
 | users | `createEntityAdapter` по `UserSummary`, пока пустой | `usersReceived`; `selectUsers`, `selectUserById` |

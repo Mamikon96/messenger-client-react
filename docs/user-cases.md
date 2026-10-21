@@ -55,7 +55,7 @@
 
 | ID | Название | Статус | Файл |
 |---|---|---|---|
-| UC-CHAT-01 | Создание чата кнопкой Join | active | docs/user-cases/chat.md |
+| UC-CHAT-01 | Поиск человека и личный чат | active | docs/user-cases/chat.md |
 | UC-CHAT-02 | Выбор чата | active | docs/user-cases/chat.md |
 | UC-CHAT-03 | Список чатов с сервера | active | docs/user-cases/chat.md |
 | UC-CHAT-04 | Создание личного чата или группы | planned | docs/user-cases/chat.md |

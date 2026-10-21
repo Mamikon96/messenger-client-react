@@ -1,16 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { login, signIn, signInControl, userMenuButton } = require('./helpers/auth');
-
-// popover после Join не закрывается сам (FE-03) — закрываем кликом по оверлею
-const createChat = async (page, title) => {
-  // пока идёт загрузка списка, ответ сервера заменил бы созданный чат
-  await expect(page.getByText('Загрузка чатов…')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Join', exact: true }).click();
-  await page.locator('input[name="title"]').fill(title);
-  await page.locator('input[name="name"]').fill('Mock');
-  await page.locator('.join-form').getByRole('button', { name: 'Join' }).click();
-  await page.locator('.overlay').click({ position: { x: 5, y: 5 } });
-};
+const { BOB, mockPeopleServer, openDirectChat } = require('./helpers/people');
 
 const SESSION_CLOSED = 'Сессия завершена. Войдите снова.';
 
@@ -30,8 +20,9 @@ const closeSessionElsewhere = async ({ browser, context, baseURL }) => {
 };
 
 test('[UC-SESSION-06] сессию закрыли в другой вкладке: следующее действие возвращает на экран входа с сообщением', async ({ page, browser, context, baseURL }) => {
+  await mockPeopleServer(page);
   await login(page);
-  await createChat(page, 'Secret room');
+  await openDirectChat(page, BOB);
   await closeSessionElsewhere({ browser, context, baseURL });
 
   // До первого запроса страница не знает, что сессия закрыта.
@@ -47,17 +38,19 @@ test('[UC-SESSION-06] сессию закрыли в другой вкладке
 });
 
 test('[UC-SESSION-06] после нового входа сообщения о закрытой сессии и чатов прежней сессии нет', async ({ page, browser, context, baseURL }) => {
+  const server = await mockPeopleServer(page);
   await login(page);
-  await createChat(page, 'Secret room');
+  await openDirectChat(page, BOB);
   await closeSessionElsewhere({ browser, context, baseURL });
   await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();
   await expect(page.getByRole('status')).toHaveText(SESSION_CLOSED);
 
+  server.chats.length = 0; // у следующего пользователя чатов нет
   await signIn(page);
 
   await expect(userMenuButton(page)).toBeVisible();
-  await expect(page.getByText('Secret room')).toHaveCount(0);
+  await expect(page.locator('.chat')).toHaveCount(0);
   // обычный выход после нового входа: сообщения о закрытой сессии нет
   await userMenuButton(page).click();
   await page.getByRole('button', { name: 'Выйти' }).click();

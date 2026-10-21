@@ -7,7 +7,7 @@ import { rootReducer } from '../../../../store';
 import { ApiError } from '../../../../services/apiClient';
 import { checkSession } from '../../../../reducers/auth';
 import { chatSelected } from '../../../../reducers/activeChatId';
-import { chatCreated, fetchChats, selectChats } from '../../../../reducers/chats';
+import { chatReceived, fetchChats, selectChats } from '../../../../reducers/chats';
 import { messageAdded } from '../../../../reducers/messageEvents';
 import { selectChatMessages, sendMessage } from '../../../../reducers/messages';
 
@@ -20,11 +20,15 @@ const chatsApi = require('../../../../services/chatsApi');
 const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
+// Чат с флагом local (не из ответа сервера): фикстура вместо удалённого события chatCreated.
+const localChat = (id, title) =>
+  chatReceived({ id, type: 'group', title, lastSeq: 0, lastMessage: null, unreadCount: 0, local: true });
+
 const renderDialog = ({ withActiveChat = true, authorized = true } = {}) => {
   const store = configureStore({ reducer: rootReducer });
   if (authorized) store.dispatch(checkSession.fulfilled(user, 'req'));
-  store.dispatch(chatCreated({ title: 'Room' }));
-  store.dispatch(chatCreated({ title: 'Other' }));
+  store.dispatch(localChat('room', 'Room'));
+  store.dispatch(localChat('other', 'Other'));
   const [room, other] = selectChats(store.getState());
   if (withActiveChat) store.dispatch(chatSelected(room.id));
   render(

@@ -1,6 +1,6 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import reducer, { retryMessage, selectChatMessages, sendMessage } from './messages';
-import chats, { chatCreated, fetchChats, selectChatById } from './chats';
+import chats, { chatReceived, fetchChats, selectChatById } from './chats';
 import outbox, { selectChatOutbox } from './outbox';
 import { ApiError } from '../services/apiClient';
 import { chatRemoved, messageAdded } from './messageEvents';
@@ -9,6 +9,10 @@ import { fetchOlderMessages, loadChatHistory } from './chatHistory';
 jest.mock('../services/chatsApi');
 jest.mock('../services/clientId', () => ({ createClientId: jest.fn() }));
 const { createClientId } = require('../services/clientId');
+
+// Чат с флагом local (не из ответа сервера): фикстура вместо удалённого события chatCreated.
+const localChat = (id, title) =>
+  chatReceived({ id, type: 'group', title, lastSeq: 0, lastMessage: null, unreadCount: 0, local: true });
 const chatsApi = require('../services/chatsApi');
 
 const dto = (chatId, seq, body = `m${seq}`) => ({
@@ -67,10 +71,8 @@ describe('messages reducer', () => {
   describe('sendMessage (локальная отправка)', () => {
     const makeStore = () => configureStore({ reducer: combineReducers({ chats, messages: reducer }) });
     const withChat = () => {
-      createClientId.mockReturnValueOnce('c1');
       const store = makeStore();
-      store.dispatch(chatCreated({ title: 'Room' }));
-      createClientId.mockReturnValue('client-1');
+      store.dispatch(localChat('c1', 'Room'));
       return store;
     };
 
@@ -95,10 +97,8 @@ describe('messages reducer', () => {
 
     it('seq считается по каждому чату отдельно', async () => {
       const store = makeStore();
-      createClientId.mockReturnValueOnce('c1').mockReturnValueOnce('c2');
-      store.dispatch(chatCreated({ title: 'One' }));
-      store.dispatch(chatCreated({ title: 'Two' }));
-      createClientId.mockReturnValue('client-1');
+      store.dispatch(localChat('c1', 'One'));
+      store.dispatch(localChat('c2', 'Two'));
 
       await store.dispatch(sendMessage({ chatId: 'c1', senderId: 'u1', body: 'a' }));
       await store.dispatch(sendMessage({ chatId: 'c1', senderId: 'u1', body: 'b' }));
@@ -343,9 +343,7 @@ describe('sendMessage в серверном чате (FE-40)', () => {
 
   it('local-чат: POST не уходит, очередь не используется', async () => {
     const store = await makeServerStore();
-    createClientId.mockReturnValueOnce('loc');
-    store.dispatch(chatCreated({ title: 'Local' }));
-    createClientId.mockReturnValue('k9');
+    store.dispatch(localChat('loc', 'Local'));
 
     await store.dispatch(sendMessage({ chatId: 'loc', senderId: 'u1', body: 'x' }));
 

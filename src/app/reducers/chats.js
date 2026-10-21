@@ -1,6 +1,7 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { createClientId } from '../services/clientId'
-import { fetchChats as fetchChatsRequest } from '../services/chatsApi'
+import { fetchChats as fetchChatsRequest, postDirectChat } from '../services/chatsApi'
+import { ApiError } from '../services/apiClient'
+import { selectAuthUserId } from './auth'
 import { chatRemoved, messageAdded } from './messageEvents'
 import { fetchOlderMessages, loadChatHistory } from './chatHistory'
 
@@ -17,6 +18,24 @@ export const fetchChats = createAsyncThunk(
         // устаревший ответ не должен дойти до fulfilled, иначе слайсы (в т. ч. users) запишут чужие данные.
         if (getState().chats.requestId !== requestId) return rejectWithValue('stale')
         return chats
+    }
+)
+
+// Открыть direct-чат с пользователем (POST /api/chats: 201 — создан, 200 — уже был). Ошибка отклоняет thunk кодом:
+// 'not_found' — пользователь недоступен (404), 'failed' — прочее, 'stale' — store сбросили, пока шёл запрос. Слайсы activeChatId и users подписаны на fulfilled.
+export const createDirectChat = createAsyncThunk(
+    'chats/createDirectChat',
+    async (userId, { signal, requestId, getState, rejectWithValue }) => {
+        try {
+            const dto = await postDirectChat(userId, { signal })
+            // Store могли сбросить (выход, закрытая сессия, другой пользователь), пока шёл запрос: ответ прежнего пользователя не пишем.
+            if (getState().chats.createRequestId !== requestId) return rejectWithValue('stale')
+            // chat — элемент списка (peerId зависит от текущего пользователя), members — участники с именами для слайса users.
+            return { chat: toChatFromDto(dto, selectAuthUserId(getState())), members: dto.members }
+        } catch (error) {
+            if (getState().chats.createRequestId !== requestId) return rejectWithValue('stale')
+            return rejectWithValue(error instanceof ApiError && error.status === 404 ? 'not_found' : 'failed')
+        }
     }
 )
 
@@ -59,14 +78,11 @@ export const chatsSlice = createSlice({
     name: "chats",
     // status: idle — ещё не грузили, loading — идёт загрузка, succeeded — список получен, failed — загрузить не удалось.
     // requestId — запрос, чей ответ ждём (null вне загрузки): ответы остальных запросов игнорируются.
-    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null }),
+    // pendingUserId — пользователь, чей direct-чат открывается сейчас (null — ничего не открывается);
+    // openedWhileLoadingIds — чаты, открытые createDirectChat, пока шла загрузка списка: ответ списка их не затирает.
+    // createRequestId — запрос этого открытия, чей ответ ждём (после сброса store ответ прежнего запроса отбрасывается).
+    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] }),
     reducers: {
-        chatCreated: {
-            reducer: chatsAdapter.addOne,
-            prepare: ({ title }) => ({
-                payload: { id: createClientId(), type: "group", title, lastSeq: 0, lastMessage: null, unreadCount: 0, local: true }
-            }),
-        },
         // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
         chatReceived: chatsAdapter.addOne,
         chatsReconciled: (state, action) => reconcile(state, action.payload),
@@ -83,10 +99,16 @@ export const chatsSlice = createSlice({
             .addCase(fetchChats.pending, (state, action) => {
                 state.status = 'loading'
                 state.requestId = action.meta.requestId
+                state.openedWhileLoadingIds = []
             })
             .addCase(fetchChats.fulfilled, (state, action) => {
                 if (action.meta.requestId !== state.requestId) return
-                chatsAdapter.setAll(state, action.payload.map(toChat))
+                // Чаты, открытые через createDirectChat, пока список грузился, в ответе могут отсутствовать: остаются (как kept в reconcile).
+                const fromServer = action.payload.map(toChat)
+                const serverIds = new Set(fromServer.map(({ id }) => id))
+                const kept = state.openedWhileLoadingIds.filter((id) => !serverIds.has(id) && state.entities[id]).map((id) => state.entities[id])
+                chatsAdapter.setAll(state, [...fromServer, ...kept])
+                state.openedWhileLoadingIds = []
                 state.status = 'succeeded'
                 state.requestId = null
             })
@@ -94,6 +116,23 @@ export const chatsSlice = createSlice({
                 if (action.meta.aborted || action.meta.requestId !== state.requestId) return
                 state.status = 'failed'
                 state.requestId = null
+            })
+        builder
+            .addCase(createDirectChat.pending, (state, action) => {
+                state.pendingUserId = action.meta.arg
+                state.createRequestId = action.meta.requestId
+            })
+            .addCase(createDirectChat.fulfilled, (state, { payload }) => {
+                state.pendingUserId = null
+                state.createRequestId = null
+                // Чат уже в списке (200): lastMessage и unreadCount актуальнее ответа, не перезаписываем.
+                chatsAdapter.addOne(state, payload.chat)
+                if (state.requestId !== null) state.openedWhileLoadingIds.push(payload.chat.id)
+            })
+            .addCase(createDirectChat.rejected, (state, action) => {
+                if (action.meta.requestId !== state.createRequestId) return
+                state.pendingUserId = null
+                state.createRequestId = null
             })
         // История чата (поле history): status — idle (поля нет) / loading / succeeded / failed; hasMore — есть ли старее;
         // olderStatus — подкачка старых (idle / loading / failed). requestId и olderRequestId — запросы, чьи ответы ждём.
@@ -149,12 +188,14 @@ export const chatsSlice = createSlice({
     },
 })
 
-export const { chatCreated, chatReceived, chatsReconciled, chatUpdated } = chatsSlice.actions
+export const { chatReceived, chatsReconciled, chatUpdated } = chatsSlice.actions
 
 export const { selectAll: selectChats, selectById: selectChatById } =
     chatsAdapter.getSelectors((state) => state.chats)
 
 export const selectChatsStatus = (state) => state.chats.status
+
+export const selectPendingUserId = (state) => state.chats.pendingUserId
 
 // Состояние загрузки истории чата или undefined, пока чат не открывали.
 export const selectChatHistory = (state, chatId) => state.chats.entities[chatId]?.history

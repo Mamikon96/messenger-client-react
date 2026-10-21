@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages, postDirectChat, postMessage } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages, postDirectChat, postMessage, postRead } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -139,6 +139,19 @@ describe("chatsApi: открытие чата", () => {
         await postMessage("c1", { clientId: "k1", body: "hi", signal });
 
         expect(fetch.mock.calls[0][1].signal).toBe(signal);
+    });
+
+    it("postRead шлёт POST /api/chats/:id/read с seq и пробрасывает signal; ответ 204 принимается", async () => {
+        fetch.mockResolvedValueOnce(reply(204));
+        const { signal } = new AbortController();
+
+        await postRead("c 1", { seq: 7, signal });
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201/read");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body)).toEqual({ seq: 7 });
+        expect(options.signal).toBe(signal);
     });
 
     it("postDirectChat шлёт POST /api/chats с type direct и userId и возвращает ChatDto (201 и 200)", async () => {

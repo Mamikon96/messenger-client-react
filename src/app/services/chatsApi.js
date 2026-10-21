@@ -31,3 +31,8 @@ export function postMessage(chatId, { clientId, body, signal } = {}) {
 export function postDirectChat(userId, { signal } = {}) {
     return apiRequest("/api/chats", { method: "POST", body: { type: "direct", userId }, signal });
 }
+
+// Отметка о прочтении: last_read_seq = max(текущий, seq) (204 без тела; 400 — seq больше lastSeq чата; §3.10). Событий о прочтении нет.
+export function postRead(chatId, { seq, signal } = {}) {
+    return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/read`, { method: "POST", body: { seq }, signal });
+}

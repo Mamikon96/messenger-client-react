@@ -32,6 +32,8 @@ const CATCH_UP_LIMIT = 100
 // stopCurrent закрывает его и отменяет его запросы (GET чата, догонка): ответ прежнего владельца сессии store не меняет.
 let service = null
 let stopCurrent = null
+// Запуск сверки списка текущего запуска (с отменой прежней сверки); null, пока realtime не запущен.
+let reconcileCurrent = null
 // Чаты, удалённые событием chat.removed: опоздавшие кадры message.new не должны воскрешать их через GET чата.
 let removedChatIds = new Set()
 // Загрузка чата или догонка по chatId: параллельные кадры того же чата ждут одну операцию.
@@ -238,12 +240,14 @@ export const startRealtime = () => (dispatch, getState) => {
         },
     })
     const stop = () => {
+        if (reconcileCurrent === startReconcile) reconcileCurrent = null
         controller.abort()
         reconcile?.abort()
         instance.close()
     }
     service = instance
     stopCurrent = stop
+    reconcileCurrent = startReconcile
     instance.connect()
     return () => {
         stop()
@@ -262,6 +266,12 @@ export const pauseRealtime = () => () => {
 // Сеть вернулась или вкладка снова видна: если сокет ждёт повтора, повторить сразу, не дожидаясь backoff.
 export const nudgeRealtime = () => () => {
     service?.retryNow()
+}
+
+// Вкладка снова видна или окно получило фокус: сверить список чатов с сервером (§8а.6; события о прочтении в других вкладках нет).
+// Та же сверка, что после переподключения (history и сообщения сохраняются); пока список не загружен или realtime не запущен — ничего.
+export const reconcileRealtime = () => () => {
+    reconcileCurrent?.()
 }
 
 // Возобновление: после неудачного выхода и по кнопке «Подключиться» при вытеснении (4008).

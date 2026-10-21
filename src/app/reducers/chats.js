@@ -1,5 +1,5 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { fetchChats as fetchChatsRequest, postDirectChat } from '../services/chatsApi'
+import { fetchChats as fetchChatsRequest, postDirectChat, postRead } from '../services/chatsApi'
 import { ApiError } from '../services/apiClient'
 import { selectAuthUserId } from './auth'
 import { chatRemoved, messageAdded } from './messageEvents'
@@ -36,6 +36,14 @@ export const createDirectChat = createAsyncThunk(
             if (getState().chats.createRequestId !== requestId) return rejectWithValue('stale')
             return rejectWithValue(error instanceof ApiError && error.status === 404 ? 'not_found' : 'failed')
         }
+    }
+)
+
+// Отметить чат прочитанным до seq (POST /api/chats/{id}/read). Ошибка запроса отклоняет thunk, счётчик остаётся как был.
+export const markChatRead = createAsyncThunk(
+    'chats/markChatRead',
+    async ({ chatId, seq }, { signal }) => {
+        await postRead(chatId, { seq, signal })
     }
 )
 
@@ -183,6 +191,11 @@ export const chatsSlice = createSlice({
             chat.lastSeq = Math.max(chat.lastSeq, seq)
             chat.lastMessage = action.payload
             if (action.meta?.unread) chat.unreadCount += 1
+        })
+        // Сообщение, пришедшее после отправленного seq (lastSeq вырос), остаётся непрочитанным.
+        builder.addCase(markChatRead.fulfilled, (state, action) => {
+            const chat = state.entities[action.meta.arg.chatId]
+            if (chat && action.meta.arg.seq >= chat.lastSeq) chat.unreadCount = 0
         })
         builder.addCase(chatRemoved, chatsAdapter.removeOne)
     },

@@ -47,6 +47,6 @@
 - **FE-150 (P3)** Расхождения mock-BFF с контрактом: `Origin` (403), `429` с `Retry-After`, тело `404`, `413`, UUID (сверка FE-98). Подробности: `.ai/memory/backlog/FE-150.md`
 - **FE-155 (P3)** Подкачка истории: защита от пустой страницы при `hasMore: true`, тесты Dialog/realtime по ревью FE-148. Подробности: `.ai/memory/backlog/FE-155.md`
 - **FE-156 (P3)** Dev: предупреждение WebSocket при входе (StrictMode?) и порядок чатов после `message.new` (QA FE-98). Подробности: `.ai/memory/backlog/FE-156.md`
-- **FE-157 (P3)** Удалить мёртвые ветки `local`-чатов после удаления `chatCreated` и их тесты; проверить неиспользуемый `Action`. Подробности: `.ai/memory/backlog/FE-157.md`
+- **FE-157 (P3)** Удалить мёртвые ветки `local`-чатов после удаления `chatCreated` и их тесты. Подробности: `.ai/memory/backlog/FE-157.md`
 - **FE-158 (P3)** mock-BFF `GET /api/users`: привести к §3.1 (без `q` вызывающий в списке, сортировка с приоритетом префикса, валидация `limit`). Подробности: `.ai/memory/backlog/FE-158.md`
 - **FE-159 (P2)** mock-BFF отдаёт созданные чаты, историю и принимает сообщения; порядок нового чата в списке (QA FE-44). Подробности: `.ai/memory/backlog/FE-159.md`

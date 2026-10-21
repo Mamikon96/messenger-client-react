@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatName, selectChats, selectChatsStatus } from './chats';
+import reducer, { createDirectChat, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
@@ -501,6 +501,36 @@ describe('chats reducer', () => {
       expect(selectChatName(state, 'nope')).toBe('');
     });
   });
+
+  describe('selectChatMembersCount', () => {
+    const state = {
+      chats: {
+        ids: ['g1', 'g2', 'd1', 'g3'],
+        entities: {
+          g1: { id: 'g1', type: 'group', members: [{ userId: 'u1', role: 'owner' }, { userId: 'u2', role: 'member' }] },
+          g2: { id: 'g2', type: 'group' },
+          d1: { id: 'd1', type: 'direct', peerId: 'u2', members: [{ userId: 'u2', role: 'member' }] },
+          g3: { id: 'g3', type: 'group', members: [] },
+        },
+        status: 'succeeded',
+      },
+    };
+
+    it('у группы с известным составом — число участников', () => {
+      expect(selectChatMembersCount(state, 'g1')).toBe(2);
+      expect(selectChatMembersCount(state, 'g3')).toBe(0);
+    });
+
+    it('состав неизвестен — null', () => {
+      expect(selectChatMembersCount(state, 'g2')).toBeNull();
+    });
+
+    it('у direct и неизвестного чата — null', () => {
+      expect(selectChatMembersCount(state, 'd1')).toBeNull();
+      expect(selectChatMembersCount(state, 'nope')).toBeNull();
+    });
+  });
+
   describe('история чата: loadChatHistory', () => {
     const makeStore = () => configureStore({ reducer: { chats: reducer, users, messages } });
     const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0 };

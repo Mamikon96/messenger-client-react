@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAuthUserId } from "../../../../reducers/auth";
 import { selectActiveChat } from "../../../../reducers/activeChatId";
-import { selectChatHistory, selectChatName } from "../../../../reducers/chats";
+import { selectChatHistory, selectChatMembersCount, selectChatName } from "../../../../reducers/chats";
 import { loadChatHistory, loadOlderMessages } from "../../../../reducers/chatHistory";
 import { selectChatOutbox } from "../../../../reducers/outbox";
 import { MAX_MESSAGE_LENGTH, messageLength } from "../../../../services/messageLength";
@@ -16,6 +16,16 @@ import MessageStatus from "./MessageStatus";
 // Расстояние в пикселях от края ленты, в пределах которого пользователь считается «у края»: у низа — следуем за новыми, у верха — подкачиваем старые.
 const EDGE_THRESHOLD = 50;
 
+// «1 участник», «2 участника», «5 участников», «11 участников»: форма по последним цифрам числа.
+const membersLabel = (count) => {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    if (lastTwo >= 11 && lastTwo <= 14) return `${count} участников`;
+    if (last === 1) return `${count} участник`;
+    if (last >= 2 && last <= 4) return `${count} участника`;
+    return `${count} участников`;
+}
+
 function Dialog() {
     const activeChat = useSelector(selectActiveChat);
     const userId = useSelector(selectAuthUserId);
@@ -23,6 +33,7 @@ function Dialog() {
     const chatMessages = useSelector((state) => selectChatMessages(state, chatId));
     const outbox = useSelector((state) => selectChatOutbox(state, chatId));
     const chatName = useSelector((state) => selectChatName(state, chatId));
+    const membersCount = useSelector((state) => selectChatMembersCount(state, chatId));
     const history = useSelector((state) => selectChatHistory(state, chatId));
     const historyStatus = history?.status;
     const olderStatus = history?.olderStatus;
@@ -108,6 +119,7 @@ function Dialog() {
                 <div className="dialog__header-title">
                     {chatName}
                 </div>
+                {membersCount !== null && <div className="dialog__header-meta">{membersLabel(membersCount)}</div>}
             </div>
             {historyStatus === "loading" && <div className="dialog__status" role="status">Загрузка сообщений…</div>}
             {historyStatus === "failed" && (

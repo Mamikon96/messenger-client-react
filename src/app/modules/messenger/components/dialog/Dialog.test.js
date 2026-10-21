@@ -288,6 +288,51 @@ describe('Dialog: история серверного чата', () => {
     expect(screen.getByText('Боб', { selector: '.dialog__header-title' })).toBeInTheDocument();
   });
 
+  it('в группе под названием — число участников; пока состав неизвестен, счётчика нет', async () => {
+    let release;
+    chatsApi.fetchChat.mockImplementation(() => new Promise((resolve) => { release = () => resolve(groupDto); }));
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
+
+    renderServerChat();
+
+    expect(screen.queryByText(/участник/)).not.toBeInTheDocument();
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByText('2 участника', { selector: '.dialog__header-meta' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [0, '0 участников'],
+    [1, '1 участник'],
+    [4, '4 участника'],
+    [5, '5 участников'],
+    [11, '11 участников'],
+    [14, '14 участников'],
+    [21, '21 участник'],
+    [22, '22 участника'],
+    [111, '111 участников'],
+    [112, '112 участников'],
+  ])('склонение: %i → «%s»', async (count, label) => {
+    const members = Array.from({ length: count }, (_, i) => ({ userId: `m${i}`, name: `М${i}`, avatarUrl: '', role: 'member' }));
+    chatsApi.fetchChat.mockResolvedValue({ ...groupDto, members });
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
+
+    renderServerChat();
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
+  it('у direct-чата счётчика участников нет', async () => {
+    chatsApi.fetchChat.mockResolvedValue(directDto);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([{ ...msg(1, 'u2', 'привет'), chatId: 'd1' }]));
+
+    renderServerChat('d1');
+
+    expect(await screen.findByText('привет')).toBeInTheDocument();
+    expect(screen.queryByText(/участник/)).not.toBeInTheDocument();
+  });
+
   it('в группе у чужих сообщений есть имя автора, у своих — нет', async () => {
     chatsApi.fetchChat.mockResolvedValue(groupDto);
     chatsApi.fetchMessages.mockResolvedValue(withHasMore([msg(1, 'u2', 'привет'), msg(2, 'u1', 'здорово')]));

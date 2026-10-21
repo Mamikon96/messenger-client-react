@@ -10,10 +10,17 @@
 
 .dialog__header {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--color-text);
+}
+
+.dialog__header-meta {
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    color: var(--color-text-muted);
 }
 
 .dialog__footer {

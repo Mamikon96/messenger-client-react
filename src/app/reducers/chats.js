@@ -208,4 +208,11 @@ export const selectChatName = (state, chatId) => {
     return chat.title ?? ''
 }
 
+// Число участников группы или null: у direct, неизвестного чата и пока состав не загружен (members нет).
+export const selectChatMembersCount = (state, chatId) => {
+    const chat = state.chats.entities[chatId]
+    if (!chat || chat.type !== 'group' || !chat.members) return null
+    return chat.members.length
+}
+
 export default chatsSlice.reducer

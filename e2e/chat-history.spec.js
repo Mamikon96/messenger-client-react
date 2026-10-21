@@ -85,6 +85,15 @@ test('[UC-CHAT-02] открытие группы с сервера: назван
   await expect(page.locator('.dialog__message').first()).toContainText('Боб Собеседник');
 });
 
+test('[UC-CHAT-02] в заголовке группы под названием — число участников', async ({ page }) => {
+  await mockServer(page);
+  await login(page);
+
+  await page.locator('.chat', { hasText: 'Команда' }).click();
+
+  await expect(page.locator('.dialog__header-meta')).toHaveText('2 участника');
+});
+
 test('[UC-CHAT-02] у direct-чата заголовок — имя собеседника, имя автора у сообщений не дублируется', async ({ page }) => {
   await mockServer(page);
   await login(page);
@@ -93,6 +102,7 @@ test('[UC-CHAT-02] у direct-чата заголовок — имя собесе
 
   await expect(page.locator('.dialog__header-title')).toHaveText('Боб Собеседник');
   await expect(page.locator('.dialog__message')).toHaveCount(1);
+  await expect(page.locator('.dialog__header-meta')).toHaveCount(0);
   await expect(page.locator('.dialog__message')).toHaveText('Привет, личка');
 });
 

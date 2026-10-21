@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages, postDirectChat, postMessage, postRead } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages, postDirectChat, postGroupChat, postMessage, postRead } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -175,5 +175,27 @@ describe("chatsApi: открытие чата", () => {
         expect(fetch.mock.calls[0][1].signal).toBe(signal);
 
         await expect(postDirectChat("u3")).rejects.toMatchObject({ status: 404, code: "not_found" });
+    });
+
+    it("postGroupChat шлёт POST /api/chats с type group, title и пустым memberIds и возвращает ChatDto", async () => {
+        const dto = { id: "g1", type: "group", title: "Team", lastSeq: 0, members: [] };
+        fetch.mockResolvedValueOnce(reply(201, dto));
+
+        await expect(postGroupChat("Team")).resolves.toEqual(dto);
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body)).toEqual({ type: "group", title: "Team", memberIds: [] });
+    });
+
+    it("postGroupChat пробрасывает signal; 400 — ApiError", async () => {
+        const { signal } = new AbortController();
+        fetch.mockResolvedValueOnce(reply(201, {})).mockResolvedValueOnce(reply(400, { error: { code: "validation_failed" } }));
+
+        await postGroupChat("Team", { signal });
+        expect(fetch.mock.calls[0][1].signal).toBe(signal);
+
+        await expect(postGroupChat(" ")).rejects.toMatchObject({ status: 400, code: "validation_failed" });
     });
 });

@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './store';
-import { createDirectChat, fetchChats, selectChatById } from './reducers/chats';
+import { createDirectChat, createGroupChat, fetchChats, selectChatById } from './reducers/chats';
 import { loadChatHistory, loadOlderMessages } from './reducers/chatHistory';
 import * as chatsApi from './services/chatsApi';
 import { chatReceived, selectChats } from './reducers/chats';
@@ -19,7 +19,7 @@ const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const emptyState = {
-  chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] },
+  chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] },
   messages: {},
   outbox: { ids: [], entities: {} },
   users: { ids: [], entities: {} },
@@ -149,7 +149,7 @@ describe('rootReducer: запоздавшие ответы fetchChats после
     resolveRequest([direct]);
     await request;
 
-    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] });
+    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] });
     expect(store.getState().users).toEqual({ ids: [], entities: {} });
   });
 });
@@ -186,6 +186,36 @@ describe('rootReducer: запоздавший ответ createDirectChat пос
     expect(result.payload).toBe('stale');
     expect(store.getState().chats).toEqual(after.chats);
     expect(store.getState().chats.ids).toEqual([]);
+    expect(store.getState().users).toEqual({ ids: [], entities: {} });
+    expect(store.getState().activeChatId).toBeNull();
+  });
+});
+
+describe('rootReducer: запоздавший ответ createGroupChat после сброса store', () => {
+  const dto = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, members: [{ userId: '1', name: 'Ann', avatarUrl: '', role: 'owner' }] };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it.each([
+    ['logout', () => logout.fulfilled(undefined, 'req')],
+    ['sessionClosed', () => sessionClosed()],
+    ['userSwitched', () => userSwitched({ ...user, id: '2', login: 'bob' })],
+  ])('ответ после %s не пишет группу, владельца и активный чат в сброшенный store', async (_, makeAction) => {
+    let resolveRequest;
+    chatsApi.postGroupChat.mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    const request = store.dispatch(createGroupChat('Team'));
+
+    store.dispatch(makeAction());
+    resolveRequest(dto);
+    const result = await request;
+
+    expect(result.payload).toBe('stale');
+    expect(store.getState().chats.ids).toEqual([]);
+    expect(store.getState().chats.groupRequestId).toBeNull();
     expect(store.getState().users).toEqual({ ids: [], entities: {} });
     expect(store.getState().activeChatId).toBeNull();
   });

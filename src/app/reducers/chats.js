@@ -1,5 +1,5 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { fetchChats as fetchChatsRequest, postDirectChat, postRead } from '../services/chatsApi'
+import { fetchChats as fetchChatsRequest, postDirectChat, postGroupChat, postRead } from '../services/chatsApi'
 import { ApiError } from '../services/apiClient'
 import { selectAuthUserId } from './auth'
 import { chatRemoved, messageAdded } from './messageEvents'
@@ -37,6 +37,23 @@ export const createDirectChat = createAsyncThunk(
             return rejectWithValue(error instanceof ApiError && error.status === 404 ? 'not_found' : 'failed')
         }
     }
+)
+
+// Создать группу с названием (POST /api/chats: 201). Пока запрос идёт, повторный запуск отменяется (condition). Ошибка отклоняет thunk кодом:
+// 'invalid' — сервер отверг название (400), 'failed' — прочее, 'stale' — store сбросили, пока шёл запрос. Слайсы activeChatId и users подписаны на fulfilled.
+export const createGroupChat = createAsyncThunk(
+    'chats/createGroupChat',
+    async (title, { signal, requestId, getState, rejectWithValue }) => {
+        try {
+            const dto = await postGroupChat(title, { signal })
+            if (getState().chats.groupRequestId !== requestId) return rejectWithValue('stale')
+            return { chat: toChatFromDto(dto, selectAuthUserId(getState())), members: dto.members }
+        } catch (error) {
+            if (getState().chats.groupRequestId !== requestId) return rejectWithValue('stale')
+            return rejectWithValue(error instanceof ApiError && error.status === 400 ? 'invalid' : 'failed')
+        }
+    },
+    { condition: (_, { getState }) => getState().chats.groupRequestId === null }
 )
 
 // Отметить чат прочитанным до seq (POST /api/chats/{id}/read). Ошибка запроса отклоняет thunk, счётчик остаётся как был.
@@ -87,9 +104,10 @@ export const chatsSlice = createSlice({
     // status: idle — ещё не грузили, loading — идёт загрузка, succeeded — список получен, failed — загрузить не удалось.
     // requestId — запрос, чей ответ ждём (null вне загрузки): ответы остальных запросов игнорируются.
     // pendingUserId — пользователь, чей direct-чат открывается сейчас (null — ничего не открывается);
-    // openedWhileLoadingIds — чаты, открытые createDirectChat, пока шла загрузка списка: ответ списка их не затирает.
+    // openedWhileLoadingIds — чаты, открытые через createDirectChat или createGroupChat, пока шла загрузка списка: ответ списка их не затирает.
     // createRequestId — запрос этого открытия, чей ответ ждём (после сброса store ответ прежнего запроса отбрасывается).
-    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, openedWhileLoadingIds: [] }),
+    // groupRequestId — запрос создания группы, чей ответ ждём (null — группа не создаётся).
+    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] }),
     reducers: {
         // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
         chatReceived: chatsAdapter.addOne,
@@ -111,7 +129,7 @@ export const chatsSlice = createSlice({
             })
             .addCase(fetchChats.fulfilled, (state, action) => {
                 if (action.meta.requestId !== state.requestId) return
-                // Чаты, открытые через createDirectChat, пока список грузился, в ответе могут отсутствовать: остаются (как kept в reconcile).
+                // Чаты, открытые через createDirectChat или createGroupChat, пока список грузился, в ответе могут отсутствовать: остаются (как kept в reconcile).
                 const fromServer = action.payload.map(toChat)
                 const serverIds = new Set(fromServer.map(({ id }) => id))
                 const kept = state.openedWhileLoadingIds.filter((id) => !serverIds.has(id) && state.entities[id]).map((id) => state.entities[id])
@@ -141,6 +159,19 @@ export const chatsSlice = createSlice({
                 if (action.meta.requestId !== state.createRequestId) return
                 state.pendingUserId = null
                 state.createRequestId = null
+            })
+        builder
+            .addCase(createGroupChat.pending, (state, action) => {
+                state.groupRequestId = action.meta.requestId
+            })
+            .addCase(createGroupChat.fulfilled, (state, { payload }) => {
+                state.groupRequestId = null
+                chatsAdapter.addOne(state, payload.chat)
+                if (state.requestId !== null) state.openedWhileLoadingIds.push(payload.chat.id)
+            })
+            .addCase(createGroupChat.rejected, (state, action) => {
+                if (action.meta.requestId !== state.groupRequestId) return
+                state.groupRequestId = null
             })
         // История чата (поле history): status — idle (поля нет) / loading / succeeded / failed; hasMore — есть ли старее;
         // olderStatus — подкачка старых (idle / loading / failed). requestId и olderRequestId — запросы, чьи ответы ждём.
@@ -211,6 +242,8 @@ export const { selectAll: selectChats, selectById: selectChatById } =
 export const selectChatsStatus = (state) => state.chats.status
 
 export const selectPendingUserId = (state) => state.chats.pendingUserId
+
+export const selectIsCreatingGroup = (state) => state.chats.groupRequestId !== null
 
 // Состояние загрузки истории чата или undefined, пока чат не открывали.
 export const selectChatHistory = (state, chatId) => state.chats.entities[chatId]?.history

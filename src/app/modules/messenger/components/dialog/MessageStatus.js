@@ -2,7 +2,7 @@ import "./MessageStatus.css";
 
 const svgProps = { viewBox: "0 0 16 16", width: 14, height: 14, fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
 
-// Статус своего сообщения в серверном чате: часы (sending), галочка (sent), красный треугольник с «!» — кнопка повтора (failed).
+// Статус своего сообщения в серверном чате: часы (sending), одна галочка (sent), две галочки (read), красный треугольник с «!» — кнопка повтора (failed).
 function MessageStatus({ status, onRetry }) {
     if (status === "failed") {
         return (
@@ -18,6 +18,13 @@ function MessageStatus({ status, onRetry }) {
         return (
             <span className="message-status message-status__sent" role="img" aria-label="Отправлено">
                 <svg {...svgProps} aria-hidden="true" focusable="false"><path d="M3 8.5 L6.5 12 L13 4.5" /></svg>
+            </span>
+        );
+    }
+    if (status === "read") {
+        return (
+            <span className="message-status message-status__read" role="img" aria-label="Прочитано">
+                <svg {...svgProps} aria-hidden="true" focusable="false"><path d="M1.5 8.5 L5 12 L11.5 4.5" /><path d="M8 11.2 L8.8 12 L14.5 4.5" /></svg>
             </span>
         );
     }

@@ -490,6 +490,33 @@ describe('Dialog: отправка в серверном чате (FE-40)', () =
     expect(screen.queryByRole('button', { name: /Повторить/ })).not.toBeInTheDocument();
   });
 
+  it('ошибка доставки: кнопка повтора стоит рядом с пузырём, а не внутри него', async () => {
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(400, null));
+    await renderServerChat();
+    typeAndSend('привет');
+
+    const retry = await screen.findByRole('button', { name: 'Не отправлено. Повторить' });
+    const bubble = screen.getByText('привет');
+
+    expect(bubble).not.toContainElement(retry);
+    expect(screen.getByRole('article')).toContainElement(retry);
+  });
+
+  it('после повтора с клавиатуры фокус уходит в поле ввода, а не на body', async () => {
+    chatsApi.postMessage.mockRejectedValueOnce(new ApiError(400, null));
+    await renderServerChat();
+    typeAndSend('привет');
+
+    const retry = await screen.findByRole('button', { name: 'Не отправлено. Повторить' });
+    const firstClientId = chatsApi.postMessage.mock.calls[0][1].clientId;
+    chatsApi.postMessage.mockResolvedValueOnce(created(1, 'привет', firstClientId));
+    retry.focus();
+    fireEvent.click(retry);
+
+    expect(input()).toHaveFocus();
+    expect(await screen.findByRole('img', { name: 'Отправлено' })).toBeInTheDocument();
+  });
+
   it('текст длиннее 4000 кодовых точек: счётчик «N / 4000», Send и Enter не отправляют, текст не обрезается', async () => {
     await renderServerChat();
     const long = '😀'.repeat(4001);
@@ -956,5 +983,45 @@ describe('Dialog: отметка о прочтении (FE-43)', () => {
     await settle();
 
     expect(chatsApi.postRead).not.toHaveBeenCalled();
+  });
+});
+
+describe('Dialog: статус «прочитано» (FE-113)', () => {
+  const own = (seq) => ({ chatId: 'g1', seq, senderId: 'u1', clientId: `c${seq}`, body: `моё ${seq}`, createdAt: '2026-10-17T10:00:00.000Z' });
+  const groupDto = { id: 'g1', type: 'group', title: 'Команда', lastSeq: 2, members: [{ userId: 'u1', name: 'Ann', avatarUrl: '', role: 'owner' }] };
+
+  const renderWith = async (extra) => {
+    chatsApi.fetchChat.mockResolvedValue(groupDto);
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([own(1), own(2)]));
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    store.dispatch(chatReceived({ id: 'g1', type: 'group', title: 'Команда', lastSeq: 2, lastMessage: null, unreadCount: 0, ...extra }));
+    render(
+      <Provider store={store}>
+        <Dialog />
+      </Provider>
+    );
+    await act(async () => {
+      store.dispatch(chatSelected('g1'));
+    });
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('seq <= readSeq чата — две галки «Прочитано», остальные — «Отправлено»', async () => {
+    await renderWith({ readSeq: 1 });
+
+    expect(await screen.findAllByRole('img', { name: 'Прочитано' })).toHaveLength(1);
+    expect(within(screen.getByText('моё 1')).getByRole('img', { name: 'Прочитано' })).toBeInTheDocument();
+    expect(within(screen.getByText('моё 2')).getByRole('img', { name: 'Отправлено' })).toBeInTheDocument();
+  });
+
+  it('readSeq нет — все свои сообщения «Отправлено»', async () => {
+    await renderWith({});
+
+    expect(await screen.findAllByRole('img', { name: 'Отправлено' })).toHaveLength(2);
+    expect(screen.queryByRole('img', { name: 'Прочитано' })).not.toBeInTheDocument();
   });
 });

@@ -1,39 +1,21 @@
 const { test, expect } = require('@playwright/test');
 const { login } = require('./helpers/auth');
-
-// popover после Join не закрывается сам (FE-03) — закрываем кликом по оверлею
-const createChat = async (page, title) => {
-  // пока идёт загрузка списка, ответ сервера заменил бы созданный чат
-  await expect(page.getByText('Загрузка чатов…')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Join', exact: true }).click();
-  await page.locator('input[name="title"]').fill(title);
-  await page.locator('input[name="name"]').fill('Mock');
-  await page.locator('.join-form').getByRole('button', { name: 'Join' }).click();
-  await page.locator('.overlay').click({ position: { x: 5, y: 5 } });
-};
-
-test('[UC-CHAT-01] кнопка Join создаёт чат с введённым названием в списке чатов', async ({ page }) => {
-  await login(page);
-  await expect(page.locator('.chat')).toHaveCount(0);
-
-  await createChat(page, 'Room A');
-
-  await expect(page.locator('.chat', { hasText: 'Room A' })).toHaveCount(1);
-});
+const { BOB, CAROL, mockPeopleServer, openDirectChat } = require('./helpers/people');
 
 test('[UC-CHAT-02] выбор чата открывает его диалог и подсвечивает его в списке', async ({ page }) => {
+  await mockPeopleServer(page);
   await login(page);
-  await createChat(page, 'Room A');
-  await createChat(page, 'Room B');
+  await openDirectChat(page, BOB);
+  await openDirectChat(page, CAROL);
 
-  await page.locator('.chat', { hasText: 'Room A' }).click();
-  await expect(page.locator('.dialog__header-title')).toHaveText('Room A');
+  await page.locator('.chat', { hasText: BOB.name }).click();
+  await expect(page.locator('.dialog__header-title')).toHaveText(BOB.name);
   await expect(page.locator('.chat._active')).toHaveCount(1);
-  await expect(page.locator('.chat._active')).toContainText('Room A');
+  await expect(page.locator('.chat._active')).toContainText(BOB.name);
 
-  await page.locator('.chat', { hasText: 'Room B' }).click();
-  await expect(page.locator('.dialog__header-title')).toHaveText('Room B');
-  await expect(page.locator('.chat._active')).toContainText('Room B');
+  await page.locator('.chat', { hasText: CAROL.name }).click();
+  await expect(page.locator('.dialog__header-title')).toHaveText(CAROL.name);
+  await expect(page.locator('.chat._active')).toContainText(CAROL.name);
 });
 
 const message = (chatId, seq, body) => ({

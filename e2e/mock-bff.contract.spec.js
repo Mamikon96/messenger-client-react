@@ -366,3 +366,77 @@ test('logout после входа по паролю: csrfToken из login по�
   expect(res.headers()['set-cookie']).not.toMatch(/Secure/i);
   expect((await api.get('/api/auth/session')).status()).toBe(401);
 });
+
+async function signInWithCsrf() {
+  return (await (await signIn()).json()).csrfToken;
+}
+
+test('GET /api/users?q=: без сессии — 401', async () => {
+  const res = await api.get('/api/users?q=bo');
+  expect(res.status()).toBe(401);
+  await expectError(res, 401, 'unauthorized');
+});
+
+test('GET /api/users?q=: q короче 2 символов после trim — 400 validation_failed', async () => {
+  await signIn();
+  for (const query of ['?q=b', '?q=%20b%20', '?q=']) {
+    const res = await api.get(`/api/users${query}`);
+    expect(res.status(), query).toBe(400);
+    await expectError(res, 400, 'validation_failed', undefined, query);
+  }
+});
+
+test('GET /api/users?q=: поиск по имени без учёта регистра, без себя и отключённых, без login', async () => {
+  await signIn();
+  const res = await api.get('/api/users?q=TESTER');
+  expect(res.status()).toBe(200);
+  const items = await res.json();
+  expect(items.map((item) => item.name)).toEqual(expect.arrayContaining(['Admin Tester', 'Bob Tester']));
+  expect(items.map((item) => item.name)).not.toContain('Alice Tester');
+  expect(items.map((item) => item.name)).not.toContain('Disabled Tester');
+  items.forEach((item) => expect(Object.keys(item).sort()).toEqual(['avatarUrl', 'id', 'name']));
+  expect(await (await api.get('/api/users?q=bo')).json()).toEqual([expect.objectContaining({ name: 'Bob Tester' })]);
+  expect(await (await api.get('/api/users?q=login-not-name')).json()).toEqual([]);
+  expect(await (await api.get('/api/users?q=bob')).json()).toHaveLength(1);
+});
+
+test('POST /api/chats: без сессии — 401, без CSRF — 403', async () => {
+  expect((await api.post('/api/chats', { data: { type: 'direct', userId: 'x' } })).status()).toBe(401);
+  await signIn();
+  await expectError(await api.post('/api/chats', { data: { type: 'direct', userId: 'x' } }), 403, 'csrf_invalid');
+});
+
+test('POST /api/chats: неверное тело — 400, неизвестный userId — 404 not_found', async () => {
+  const csrfToken = await signInWithCsrf();
+  const post = (data) => api.post('/api/chats', { data, headers: { 'X-CSRF-Token': csrfToken } });
+  for (const data of [{}, { type: 'direct' }, { type: 'direct', userId: 5 }, { type: 'direct', userId: '' }, { type: 'channel', userId: 'x' }]) {
+    const res = await post(data);
+    expect(res.status(), JSON.stringify(data)).toBe(400);
+    await expectError(res, 400, 'validation_failed', undefined, JSON.stringify(data));
+  }
+  const unknown = await post({ type: 'direct', userId: 'no-such-user' });
+  expect(unknown.status()).toBe(404);
+  await expectError(unknown, 404, 'not_found');
+});
+
+test('POST /api/chats: direct — 201 и ChatDto, повторный запрос с тем же userId — 200 с тем же чатом', async () => {
+  const csrfToken = await signInWithCsrf();
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const post = () => api.post('/api/chats', { data: { type: 'direct', userId: bob.id }, headers: { 'X-CSRF-Token': csrfToken } });
+  const created = await post();
+  expect(created.status()).toBe(201);
+  const chat = await created.json();
+  expect(chat).toEqual({
+    id: expect.any(String),
+    type: 'direct',
+    title: null,
+    lastSeq: 0,
+    members: [
+      expect.objectContaining({ name: 'Alice Tester', role: 'member' }),
+      { userId: bob.id, name: 'Bob Tester', avatarUrl: '', role: 'member' },
+    ],
+  });
+  const again = await post();
+  expect(again.status()).toBe(200);
+  expect((await again.json()).id).toBe(chat.id);
+});

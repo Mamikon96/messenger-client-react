@@ -1,0 +1,54 @@
+.people-search {
+    margin-bottom: var(--space-2);
+}
+
+.people-search .people-search__title {
+    margin: var(--space-2) 0 var(--space-1);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.people-search .people-search__status {
+    margin: var(--space-2) 0;
+    text-align: center;
+}
+
+.people-search .people-search__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.people-search .people-search__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-1) var(--space-3);
+}
+
+.people-search .people-search__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.people-search .people-search__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.people-search .icon-button[aria-busy="true"],
+.people-search .icon-button[aria-busy="true"]:hover {
+    cursor: progress;
+    opacity: .55;
+}

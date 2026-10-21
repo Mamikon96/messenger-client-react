@@ -26,3 +26,8 @@ export function fetchMessages(chatId, { before, since, limit, signal } = {}) {
 export function postMessage(chatId, { clientId, body, signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/messages`, { method: "POST", body: { clientId, body }, signal });
 }
+
+// Direct-чат с пользователем: ChatDto (201 — создан, 200 — уже существовал).
+export function postDirectChat(userId, { signal } = {}) {
+    return apiRequest("/api/chats", { method: "POST", body: { type: "direct", userId }, signal });
+}

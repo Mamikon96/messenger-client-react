@@ -9,7 +9,7 @@ test("проверка ловит глобальные селекторы эле
     ["button {}", "a, input {}", "button[type] {}", "x { } textarea:focus {}", "button > span {}"].forEach((css) => {
         expect(css).toMatch(GLOBAL_ELEMENT);
     });
-    [".button {}", ".input:focus {}", ".join-form__footer .btn {}", ".x { color: red; }"].forEach((css) => {
+    [".button {}", ".input:focus {}", ".people-search__row .btn {}", ".x { color: red; }"].forEach((css) => {
         expect(css).not.toMatch(GLOBAL_ELEMENT);
     });
 });

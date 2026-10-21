@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages, postMessage } from "./chatsApi";
+import { fetchChat, fetchChats, fetchMessages, postDirectChat, postMessage } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -139,5 +139,28 @@ describe("chatsApi: открытие чата", () => {
         await postMessage("c1", { clientId: "k1", body: "hi", signal });
 
         expect(fetch.mock.calls[0][1].signal).toBe(signal);
+    });
+
+    it("postDirectChat шлёт POST /api/chats с type direct и userId и возвращает ChatDto (201 и 200)", async () => {
+        const dto = { id: "d1", type: "direct", title: null, lastSeq: 0, members: [] };
+        fetch.mockResolvedValueOnce(reply(201, dto)).mockResolvedValueOnce(reply(200, dto));
+
+        await expect(postDirectChat("u2")).resolves.toEqual(dto);
+        await expect(postDirectChat("u2")).resolves.toEqual(dto);
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body)).toEqual({ type: "direct", userId: "u2" });
+    });
+
+    it("postDirectChat пробрасывает signal; 404 — ApiError", async () => {
+        const { signal } = new AbortController();
+        fetch.mockResolvedValueOnce(reply(201, {})).mockResolvedValueOnce(reply(404, { error: { code: "not_found" } }));
+
+        await postDirectChat("u2", { signal });
+        expect(fetch.mock.calls[0][1].signal).toBe(signal);
+
+        await expect(postDirectChat("u3")).rejects.toMatchObject({ status: 404, code: "not_found" });
     });
 });

@@ -4,7 +4,7 @@ const { login, signInControl } = require('./helpers/auth');
 test('[UC-SESSION-01] после перезагрузки сессия сохраняется и вход не показывается', async ({ page }) => {
   await login(page);
   await page.reload();
-  await expect(page.getByText('Join').first()).toBeVisible();
+  await expect(page.getByLabel('Поиск людей')).toBeVisible();
   await expect(signInControl(page)).toHaveCount(0);
 });
 

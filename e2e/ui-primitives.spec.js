@@ -14,10 +14,9 @@ test('[UC-UI-01] кнопка при фокусе с клавиатуры пол
   expect(outline.width).toBeGreaterThan(0);
 });
 
-test('[UC-UI-01] поле формы Join при фокусе получает обводку акцентным цветом темы', async ({ page }) => {
+test('[UC-UI-01] поле поиска людей при фокусе получает обводку акцентным цветом темы', async ({ page }) => {
   await login(page);
-  await page.getByRole('button', { name: 'Join', exact: true }).click();
-  const input = page.getByRole('textbox', { name: 'Название чата' });
+  const input = page.getByRole('textbox', { name: 'Поиск людей' });
   await input.focus();
   const { outline, accent } = await input.evaluate((el) => {
     const probe = document.createElement('span');

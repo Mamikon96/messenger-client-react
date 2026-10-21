@@ -32,6 +32,7 @@ const isFilled = (value) => typeof value === 'string' && value.trim() !== '';
 function createServer() {
   const sessions = new Map(); // sid -> { user, csrfToken }
   const users = new Map(); // login -> { password, disabled, isAdmin, user: SessionUser }
+  const directChats = new Map(); // "idМеньший:idБольший" -> ChatDto (GET /api/chats их пока не отдаёт)
   let generatedNames = 0;
 
   const random = () => crypto.randomBytes(16).toString('hex');
@@ -199,6 +200,10 @@ function createServer() {
     const session = getSession(req);
     if (!session) return error(res, 401, 'unauthorized', 'Требуется вход');
     if (MUTATING.includes(req.method) && req.headers['x-csrf-token'] !== session.csrfToken) return error(res, 403, 'csrf_invalid', 'Неверный CSRF-токен');
+    // GET /api/users?q=
+    if (req.method === 'GET' && parts.length === 2 && parts[1] === 'users') return searchUsers(res, url.searchParams, session);
+    // POST /api/chats
+    if (req.method === 'POST' && parts.length === 2 && parts[1] === 'chats') return postChat(req, res, session);
     // GET /api/chats (пока всегда пустой список)
     if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
     // GET /api/chats/:id (чатов в mock нет: 404)
@@ -208,6 +213,35 @@ function createServer() {
     // POST /api/chats/:id/messages (чатов в mock нет: валидное тело -> 404)
     if (req.method === 'POST' && parts.length === 4 && parts[1] === 'chats' && parts[3] === 'messages') return postMessage(req, res);
     return empty(res, 404);
+  }
+
+  // Поиск по name, §3.1: q после trim 2..64 символа; без себя и отключённых; без q — весь справочник.
+  function searchUsers(res, params, session) {
+    const q = params.has('q') ? params.get('q').trim().toLowerCase() : null;
+    if (q !== null && ([...q].length < 2 || [...q].length > 64)) return error(res, 400, 'validation_failed', 'Некорректный запрос поиска');
+    const found = [...users.values()]
+      .filter(({ disabled, user }) => !disabled && user.id !== session.user.id && (q === null || user.name.toLowerCase().includes(q)))
+      .map(({ user }) => ({ id: user.id, name: user.name, avatarUrl: user.avatarUrl }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return json(res, 200, found);
+  }
+
+  function toMember({ id, name, avatarUrl }) {
+    return { userId: id, name, avatarUrl, role: 'member' };
+  }
+
+  // Только direct, §3.3: 201 — создан, 200 — уже есть, 404 — собеседник неизвестен или отключён.
+  async function postChat(req, res, session) {
+    const body = await readBody(req);
+    if (!body || body.type !== 'direct' || !isFilled(body.userId)) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
+    const peer = [...users.values()].find(({ user }) => user.id === body.userId);
+    if (!peer || peer.disabled) return error(res, 404, 'not_found', 'Пользователь не найден');
+    const key = [session.user.id, peer.user.id].sort().join(':');
+    if (directChats.has(key)) return json(res, 200, directChats.get(key));
+    const members = session.user.id === peer.user.id ? [session.user] : [session.user, peer.user];
+    const chat = { id: crypto.randomUUID(), type: 'direct', title: null, lastSeq: 0, members: members.map(toMember) };
+    directChats.set(key, chat);
+    return json(res, 201, chat);
   }
 
   async function postMessage(req, res) {

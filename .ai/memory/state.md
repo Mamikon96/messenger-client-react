@@ -22,7 +22,6 @@
 Каждая проблема — со ссылкой на задачу бэклога (→ FE-NN), где описано исправление; подробности — там, здесь не дублируются.
 2. `src/app/modules/messenger/components/dialog/Dialog.js`, `Dialog.css`: индикатор «Загрузка старых сообщений…» над лентой сдвигает текст на ~25 px; возможный двойной сдвиг из-за scroll anchoring (гипотеза). → FE-147
 3. `src/app/modules/form/Form.js` (+ css) — пустой файл. → FE-05
-4. `src/app/modules/header/components/action/Action.js`: `OVERLAY_OPACITY` объявлена внутри компонента; пустая ветка рендера `""`. → FE-29
 5. `README.md` пустой (одна строка). → FE-08
 7. Расхождение с `docs/client-integration.md` (FE-D12; план — FE-33…FE-45):
     - `mock-bff/server.js`: `401` без сессии (`session`, `logout`, прочие `/api/*`) — `{error:{code:"unauthorized"}}`; `403` при неверном CSRF — `{error:{code:"csrf_invalid"}}` (FE-96), `404` — с пустым телом; cookie сессии без `Secure`, только auth; остальные `/api/*` — 404; проверки `Origin` и rate limit нет (`429` в e2e — `page.route`).
@@ -30,9 +29,9 @@
 9. `mock-bff/server.js`: не отдаёт чаты и историю (`GET /api/chats` всегда `[]`, `GET /api/chats/:id`, `/messages`, `POST .../messages` — 404); созданный из поиска чат на стенде сразу с ошибкой загрузки сообщений, новый чат встаёт в конец списка, а не наверх. → FE-159
 
 ## Последняя приёмка
-`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-21) · ревью react-reviewer APPROVE, QA qa-tester PASS (полный проход, `.qa/runs/FE-136.md`) · FE-136 · 2026-10-21
+`npm run accept` → код выхода 0 (штамп `.qa/accept.json` 2026-10-21) · ревью react-reviewer APPROVE, QA qa-tester PASS (смоук-проход, `.qa/runs/FE-29.md`) · FE-29 · 2026-10-21
 
 ## Фокус сейчас
-Эпик входа по логину/паролю (FE-D38, SH-D18) и экран чатов закрыты по FE-28 (`Header`, `UserMenu`) включительно; история — `done.md`. Дальше FE-29 …
+Эпик входа по логину/паролю (FE-D38, SH-D18) и экран чатов закрыты по FE-28 (`Header`, `UserMenu`) включительно; история — `done.md`. Дальше — по бэклогу (FE-43, FE-30 …).
 Копия `docs/client-integration.md` — итоговая версия бэкенда (develop, без неслитого BE-20; FE-98); спека `docs/auth-password-spec.md` удалена; при новых правках контракта бэкенда сверять снова.
 Проверка харнесса после FE-105 (замер первого хода, `context-guard.sh` в субагентах) — `done/FE-105.md`.

@@ -1,0 +1,41 @@
+.ui-dialog__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    background: var(--color-overlay);
+}
+
+.ui-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+    max-width: 420px;
+    max-height: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.ui-dialog:focus {
+    outline: none;
+}
+
+.ui-dialog .ui-dialog__title {
+    margin: 0;
+    font-size: var(--font-size-lg);
+}
+
+.ui-dialog .ui-dialog__body {
+    overflow-y: auto;
+}
+
+.ui-dialog .ui-dialog__footer {
+    display: flex;
+    justify-content: flex-end;
+}

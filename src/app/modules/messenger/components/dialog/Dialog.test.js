@@ -1036,3 +1036,42 @@ describe('Dialog: возврат к списку', () => {
     expect(store.getState().activeChatId).toBeNull();
   });
 });
+
+describe('Dialog: кнопка «Пригласить» в шапке (FE-108)', () => {
+  const renderChat = (chat) => {
+    const store = configureStore({ reducer: rootReducer });
+    store.dispatch(checkSession.fulfilled(user, 'req'));
+    store.dispatch(chatReceived({ lastSeq: 0, lastMessage: null, unreadCount: 0, ...chat }));
+    store.dispatch(chatSelected(chat.id));
+    const names = { u1: 'Ann', u2: 'Bob' };
+    chatsApi.fetchChat.mockResolvedValue({
+      id: chat.id, type: chat.type, title: chat.title ?? null, lastSeq: 0,
+      members: chat.members.map(({ userId, role }) => ({ userId, role, name: names[userId], avatarUrl: '' })),
+    });
+    chatsApi.fetchMessages.mockResolvedValue(withHasMore([]));
+    render(
+      <Provider store={store}>
+        <Dialog />
+      </Provider>
+    );
+  };
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('owner группы видит кнопку', () => {
+    renderChat({ id: 'g1', type: 'group', title: 'T', members: [{ userId: 'u1', role: 'owner' }] });
+    expect(screen.getByRole('button', { name: 'Пригласить' })).toBeInTheDocument();
+  });
+
+  it('member группы кнопку не видит', () => {
+    renderChat({ id: 'g1', type: 'group', title: 'T', members: [{ userId: 'u1', role: 'member' }, { userId: 'u2', role: 'owner' }] });
+    expect(screen.queryByRole('button', { name: 'Пригласить' })).not.toBeInTheDocument();
+  });
+
+  it('в direct-чате кнопки нет', () => {
+    renderChat({ id: 'd1', type: 'direct', peerId: 'u2', members: [{ userId: 'u1', role: 'member' }, { userId: 'u2', role: 'member' }] });
+    expect(screen.queryByRole('button', { name: 'Пригласить' })).not.toBeInTheDocument();
+  });
+});

@@ -1,5 +1,5 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { createDirectChat, createGroupChat, fetchChats } from './chats'
+import { addChatMember, createDirectChat, createGroupChat, fetchChats } from './chats'
 import { loadChatHistory } from './chatHistory'
 
 // Пользователи по UserSummary (раздел 4 docs/client-integration.md); наполняет сервер (FE-38, FE-39, FE-41).
@@ -16,12 +16,14 @@ export const usersSlice = createSlice({
         builder.addCase(fetchChats.fulfilled, (state, action) => {
             usersAdapter.upsertMany(state, action.payload.flatMap((chat) => (chat.peer ? [chat.peer] : [])))
         })
-        // Участники чата, открытого через поиск людей, и создатель новой группы.
+        // Участники чата, открытого через поиск людей, создатель новой группы и приглашённые.
         const upsertMembers = (state, action) => {
+            if (!action.payload.members) return
             usersAdapter.upsertMany(state, action.payload.members.map(({ userId, name, avatarUrl }) => ({ id: userId, name, avatarUrl })))
         }
         builder.addCase(createDirectChat.fulfilled, upsertMembers)
         builder.addCase(createGroupChat.fulfilled, upsertMembers)
+        builder.addCase(addChatMember.fulfilled, upsertMembers)
         // Участники открытого чата: имя автора сообщения берётся отсюда (в сообщении только senderId).
         builder.addCase(loadChatHistory.fulfilled, (state, action) => {
             usersAdapter.upsertMany(state, action.payload.chat.members.map(({ userId, name, avatarUrl }) => ({ id: userId, name, avatarUrl })))

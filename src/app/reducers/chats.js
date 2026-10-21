@@ -1,5 +1,5 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { fetchChats as fetchChatsRequest, postDirectChat, postGroupChat, postRead } from '../services/chatsApi'
+import { fetchChat, fetchChats as fetchChatsRequest, postChatMember, postDirectChat, postGroupChat, postRead } from '../services/chatsApi'
 import { ApiError } from '../services/apiClient'
 import { selectAuthUserId } from './auth'
 import { chatRemoved, messageAdded } from './messageEvents'
@@ -56,6 +56,38 @@ export const createGroupChat = createAsyncThunk(
     { condition: (_, { getState }) => getState().chats.groupRequestId === null }
 )
 
+// Код отказа приглашения по статусу ответа: 403 — не owner, 404 — нет группы или человека, 400 — лимит участников.
+const INVITE_ERRORS = { 403: 'forbidden', 404: 'not_found', 400: 'limit' }
+
+// Добавить человека в группу chatId (POST /api/chats/{id}/members: 204), затем перечитать карточку (GET /api/chats/{id}): состав берётся оттуда.
+// 409 already_member — тоже успех; сбой GET после успешного POST — тоже успех (без нового состава). Пока приглашение идёт, повторный запуск отменяется (condition). Ошибка отклоняет thunk кодом:
+// 'forbidden' / 'not_found' / 'limit' / 'failed', 'stale' — store сбросили, пока шёл запрос. Слайс users подписан на fulfilled.
+export const addChatMember = createAsyncThunk(
+    'chats/addChatMember',
+    async ({ chatId, userId }, { signal, requestId, getState, rejectWithValue }) => {
+        try {
+            try {
+                await postChatMember(chatId, userId, { signal })
+            } catch (error) {
+                if (!(error instanceof ApiError && error.status === 409)) throw error
+            }
+            // Приглашение уже выполнено: сбой перечитывания не его ошибка, состав остаётся прежним (members: undefined).
+            let members
+            try {
+                members = (await fetchChat(chatId, { signal })).members
+            } catch {
+                members = undefined
+            }
+            if (getState().chats.inviteRequestId !== requestId) return rejectWithValue('stale')
+            return { chatId, members }
+        } catch (error) {
+            if (getState().chats.inviteRequestId !== requestId) return rejectWithValue('stale')
+            return rejectWithValue((error instanceof ApiError && INVITE_ERRORS[error.status]) || 'failed')
+        }
+    },
+    { condition: (_, { getState }) => getState().chats.inviteRequestId === null }
+)
+
 // Отметить чат прочитанным до seq (POST /api/chats/{id}/read). Ошибка запроса отклоняет thunk, счётчик остаётся как был.
 export const markChatRead = createAsyncThunk(
     'chats/markChatRead',
@@ -107,7 +139,8 @@ export const chatsSlice = createSlice({
     // openedWhileLoadingIds — чаты, открытые через createDirectChat или createGroupChat, пока шла загрузка списка: ответ списка их не затирает.
     // createRequestId — запрос этого открытия, чей ответ ждём (после сброса store ответ прежнего запроса отбрасывается).
     // groupRequestId — запрос создания группы, чей ответ ждём (null — группа не создаётся).
-    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] }),
+    // inviteRequestId и invitingUserId — запрос приглашения в группу, чей ответ ждём, и приглашаемый (null — приглашения нет).
+    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] }),
     reducers: {
         // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
         chatReceived: chatsAdapter.addOne,
@@ -172,6 +205,22 @@ export const chatsSlice = createSlice({
             .addCase(createGroupChat.rejected, (state, action) => {
                 if (action.meta.requestId !== state.groupRequestId) return
                 state.groupRequestId = null
+            })
+        builder
+            .addCase(addChatMember.pending, (state, action) => {
+                state.inviteRequestId = action.meta.requestId
+                state.invitingUserId = action.meta.arg.userId
+            })
+            .addCase(addChatMember.fulfilled, (state, { payload }) => {
+                state.inviteRequestId = null
+                state.invitingUserId = null
+                const chat = state.entities[payload.chatId]
+                if (chat && payload.members) chat.members = payload.members.map(({ userId, role }) => ({ userId, role }))
+            })
+            .addCase(addChatMember.rejected, (state, action) => {
+                if (action.meta.requestId !== state.inviteRequestId) return
+                state.inviteRequestId = null
+                state.invitingUserId = null
             })
         // История чата (поле history): status — idle (поля нет) / loading / succeeded / failed; hasMore — есть ли старее;
         // olderStatus — подкачка старых (idle / loading / failed). requestId и olderRequestId — запросы, чьи ответы ждём.
@@ -244,6 +293,15 @@ export const selectChatsStatus = (state) => state.chats.status
 export const selectPendingUserId = (state) => state.chats.pendingUserId
 
 export const selectIsCreatingGroup = (state) => state.chats.groupRequestId !== null
+
+// Id человека, которого приглашают в группу сейчас, или null.
+export const selectInvitingUserId = (state) => state.chats.invitingUserId
+
+// Я — owner чата: false, пока состав не загружен, у direct и неизвестного чата.
+export const selectIsChatOwner = (state, chatId) => {
+    const meId = selectAuthUserId(state)
+    return Boolean(meId) && Boolean(state.chats.entities[chatId]?.members?.some(({ userId, role }) => userId === meId && role === 'owner'))
+}
 
 // Состояние загрузки истории чата или undefined, пока чат не открывали.
 export const selectChatHistory = (state, chatId) => state.chats.entities[chatId]?.history

@@ -1,11 +1,11 @@
-import { configureStore } from '@reduxjs/toolkit';
-import reducer, { createDirectChat, createGroupChat, selectIsCreatingGroup, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import reducer, { createDirectChat, addChatMember, createGroupChat, selectInvitingUserId, selectIsChatOwner, selectIsCreatingGroup, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
 import users from './users';
 import activeChatId from './activeChatId';
-import auth, { checkSession } from './auth';
+import auth, { checkSession, logout } from './auth';
 import { ApiError } from '../services/apiClient';
 import * as chatsApi from '../services/chatsApi';
 
@@ -22,7 +22,7 @@ const localChat = (id, title) =>
 
 describe('chats reducer', () => {
   it('начальное состояние — пустая нормализованная коллекция', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, openedWhileLoadingIds: [] });
+    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] });
   });
 
   it('чаты хранятся в порядке добавления, без сортировки', () => {
@@ -1008,5 +1008,129 @@ describe('markChatRead (прочтение чата)', () => {
 
     await expect(pending).resolves.toBeDefined();
     expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
+  });
+
+  describe('selectIsChatOwner', () => {
+    const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+    const makeStore = (members) => {
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      store.dispatch(chatReceived({ id: 'g1', type: 'group', title: 'T', lastSeq: 0, lastMessage: null, unreadCount: 0, ...(members && { members }) }));
+      return store;
+    };
+
+    it('true, только если текущий пользователь — owner чата', () => {
+      expect(selectIsChatOwner(makeStore([{ userId: 'u1', role: 'owner' }, { userId: 'u2', role: 'member' }]).getState(), 'g1')).toBe(true);
+      expect(selectIsChatOwner(makeStore([{ userId: 'u2', role: 'owner' }, { userId: 'u1', role: 'member' }]).getState(), 'g1')).toBe(false);
+    });
+
+    it('false: нет состава, неизвестный чат или chatId', () => {
+      const store = makeStore();
+      expect(selectIsChatOwner(store.getState(), 'g1')).toBe(false);
+      expect(selectIsChatOwner(store.getState(), 'nope')).toBe(false);
+      expect(selectIsChatOwner(store.getState(), undefined)).toBe(false);
+    });
+  });
+
+  describe('addChatMember', () => {
+    const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+    const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0, members: [{ userId: 'u1', role: 'owner' }] };
+    const after = {
+      id: 'g1', type: 'group', title: 'Team', lastSeq: 0,
+      members: [
+        { userId: 'u1', name: 'Ann', avatarUrl: '', role: 'owner' },
+        { userId: 'u2', name: 'Bob', avatarUrl: '', role: 'member' },
+      ],
+    };
+    const makeStore = () => {
+      const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      store.dispatch(chatReceived(group));
+      return store;
+    };
+
+    it('204: POST по chatId из аргумента, затем GET карточки; состав и users обновляются', async () => {
+      chatsApi.postChatMember.mockResolvedValue(undefined);
+      chatsApi.fetchChat.mockResolvedValue(after);
+      const store = makeStore();
+
+      await store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(chatsApi.postChatMember).toHaveBeenCalledWith('g1', 'u2', { signal: expect.any(AbortSignal) });
+      expect(chatsApi.fetchChat).toHaveBeenCalledWith('g1', { signal: expect.any(AbortSignal) });
+      const state = store.getState();
+      expect(selectChatById(state, 'g1').members).toEqual([{ userId: 'u1', role: 'owner' }, { userId: 'u2', role: 'member' }]);
+      expect(state.users.entities.u2).toEqual({ id: 'u2', name: 'Bob', avatarUrl: '' });
+      expect(selectInvitingUserId(state)).toBeNull();
+    });
+
+    it('409 already_member считается успехом: состав перечитывается', async () => {
+      chatsApi.postChatMember.mockRejectedValue(new ApiError(409, { error: { code: 'already_member' } }));
+      chatsApi.fetchChat.mockResolvedValue(after);
+      const store = makeStore();
+
+      const result = await store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(addChatMember.fulfilled.match(result)).toBe(true);
+      expect(selectChatById(store.getState(), 'g1').members).toHaveLength(2);
+    });
+
+    it('POST 204, повторный GET 500: fulfilled без состава, приглашение не считается ошибкой', async () => {
+      chatsApi.postChatMember.mockResolvedValue(undefined);
+      chatsApi.fetchChat.mockRejectedValue(new ApiError(500, { error: { code: 'x' } }));
+      const store = makeStore();
+
+      const result = await store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(addChatMember.fulfilled.match(result)).toBe(true);
+      expect(selectChatById(store.getState(), 'g1').members).toEqual([{ userId: 'u1', role: 'owner' }]);
+      expect(selectInvitingUserId(store.getState())).toBeNull();
+    });
+
+    it.each([[403, 'forbidden'], [404, 'not_found'], [400, 'limit'], [500, 'failed']])('ошибка %s отклоняет thunk кодом %s, состав не меняется', async (status, code) => {
+      chatsApi.postChatMember.mockRejectedValue(new ApiError(status, { error: { code: 'x' } }));
+      const store = makeStore();
+
+      const result = await store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(result.payload).toBe(code);
+      expect(chatsApi.fetchChat).not.toHaveBeenCalled();
+      expect(selectChatById(store.getState(), 'g1').members).toHaveLength(1);
+      expect(selectInvitingUserId(store.getState())).toBeNull();
+    });
+
+    it('пока запрос идёт, userId виден в selectInvitingUserId и второй запуск не шлёт запрос', async () => {
+      let resolve;
+      chatsApi.postChatMember.mockReturnValue(new Promise((res) => { resolve = res; }));
+      chatsApi.fetchChat.mockResolvedValue(after);
+      const store = makeStore();
+
+      const first = store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+      expect(selectInvitingUserId(store.getState())).toBe('u2');
+      await store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+      resolve();
+      await first;
+
+      expect(chatsApi.postChatMember).toHaveBeenCalledTimes(1);
+    });
+
+    it('ответ после сброса store (выход) отбрасывается (stale)', async () => {
+      let resolve;
+      chatsApi.postChatMember.mockReturnValue(new Promise((res) => { resolve = res; }));
+      chatsApi.fetchChat.mockResolvedValue(after);
+      const appReducer = combineReducers({ chats: reducer, users, activeChatId, auth });
+      const resetOnLogout = (state, action) => appReducer(logout.fulfilled.match(action) ? undefined : state, action);
+      const store = configureStore({ reducer: resetOnLogout });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      store.dispatch(chatReceived(group));
+
+      const pending = store.dispatch(addChatMember({ chatId: 'g1', userId: 'u2' }));
+      store.dispatch(logout.fulfilled(undefined, 'req'));
+      resolve();
+      const result = await pending;
+
+      expect(result.payload).toBe('stale');
+      expect(store.getState().chats.ids).toEqual([]);
+    });
   });
 });

@@ -52,5 +52,5 @@
 - **FE-164 (P3)** Замечания QA FE-108: смена пользователя в другой вкладке (SESSION-09), фокус и шапка на 390px, `hasMore: true`. Подробности: `.ai/memory/backlog/FE-164.md`
 - **FE-165 (P3)** Фокус на список чатов на мобильной ширине при потере чата (выход из группы, `chat.removed`); MINOR ревью FE-45. Подробности: `.ai/memory/backlog/FE-165.md`
 - **FE-166 (P3)** `chatsApi.js`: комментарий у `postChatMember` ссылается на §3.5, должен §3.6. Подробности: `.ai/memory/backlog/FE-166.md`
-- **FE-167 (P2)** Расход `qa-tester`: 48% cache read субагентов, ~36 вызовов на запуск; проверить бюджет 12 + 6n (аудит 2026-10-22). Подробности: `.ai/memory/backlog/FE-167.md`
 - **FE-168 (P3)** Причины повторных запусков `react-engineer`/`react-reviewer` (ревью 75 против инженеров 64 за 14 дней; аудит 2026-10-22). Подробности: `.ai/memory/backlog/FE-168.md`
+- **FE-170 (P3)** `GroupManage`: у кнопок `loading` остаётся `disabled={busy}`, фокус теряется (ревью FE-31). Подробности: `.ai/memory/backlog/FE-170.md`

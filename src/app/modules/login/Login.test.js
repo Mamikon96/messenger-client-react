@@ -422,7 +422,7 @@ describe("Login: одна отправка за раз [UC-AUTH-18]", () => {
         fillAndSubmit("alice", "correct-horse-1", "Войти");
 
         const button = screen.getByRole("button", { name: "Войти" });
-        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute("aria-disabled", "true");
         expect(button).toHaveAttribute("aria-busy", "true");
         fireEvent.click(button);
         fireEvent.submit(screen.getByRole("tabpanel"));

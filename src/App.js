@@ -5,6 +5,7 @@ import Header from './app/modules/header/Header';
 import Login from './app/modules/login/Login';
 import Messenger from './app/modules/messenger/Messenger';
 import { Button } from './app/modules/ui/button/Button';
+import ErrorBoundary from './app/modules/ui/error-boundary/ErrorBoundary';
 import { checkSession, selectAuthStatus, selectAuthUserId } from './app/reducers/auth';
 
 function App() {
@@ -26,12 +27,18 @@ function App() {
         return (
           <>
             <Header/>
-            <Messenger key={userId}/>
+            <ErrorBoundary>
+              <Messenger key={userId}/>
+            </ErrorBoundary>
           </>
         );
       case 'anonymous':
       case 'sessionClosed':
-        return <Login/>;
+        return (
+          <ErrorBoundary>
+            <Login/>
+          </ErrorBoundary>
+        );
       case 'error':
         return (
           <div className="App__status" role="alert">

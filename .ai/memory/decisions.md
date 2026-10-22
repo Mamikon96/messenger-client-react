@@ -107,6 +107,7 @@
 | FE-D02 | Структура «модуль = папка с компонентом и CSS» (зафиксировано из кода) | действует | `decisions/frontend-structure.md` |
 | FE-D19 | Правило экспортов: компонент по default, вспомогательное — именованно (2026-10-09) | действует | `decisions/frontend-structure.md` |
 | FE-D31 | Маршрутизация: `react-router` 7.x (2026-10-13) | действует | `decisions/frontend-structure.md` |
+| FE-D58 | Error Boundary: собственный класс-компонент без библиотек (2026-10-22) | действует | `decisions/frontend-structure.md` |
 
 ## UI: токены, темы, дизайн
 | ID | Название | Статус | Файл |

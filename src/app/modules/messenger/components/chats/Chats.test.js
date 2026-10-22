@@ -49,6 +49,23 @@ describe("Chats: загрузка и список", () => {
         expect(screen.queryByText("Чатов пока нет")).not.toBeInTheDocument();
     });
 
+    test("скелетоны (aria-hidden) есть, пока промис не разрешён, и пропадают после (UC-CHAT-03)", async () => {
+        let release;
+        const { store } = await renderChats(new Promise((resolve) => { release = () => resolve([direct]); }));
+        act(() => {
+            store.dispatch(fetchChats());
+        });
+
+        await screen.findByText("Загрузка чатов…");
+        screen.getAllByTestId("skeleton").forEach((node) => expect(node).toHaveAttribute("aria-hidden", "true"));
+        await act(async () => {
+            release();
+        });
+
+        expect(await screen.findByText("Bob")).toBeInTheDocument();
+        expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    });
+
     test("пустой список — «Чатов пока нет»", async () => {
         const { store } = await renderChats(Promise.resolve([]));
         await load(store);

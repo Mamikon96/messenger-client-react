@@ -10,6 +10,7 @@ import { selectUserEntities } from "../../../../reducers/users";
 import { retryMessage, selectChatMessages, sendMessage } from "../../../../reducers/messages";
 import "./Dialog.css";
 import { Button } from "../../../ui/button/Button";
+import { Skeleton } from "../../../ui/skeleton/Skeleton";
 import { Input } from "../../../ui/input/Input";
 import MessageStatus from "./MessageStatus";
 import InviteMembers from "../invite/InviteMembers";
@@ -18,6 +19,15 @@ import { useReadReceipts } from "../../useReadReceipts";
 
 // Расстояние в пикселях от края ленты, в пределах которого пользователь считается «у края»: у низа — следуем за новыми, у верха — подкачиваем старые.
 const EDGE_THRESHOLD = 50;
+
+// Заглушки истории: чередуются чужие и свои «пузыри»; ширина — доля ленты (не больше max-width строки).
+const SKELETON_BUBBLES = [
+    { own: false, width: "55%" },
+    { own: true, width: "40%" },
+    { own: false, width: "65%" },
+    { own: true, width: "50%" },
+    { own: false, width: "35%" },
+];
 
 // «1 участник», «2 участника», «5 участников», «11 участников»: форма по последним цифрам числа.
 const membersLabel = (count) => {
@@ -163,6 +173,11 @@ function Dialog() {
             )}
             <div className="dialog__content" role="log" aria-label="Сообщения" aria-busy={historyStatus === "loading"} ref={contentRef} onScroll={handleScroll}>
                 {!hasChat && <div className="dialog__status" tabIndex={-1} ref={emptyRef}>Чат не выбран</div>}
+                {historyStatus === "loading" && SKELETON_BUBBLES.map(({ own, width }, index) => (
+                    <div key={index} className={`dialog__row${own ? " _own" : ""}`} style={{ width }}>
+                        <Skeleton height="40px" />
+                    </div>
+                ))}
                 {isEmpty && <div className="dialog__status">Сообщений пока нет</div>}
                 {chatMessages.map((message) => {
                     const own = message.senderId === userId;

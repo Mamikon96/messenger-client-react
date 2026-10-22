@@ -74,6 +74,25 @@ test('[UC-CHAT-03] пока список загружается, виден ин
   await expect(page.getByText('Загрузка чатов…')).toHaveCount(0);
 });
 
+test('[UC-CHAT-03] пока список загружается, рядом с подписью видны скелетон-заглушки', async ({ page }) => {
+  let release;
+  const released = new Promise((resolve) => { release = resolve; });
+  await page.route('**/api/chats', async (route) => {
+    await released;
+    await route.fulfill({ json: SERVER_CHATS });
+  });
+  await login(page);
+
+  await expect(page.locator('.chats .skeleton').first()).toBeVisible();
+  await expect(page.locator('.chats .skeleton').first()).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('.chats .skeleton').first()).toHaveCSS('animation-name', 'skeleton-pulse');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.chats .skeleton').first()).toHaveCSS('animation-name', 'none');
+  release();
+  await expect(page.locator('.chat')).toHaveCount(3);
+  await expect(page.locator('.skeleton')).toHaveCount(0);
+});
+
 test('[UC-CHAT-03] сбой загрузки: сообщение и «Повторить», после которого список загружается', async ({ page }) => {
   let fail = true;
   await page.route('**/api/chats', (route) => (fail ? route.fulfill({ status: 500, json: { error: { code: 'internal' } } }) : route.fulfill({ json: SERVER_CHATS })));

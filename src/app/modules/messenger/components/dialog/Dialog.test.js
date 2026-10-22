@@ -252,9 +252,12 @@ describe('Dialog: история серверного чата', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Загрузка сообщений…');
     expect(screen.getByText('Команда')).toBeInTheDocument();
+    const skeletons = screen.getAllByTestId('skeleton');
+    skeletons.forEach((node) => expect(node).toHaveAttribute('aria-hidden', 'true'));
     await act(async () => {
       release();
     });
+    expect(screen.queryByTestId('skeleton')).not.toBeInTheDocument();
 
     expect(await screen.findByText('привет')).toBeInTheDocument();
     expect(screen.getByText('здорово')).toBeInTheDocument();

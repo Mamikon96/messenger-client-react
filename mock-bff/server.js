@@ -210,6 +210,10 @@ function createServer() {
     if (req.method === 'GET' && parts.length === 2 && parts[1] === 'chats') return json(res, 200, []);
     // GET /api/chats/:id (карточка группы, где я участник; прочих чатов в mock нет: 404)
     if (req.method === 'GET' && parts.length === 3 && parts[1] === 'chats') return getChat(res, parts[2], session);
+    // PATCH /api/chats/:id
+    if (req.method === 'PATCH' && parts.length === 3 && parts[1] === 'chats') return patchChat(req, res, parts[2], session);
+    // DELETE /api/chats/:id/members/:userId
+    if (req.method === 'DELETE' && parts.length === 5 && parts[1] === 'chats' && parts[3] === 'members') return deleteMember(res, parts[2], parts[4], session);
     // POST /api/chats/:id/members
     if (req.method === 'POST' && parts.length === 4 && parts[1] === 'chats' && parts[3] === 'members') return postMember(req, res, parts[2], session);
     // GET /api/chats/:id/messages (чатов в mock нет: 404)
@@ -281,6 +285,36 @@ function createServer() {
     if (group.members.some(({ userId }) => userId === target.user.id)) return error(res, 409, 'already_member', 'Уже участник');
     if (group.members.length >= MAX_MEMBERS) return error(res, 400, 'validation_failed', 'В группе не больше 100 участников');
     group.members.push(toMember(target.user));
+    return empty(res, 204);
+  }
+
+  // Переименование группы, §3.5: 200 + ChatDto; порядок: тело 400 -> членство 404 -> direct 400 -> не owner 403.
+  async function patchChat(req, res, chatId, session) {
+    const body = await readBody(req);
+    const title = body && typeof body.title === 'string' ? body.title.trim() : '';
+    if (title === '' || title.length > 100) return error(res, 400, 'validation_failed', 'Проверьте поля формы');
+    const group = groupChats.get(chatId);
+    const mine = group && group.members.find(({ userId }) => userId === session.user.id);
+    const isDirect = [...directChats.values()].some(({ id, members }) => id === chatId && members.some(({ userId }) => userId === session.user.id));
+    if (!mine && !isDirect) return error(res, 404, 'not_found', 'Чат не найден');
+    if (isDirect) return error(res, 400, 'validation_failed', 'Direct-чат не переименовать');
+    if (mine.role !== 'owner') return error(res, 403, 'forbidden', 'Переименовать может только владелец');
+    group.title = title;
+    return json(res, 200, group);
+  }
+
+  // Убрать участника или выйти, §3.7: 204; порядок: членство 404 -> direct 400 -> чужого убирает не owner 403 -> owner выходит сам 403 -> цели нет 404.
+  function deleteMember(res, chatId, targetId, session) {
+    const group = groupChats.get(chatId);
+    const mine = group && group.members.find(({ userId }) => userId === session.user.id);
+    const isDirect = [...directChats.values()].some(({ id, members }) => id === chatId && members.some(({ userId }) => userId === session.user.id));
+    if (!mine && !isDirect) return error(res, 404, 'not_found', 'Чат не найден');
+    if (isDirect) return error(res, 400, 'validation_failed', 'Из direct-чата не выйти');
+    if (targetId !== session.user.id && mine.role !== 'owner') return error(res, 403, 'forbidden', 'Убирать участников может только владелец');
+    if (targetId === session.user.id && mine.role === 'owner') return error(res, 403, 'forbidden', 'Владелец не может выйти из группы');
+    const index = group.members.findIndex(({ userId }) => userId === targetId);
+    if (index === -1) return error(res, 404, 'not_found', 'Участник не найден');
+    group.members.splice(index, 1);
     return empty(res, 204);
   }
 

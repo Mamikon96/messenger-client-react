@@ -1,10 +1,10 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
-import reducer, { createDirectChat, addChatMember, createGroupChat, selectInvitingUserId, selectIsChatOwner, selectIsCreatingGroup, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
+import reducer, { createDirectChat, addChatMember, renameChat, removeChatMember, selectIsGroupMember, selectManagingTarget, createGroupChat, selectInvitingUserId, selectIsChatOwner, selectIsCreatingGroup, selectPendingUserId, chatReceived, chatsReconciled, chatUpdated, fetchChats, toChatFromDto, selectChatById, selectChatHistory, selectChatMembersCount, selectChatName, selectChats, selectChatsStatus, markChatRead } from './chats';
 import { loadChatHistory, loadOlderMessages, PAGE_SIZE } from './chatHistory';
 import { chatRemoved, messageAdded } from './messageEvents';
 import messages from './messages';
 import users from './users';
-import activeChatId from './activeChatId';
+import activeChatId, { chatSelected } from './activeChatId';
 import auth, { checkSession, logout } from './auth';
 import { ApiError } from '../services/apiClient';
 import * as chatsApi from '../services/chatsApi';
@@ -22,7 +22,7 @@ const localChat = (id, title) =>
 
 describe('chats reducer', () => {
   it('начальное состояние — пустая нормализованная коллекция', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] });
+    expect(reducer(undefined, { type: '@@init' })).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, manageRequestId: null, managingTarget: null, openedWhileLoadingIds: [] });
   });
 
   it('чаты хранятся в порядке добавления, без сортировки', () => {
@@ -1130,6 +1130,181 @@ describe('markChatRead (прочтение чата)', () => {
       const result = await pending;
 
       expect(result.payload).toBe('stale');
+      expect(store.getState().chats.ids).toEqual([]);
+    });
+  });
+});
+
+describe('управление группой', () => {
+  const me = { id: 'u1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: '' };
+  const members = [{ userId: 'u1', role: 'owner' }, { userId: 'u2', role: 'member' }];
+  const group = { id: 'g1', type: 'group', title: 'Team', lastSeq: 0, lastMessage: null, unreadCount: 0, members };
+  const makeStore = (chat = group) => {
+    const store = configureStore({ reducer: { chats: reducer, users, activeChatId, auth } });
+    store.dispatch(checkSession.fulfilled(me, 'req'));
+    store.dispatch(chatReceived(chat));
+    return store;
+  };
+
+  describe('selectIsGroupMember', () => {
+    it('true: группа, где я среди участников (любая роль)', () => {
+      expect(selectIsGroupMember(makeStore().getState(), 'g1')).toBe(true);
+      expect(selectIsGroupMember(makeStore({ ...group, members: [{ userId: 'u1', role: 'member' }] }).getState(), 'g1')).toBe(true);
+    });
+
+    it('false: direct, нет состава, меня нет в составе, неизвестный чат', () => {
+      expect(selectIsGroupMember(makeStore({ ...group, type: 'direct' }).getState(), 'g1')).toBe(false);
+      expect(selectIsGroupMember(makeStore({ ...group, members: undefined }).getState(), 'g1')).toBe(false);
+      expect(selectIsGroupMember(makeStore({ ...group, members: [{ userId: 'u2', role: 'owner' }] }).getState(), 'g1')).toBe(false);
+      expect(selectIsGroupMember(makeStore().getState(), 'nope')).toBe(false);
+    });
+  });
+
+  describe('renameChat', () => {
+    it('PATCH по chatId и title из аргумента; название чата берётся из ответа', async () => {
+      chatsApi.patchChat.mockResolvedValue({ id: 'g1', type: 'group', title: 'Новое', lastSeq: 0, members: [] });
+      const store = makeStore();
+
+      const result = await store.dispatch(renameChat({ chatId: 'g1', title: 'Новое' }));
+
+      expect(chatsApi.patchChat).toHaveBeenCalledWith('g1', 'Новое', { signal: expect.any(AbortSignal) });
+      expect(renameChat.fulfilled.match(result)).toBe(true);
+      expect(selectChatById(store.getState(), 'g1').title).toBe('Новое');
+      expect(selectChatById(store.getState(), 'g1').members).toEqual(members);
+      expect(store.getState().chats.manageRequestId).toBeNull();
+      expect(selectManagingTarget(store.getState())).toBeNull();
+    });
+
+    it.each([[400, 'invalid'], [403, 'forbidden'], [404, 'not_found'], [500, 'failed']])('ошибка %s отклоняет thunk кодом %s, название не меняется', async (status, code) => {
+      chatsApi.patchChat.mockRejectedValue(new ApiError(status, { error: { code: 'x' } }));
+      const store = makeStore();
+
+      const result = await store.dispatch(renameChat({ chatId: 'g1', title: 'Новое' }));
+
+      expect(result.payload).toBe(code);
+      expect(selectChatById(store.getState(), 'g1').title).toBe('Team');
+      expect(store.getState().chats.manageRequestId).toBeNull();
+    });
+
+    it('пока запрос идёт, повторный запуск отменяется', async () => {
+      let resolve;
+      chatsApi.patchChat.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const store = makeStore();
+
+      const first = store.dispatch(renameChat({ chatId: 'g1', title: 'A' }));
+      expect(selectManagingTarget(store.getState())).toBe('title');
+      await store.dispatch(renameChat({ chatId: 'g1', title: 'B' }));
+      resolve({ id: 'g1', type: 'group', title: 'A', lastSeq: 0, members: [] });
+      await first;
+
+      expect(chatsApi.patchChat).toHaveBeenCalledTimes(1);
+    });
+
+    it('store сбросили, пока шёл запрос: ответ отбрасывается (stale)', async () => {
+      let resolve;
+      chatsApi.patchChat.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const appReducer = combineReducers({ chats: reducer, users, activeChatId, auth });
+      const store = configureStore({ reducer: (state, action) => appReducer(logout.fulfilled.match(action) ? undefined : state, action) });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      store.dispatch(chatReceived(group));
+
+      const pending = store.dispatch(renameChat({ chatId: 'g1', title: 'A' }));
+      store.dispatch(logout.fulfilled(undefined, 'req'));
+      resolve({ id: 'g1', type: 'group', title: 'A', lastSeq: 0, members: [] });
+      const result = await pending;
+
+      expect(result.payload).toBe('stale');
+      expect(store.getState().chats.ids).toEqual([]);
+    });
+  });
+
+  describe('removeChatMember', () => {
+    it('убрать участника: DELETE по chatId и userId, участник уходит из состава, чат остаётся активным', async () => {
+      chatsApi.deleteChatMember.mockResolvedValue(undefined);
+      const store = makeStore();
+      store.dispatch(chatSelected('g1'));
+
+      const result = await store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(chatsApi.deleteChatMember).toHaveBeenCalledWith('g1', 'u2', { signal: expect.any(AbortSignal) });
+      expect(removeChatMember.fulfilled.match(result)).toBe(true);
+      expect(selectChatById(store.getState(), 'g1').members).toEqual([{ userId: 'u1', role: 'owner' }]);
+      expect(store.getState().activeChatId).toBe('g1');
+      expect(store.getState().chats.manageRequestId).toBeNull();
+      expect(selectManagingTarget(store.getState())).toBeNull();
+    });
+
+    it('выход (userId — я): чат убирается из стора, активный чат сбрасывается', async () => {
+      chatsApi.deleteChatMember.mockResolvedValue(undefined);
+      const store = makeStore({ ...group, members: [{ userId: 'u2', role: 'owner' }, { userId: 'u1', role: 'member' }] });
+      store.dispatch(chatReceived({ ...group, id: 'g2' }));
+      store.dispatch(chatSelected('g1'));
+
+      await store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u1' }));
+
+      expect(selectChatById(store.getState(), 'g1')).toBeUndefined();
+      expect(selectChatById(store.getState(), 'g2')).toBeDefined();
+      expect(store.getState().activeChatId).toBeNull();
+    });
+
+    it('выход не сбрасывает другой активный чат', async () => {
+      chatsApi.deleteChatMember.mockResolvedValue(undefined);
+      const store = makeStore({ ...group, members: [{ userId: 'u2', role: 'owner' }, { userId: 'u1', role: 'member' }] });
+      store.dispatch(chatReceived({ ...group, id: 'g2' }));
+      store.dispatch(chatSelected('g2'));
+
+      await store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u1' }));
+
+      expect(store.getState().activeChatId).toBe('g2');
+    });
+
+    it.each([[403, 'forbidden'], [404, 'not_found'], [400, 'failed'], [500, 'failed']])('ошибка %s отклоняет thunk кодом %s, состав и чат не меняются', async (status, code) => {
+      chatsApi.deleteChatMember.mockRejectedValue(new ApiError(status, { error: { code: 'x' } }));
+      const store = makeStore();
+      store.dispatch(chatSelected('g1'));
+
+      const result = await store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u2' }));
+
+      expect(result.payload).toBe(code);
+      expect(selectChatById(store.getState(), 'g1').members).toEqual(members);
+      expect(store.getState().activeChatId).toBe('g1');
+      expect(store.getState().chats.manageRequestId).toBeNull();
+    });
+
+    it('пока идёт запрос, цель известна, повторный запуск отменяется', async () => {
+      let resolve;
+      chatsApi.deleteChatMember.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const store = makeStore();
+
+      const first = store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u2' }));
+      expect(selectManagingTarget(store.getState())).toBe('u2');
+      await store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u3' }));
+      resolve();
+      await first;
+
+      expect(chatsApi.deleteChatMember).toHaveBeenCalledTimes(1);
+    });
+
+    it('store сбросили, пока шёл запрос: ответ отбрасывается (stale), chatRemoved не диспатчится', async () => {
+      let resolve;
+      chatsApi.deleteChatMember.mockReturnValue(new Promise((res) => { resolve = res; }));
+      const appReducer = combineReducers({ chats: reducer, users, activeChatId, auth });
+      const actions = [];
+      const spy = () => (next) => (action) => { actions.push(action.type); return next(action); };
+      const store = configureStore({
+        reducer: (state, action) => appReducer(logout.fulfilled.match(action) ? undefined : state, action),
+        middleware: (getDefault) => getDefault().concat(spy),
+      });
+      store.dispatch(checkSession.fulfilled(me, 'req'));
+      store.dispatch(chatReceived(group));
+
+      const pending = store.dispatch(removeChatMember({ chatId: 'g1', userId: 'u1' }));
+      store.dispatch(logout.fulfilled(undefined, 'req'));
+      resolve();
+      const result = await pending;
+
+      expect(result.payload).toBe('stale');
+      expect(actions).not.toContain(chatRemoved.type);
       expect(store.getState().chats.ids).toEqual([]);
     });
   });

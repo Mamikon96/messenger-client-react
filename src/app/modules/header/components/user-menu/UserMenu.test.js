@@ -168,7 +168,7 @@ describe('меню пользователя', () => {
     await waitFor(() => expect(store.getState().auth.status).toBe('anonymous'));
     expect(authApi.logout).toHaveBeenCalledTimes(1);
     expect(store.getState()).toEqual({
-      chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] },
+      chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, manageRequestId: null, managingTarget: null, openedWhileLoadingIds: [] },
       messages: {},
       outbox: { ids: [], entities: {} },
       users: { ids: [], entities: {} },

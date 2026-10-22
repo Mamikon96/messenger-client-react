@@ -13,6 +13,7 @@ import { Button } from "../../../ui/button/Button";
 import { Input } from "../../../ui/input/Input";
 import MessageStatus from "./MessageStatus";
 import InviteMembers from "../invite/InviteMembers";
+import GroupManage from "../group-manage/GroupManage";
 import { useReadReceipts } from "../../useReadReceipts";
 
 // Расстояние в пикселях от края ленты, в пределах которого пользователь считается «у края»: у низа — следуем за новыми, у верха — подкачиваем старые.
@@ -48,6 +49,8 @@ function Dialog() {
     const contentRef = useRef(null);
     const atBottomRef = useRef(true);
     const snapshotRef = useRef(null);
+    const emptyRef = useRef(null);
+    const hadChatRef = useRef(false);
 
     const hasChat = Boolean(chatId);
     const showAuthors = activeChat?.type === "group";
@@ -57,6 +60,14 @@ function Dialog() {
 
     const historyReady = activeChat?.local || historyStatus === "succeeded";
     const isEmpty = hasChat && historyReady && chatMessages.length === 0 && outbox.length === 0;
+
+    // Чат потерян (выход из группы, chat.removed): кнопка-триггер размонтирована и фокус ушёл на body — переводим его на заголовок пустого состояния.
+    // Фокус в другом поле не трогаем. На ширине <768px `.dialog` скрыт, focus() там не срабатывает.
+    useEffect(() => {
+        const lost = !document.activeElement || document.activeElement === document.body;
+        if (hadChatRef.current && !chatId && lost) emptyRef.current?.focus();
+        hadChatRef.current = Boolean(chatId);
+    }, [chatId]);
 
     useEffect(() => {
         if (chatId) dispatch(loadChatHistory(chatId));
@@ -134,6 +145,7 @@ function Dialog() {
                 </div>
                 {membersCount !== null && <div className="dialog__header-meta">{membersLabel(membersCount)}</div>}
                 {hasChat && <InviteMembers chatId={chatId} />}
+                {hasChat && <GroupManage chatId={chatId} />}
             </div>
             {historyStatus === "loading" && <div className="dialog__status" role="status">Загрузка сообщений…</div>}
             {historyStatus === "failed" && (
@@ -150,7 +162,7 @@ function Dialog() {
                 </div>
             )}
             <div className="dialog__content" role="log" aria-label="Сообщения" aria-busy={historyStatus === "loading"} ref={contentRef} onScroll={handleScroll}>
-                {!hasChat && <div className="dialog__status">Чат не выбран</div>}
+                {!hasChat && <div className="dialog__status" tabIndex={-1} ref={emptyRef}>Чат не выбран</div>}
                 {isEmpty && <div className="dialog__status">Сообщений пока нет</div>}
                 {chatMessages.map((message) => {
                     const own = message.senderId === userId;

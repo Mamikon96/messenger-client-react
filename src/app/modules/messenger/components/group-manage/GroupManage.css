@@ -1,0 +1,32 @@
+.group-manage {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.group-manage .group-manage__title {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.group-manage .group-manage__members {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.group-manage .group-manage__member {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.group-manage .group-manage__error {
+    margin: 0;
+    color: var(--color-danger);
+}

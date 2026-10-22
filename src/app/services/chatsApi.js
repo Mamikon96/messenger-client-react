@@ -42,6 +42,16 @@ export function postChatMember(chatId, userId, { signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/members`, { method: "POST", body: { userId }, signal });
 }
 
+// Переименовать группу: ChatDto (200; §3.5). 400 — название не подходит, 403 — не owner, 404 — нет чата или вы не участник.
+export function patchChat(chatId, title, { signal } = {}) {
+    return apiRequest(`/api/chats/${encodeURIComponent(chatId)}`, { method: "PATCH", body: { title }, signal });
+}
+
+// Убрать участника из группы или выйти самому, если userId — свой (204 без тела; §3.7). 403 — не owner или owner выходит сам, 404 — нет чата или участника.
+export function deleteChatMember(chatId, userId, { signal } = {}) {
+    return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/members/${encodeURIComponent(userId)}`, { method: "DELETE", signal });
+}
+
 // Отметка о прочтении: last_read_seq = max(текущий, seq) (204 без тела; 400 — seq больше lastSeq чата; §3.10). Событий о прочтении нет.
 export function postRead(chatId, { seq, signal } = {}) {
     return apiRequest(`/api/chats/${encodeURIComponent(chatId)}/read`, { method: "POST", body: { seq }, signal });

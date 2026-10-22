@@ -518,3 +518,88 @@ test('POST /api/chats/:id/members: сто участников — лимит, �
   const extra = await register(98);
   await expectError(await add(extra.id), 400, 'validation_failed');
 });
+
+test('PATCH /api/chats/:id и DELETE /api/chats/:id/members/:userId: без сессии — 401, без CSRF — 403', async () => {
+  expect((await api.patch('/api/chats/c1', { data: { title: 'X' } })).status()).toBe(401);
+  expect((await api.delete('/api/chats/c1/members/u1')).status()).toBe(401);
+  await signIn();
+  await expectError(await api.patch('/api/chats/c1', { data: { title: 'X' } }), 403, 'csrf_invalid');
+  await expectError(await api.delete('/api/chats/c1/members/u1'), 403, 'csrf_invalid');
+});
+
+test('PATCH /api/chats/:id: 200 и новое название в ChatDto и GET, ошибки 400/404', async () => {
+  const csrfToken = await signInWithCsrf();
+  const headers = { 'X-CSRF-Token': csrfToken };
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const group = await (await api.post('/api/chats', { data: { type: 'group', title: 'Team', memberIds: [] }, headers })).json();
+  const rename = (chatId, data) => api.patch(`/api/chats/${chatId}`, { data, headers });
+
+  const renamed = await rename(group.id, { title: '  Новое  ' });
+  expect(renamed.status()).toBe(200);
+  expect(await renamed.json()).toEqual({ ...group, title: 'Новое' });
+  expect((await (await api.get(`/api/chats/${group.id}`)).json()).title).toBe('Новое');
+
+  for (const data of [{}, { title: 5 }, { title: '   ' }, { title: 'a'.repeat(101) }]) {
+    await expectError(await rename(group.id, data), 400, 'validation_failed', undefined, JSON.stringify(data));
+  }
+  await expectError(await rename('no-such-chat', { title: 'X' }), 404, 'not_found');
+
+  const direct = await (await api.post('/api/chats', { data: { type: 'direct', userId: bob.id }, headers })).json();
+  await expectError(await rename(direct.id, { title: 'X' }), 400, 'validation_failed');
+});
+
+test('PATCH /api/chats/:id: не owner — 403 forbidden', async () => {
+  const aliceSession = await (await signIn()).json();
+  const bobApi = await request.newContext({ baseURL, maxRedirects: 0 });
+  try {
+    const bobSignIn = await bobApi.post('/api/auth/login', { data: { login: 'bob', password: 'correct-horse-1' } });
+    expect(bobSignIn.status()).toBe(200);
+    const bobHeaders = { 'X-CSRF-Token': (await bobSignIn.json()).csrfToken };
+    const group = await (await bobApi.post('/api/chats', { data: { type: 'group', title: 'Bob group', memberIds: [] }, headers: bobHeaders })).json();
+    expect((await bobApi.post(`/api/chats/${group.id}/members`, { data: { userId: aliceSession.user.id }, headers: bobHeaders })).status()).toBe(204);
+
+    await expectError(await api.patch(`/api/chats/${group.id}`, { data: { title: 'X' }, headers: { 'X-CSRF-Token': aliceSession.csrfToken } }), 403, 'forbidden');
+  } finally {
+    await bobApi.dispose();
+  }
+});
+
+test('DELETE /api/chats/:id/members/:userId: owner убирает участника — 204, ошибки 404/400/403', async () => {
+  const csrfToken = await signInWithCsrf();
+  const headers = { 'X-CSRF-Token': csrfToken };
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const group = await (await api.post('/api/chats', { data: { type: 'group', title: 'Team', memberIds: [] }, headers })).json();
+  const ownerId = group.members[0].userId;
+  expect((await api.post(`/api/chats/${group.id}/members`, { data: { userId: bob.id }, headers })).status()).toBe(204);
+  const remove = (chatId, userId) => api.delete(`/api/chats/${chatId}/members/${userId}`, { headers });
+
+  await expectError(await remove(group.id, ownerId), 403, 'forbidden');
+  await expectError(await remove(group.id, 'no-such-user'), 404, 'not_found');
+  await expectError(await remove('no-such-chat', bob.id), 404, 'not_found');
+  const direct = await (await api.post('/api/chats', { data: { type: 'direct', userId: bob.id }, headers })).json();
+  await expectError(await remove(direct.id, bob.id), 400, 'validation_failed');
+
+  expect((await remove(group.id, bob.id)).status()).toBe(204);
+  expect((await (await api.get(`/api/chats/${group.id}`)).json()).members).toEqual([expect.objectContaining({ userId: ownerId, role: 'owner' })]);
+  await expectError(await remove(group.id, bob.id), 404, 'not_found');
+});
+
+test('DELETE /api/chats/:id/members/:userId: участник выходит сам — 204 и чат недоступен, чужого убрать — 403', async () => {
+  const aliceSession = await (await signIn()).json();
+  const aliceHeaders = { 'X-CSRF-Token': aliceSession.csrfToken };
+  const [bob] = await (await api.get('/api/users?q=bob')).json();
+  const bobApi = await request.newContext({ baseURL, maxRedirects: 0 });
+  try {
+    const bobSignIn = await bobApi.post('/api/auth/login', { data: { login: 'bob', password: 'correct-horse-1' } });
+    expect(bobSignIn.status()).toBe(200);
+    const bobHeaders = { 'X-CSRF-Token': (await bobSignIn.json()).csrfToken };
+    const group = await (await bobApi.post('/api/chats', { data: { type: 'group', title: 'Bob group', memberIds: [] }, headers: bobHeaders })).json();
+    expect((await bobApi.post(`/api/chats/${group.id}/members`, { data: { userId: aliceSession.user.id }, headers: bobHeaders })).status()).toBe(204);
+
+    await expectError(await api.delete(`/api/chats/${group.id}/members/${bob.id}`, { headers: aliceHeaders }), 403, 'forbidden');
+    expect((await api.delete(`/api/chats/${group.id}/members/${aliceSession.user.id}`, { headers: aliceHeaders })).status()).toBe(204);
+    await expectError(await api.get(`/api/chats/${group.id}`), 404, 'not_found');
+  } finally {
+    await bobApi.dispose();
+  }
+});

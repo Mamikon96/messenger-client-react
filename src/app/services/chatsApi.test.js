@@ -1,4 +1,4 @@
-import { fetchChat, fetchChats, fetchMessages, postChatMember, postDirectChat, postGroupChat, postMessage, postRead } from "./chatsApi";
+import { deleteChatMember, fetchChat, fetchChats, fetchMessages, patchChat, postChatMember, postDirectChat, postGroupChat, postMessage, postRead } from "./chatsApi";
 import { setUnauthorizedHandler } from "./apiClient";
 
 const reply = (status, body) => ({
@@ -166,6 +166,35 @@ describe("chatsApi: открытие чата", () => {
         expect(JSON.parse(options.body)).toEqual({ userId: "u2" });
         expect(options.signal).toBe(signal);
         await expect(postChatMember("c1", "u2")).rejects.toMatchObject({ status: 409, code: "already_member" });
+    });
+
+    it("patchChat шлёт PATCH /api/chats/:id с title и возвращает ChatDto; 403 приходит как ApiError", async () => {
+        const dto = { id: "c 1", type: "group", title: "New", lastSeq: 0, members: [] };
+        fetch.mockResolvedValueOnce(reply(200, dto)).mockResolvedValueOnce(reply(403, { error: { code: "forbidden" } }));
+        const { signal } = new AbortController();
+
+        await expect(patchChat("c 1", "New", { signal })).resolves.toEqual(dto);
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201");
+        expect(options.method).toBe("PATCH");
+        expect(JSON.parse(options.body)).toEqual({ title: "New" });
+        expect(options.signal).toBe(signal);
+        await expect(patchChat("c1", "New")).rejects.toMatchObject({ status: 403, code: "forbidden" });
+    });
+
+    it("deleteChatMember шлёт DELETE /api/chats/:id/members/:userId и принимает 204; 404 приходит как ApiError", async () => {
+        fetch.mockResolvedValueOnce(reply(204)).mockResolvedValueOnce(reply(404, { error: { code: "not_found" } }));
+        const { signal } = new AbortController();
+
+        await deleteChatMember("c 1", "u/2", { signal });
+
+        const [url, options] = fetch.mock.calls[0];
+        expect(url).toBe("/api/chats/c%201/members/u%2F2");
+        expect(options.method).toBe("DELETE");
+        expect(options.body).toBeUndefined();
+        expect(options.signal).toBe(signal);
+        await expect(deleteChatMember("c1", "u2")).rejects.toMatchObject({ status: 404, code: "not_found" });
     });
 
     it("postDirectChat шлёт POST /api/chats с type direct и userId и возвращает ChatDto (201 и 200)", async () => {

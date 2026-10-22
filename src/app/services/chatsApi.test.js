@@ -8,6 +8,9 @@ const reply = (status, body) => ({
     text: () => Promise.resolve(body === undefined ? "" : JSON.stringify(body)),
 });
 
+const EMPTY_PAGE = { messages: [], hasMore: false };
+const EMPTY_CHAT = { id: "c1", type: "group", title: "Team", lastSeq: 0, members: [] };
+
 describe("chatsApi", () => {
     beforeEach(() => {
         global.fetch = jest.fn();
@@ -78,7 +81,7 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("fetchMessages без параметров шлёт GET без query", async () => {
-        const page = { messages: [{ chatId: "c1", seq: 1 }], hasMore: true };
+        const page = { messages: [{ chatId: "c1", seq: 1, senderId: "u1", clientId: "k1", body: "hi", createdAt: "2026-10-15T10:00:00.000Z" }], hasMore: true };
         fetch.mockResolvedValueOnce(reply(200, page));
 
         await expect(fetchMessages("c1")).resolves.toEqual(page);
@@ -87,7 +90,7 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("fetchMessages передаёт before и limit в query", async () => {
-        fetch.mockResolvedValueOnce(reply(200, []));
+        fetch.mockResolvedValueOnce(reply(200, EMPTY_PAGE));
 
         await fetchMessages("c1", { before: 51, limit: 50 });
 
@@ -95,7 +98,7 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("fetchMessages передаёт since в query (догонка после пропуска seq)", async () => {
-        fetch.mockResolvedValueOnce(reply(200, []));
+        fetch.mockResolvedValueOnce(reply(200, EMPTY_PAGE));
 
         await fetchMessages("c1", { since: 7, limit: 100 });
 
@@ -103,7 +106,7 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("fetchChat и fetchMessages пробрасывают signal", async () => {
-        fetch.mockResolvedValue(reply(200, []));
+        fetch.mockResolvedValueOnce(reply(200, EMPTY_CHAT)).mockResolvedValueOnce(reply(200, EMPTY_PAGE));
         const { signal } = new AbortController();
 
         await fetchChat("c1", { signal });
@@ -133,7 +136,7 @@ describe("chatsApi: открытие чата", () => {
     });
 
     it("postMessage пробрасывает signal", async () => {
-        fetch.mockResolvedValue(reply(201, {}));
+        fetch.mockResolvedValue(reply(201, { chatId: "c1", seq: 1, senderId: "u1", clientId: "k1", body: "hi", createdAt: "2026-10-15T10:00:00.000Z" }));
         const { signal } = new AbortController();
 
         await postMessage("c1", { clientId: "k1", body: "hi", signal });
@@ -212,7 +215,7 @@ describe("chatsApi: открытие чата", () => {
 
     it("postDirectChat пробрасывает signal; 404 — ApiError", async () => {
         const { signal } = new AbortController();
-        fetch.mockResolvedValueOnce(reply(201, {})).mockResolvedValueOnce(reply(404, { error: { code: "not_found" } }));
+        fetch.mockResolvedValueOnce(reply(201, EMPTY_CHAT)).mockResolvedValueOnce(reply(404, { error: { code: "not_found" } }));
 
         await postDirectChat("u2", { signal });
         expect(fetch.mock.calls[0][1].signal).toBe(signal);
@@ -234,11 +237,79 @@ describe("chatsApi: открытие чата", () => {
 
     it("postGroupChat пробрасывает signal; 400 — ApiError", async () => {
         const { signal } = new AbortController();
-        fetch.mockResolvedValueOnce(reply(201, {})).mockResolvedValueOnce(reply(400, { error: { code: "validation_failed" } }));
+        fetch.mockResolvedValueOnce(reply(201, EMPTY_CHAT)).mockResolvedValueOnce(reply(400, { error: { code: "validation_failed" } }));
 
         await postGroupChat("Team", { signal });
         expect(fetch.mock.calls[0][1].signal).toBe(signal);
 
         await expect(postGroupChat(" ")).rejects.toMatchObject({ status: 400, code: "validation_failed" });
+    });
+});
+
+describe("chatsApi: проверка формы ответа", () => {
+    const member = { userId: "u1", name: "Ann", avatarUrl: "", role: "owner" };
+    const message = { chatId: "c1", seq: 1, senderId: "u1", clientId: "k1", body: "hi", createdAt: "2026-10-15T10:00:00.000Z" };
+    const chatDto = { id: "c1", type: "group", title: "Team", lastSeq: 1, members: [member] };
+    const listItem = { id: "c1", type: "group", title: "Team", lastSeq: 1, lastMessage: message, unreadCount: 0 };
+    const directItem = { id: "d1", type: "direct", title: null, lastSeq: 0, lastMessage: null, unreadCount: 0, peer: { id: "u2", name: "Bob", avatarUrl: "" } };
+
+    beforeEach(() => {
+        global.fetch = jest.fn();
+        setUnauthorizedHandler(null);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+    });
+
+    it("валидные ответы возвращаются как есть", async () => {
+        fetch
+            .mockResolvedValueOnce(reply(200, [listItem, directItem]))
+            .mockResolvedValueOnce(reply(200, chatDto))
+            .mockResolvedValueOnce(reply(200, { messages: [message], hasMore: false }))
+            .mockResolvedValueOnce(reply(201, message));
+
+        await expect(fetchChats()).resolves.toEqual([listItem, directItem]);
+        await expect(fetchChat("c1")).resolves.toEqual(chatDto);
+        await expect(fetchMessages("c1")).resolves.toEqual({ messages: [message], hasMore: false });
+        await expect(postMessage("c1", { clientId: "k1", body: "hi" })).resolves.toEqual(message);
+    });
+
+    it.each([
+        ["fetchChats", () => fetchChats(), "GET /api/chats", [{ ...listItem, title: 42 }]],
+        ["fetchChat", () => fetchChat("c1"), "GET /api/chats/:id", { ...chatDto, members: [{ ...member, name: 42 }] }],
+        ["fetchMessages", () => fetchMessages("c1"), "GET /api/chats/:id/messages", { messages: [{ ...message, body: 42 }], hasMore: false }],
+        ["postMessage", () => postMessage("c1", { clientId: "k1", body: "hi" }), "POST /api/chats/:id/messages", { ...message, seq: "1" }],
+        ["postDirectChat", () => postDirectChat("u2"), "POST /api/chats", { ...chatDto, type: "channel" }],
+        ["postGroupChat", () => postGroupChat("Team"), "POST /api/chats", { ...chatDto, id: 7 }],
+        ["patchChat", () => patchChat("c1", "New"), "PATCH /api/chats/:id", { ...chatDto, members: null }],
+    ])("%s: поле неверного типа даёт ошибку запроса", async (_name, call, endpoint, body) => {
+        fetch.mockResolvedValueOnce(reply(200, body));
+
+        await expect(call()).rejects.toThrow(`Некорректный ответ ${endpoint}`);
+    });
+
+    it.each([
+        ["список чатов не массив", () => fetchChats(), {}],
+        ["peer без name", () => fetchChats(), [{ ...directItem, peer: { id: "u2", avatarUrl: "" } }]],
+        ["lastMessage неверной формы", () => fetchChats(), [{ ...listItem, lastMessage: { seq: 1 } }]],
+        ["unreadCount не число", () => fetchChats(), [{ ...listItem, unreadCount: "0" }]],
+        ["один битый среди валидных", () => fetchChats(), [listItem, { ...listItem, id: null }]],
+        ["роль участника вне перечня", () => fetchChat("c1"), { ...chatDto, members: [{ ...member, role: "admin" }] }],
+        ["messages не массив", () => fetchMessages("c1"), { messages: {}, hasMore: false }],
+        ["hasMore не boolean", () => fetchMessages("c1"), { messages: [], hasMore: "no" }],
+        ["пустой ответ", () => postMessage("c1", { clientId: "k1", body: "hi" }), {}],
+    ])("отклоняет: %s", async (_title, call, body) => {
+        fetch.mockResolvedValueOnce(reply(200, body));
+
+        await expect(call()).rejects.toThrow("Некорректный ответ");
+    });
+
+    it("direct с title null, пустое body и пустое name допустимы", async () => {
+        const direct = { ...chatDto, type: "direct", title: null, members: [{ ...member, name: "" }] };
+        fetch.mockResolvedValueOnce(reply(200, direct)).mockResolvedValueOnce(reply(200, { ...message, body: "" }));
+
+        await expect(fetchChat("d1")).resolves.toEqual(direct);
+        await expect(postMessage("d1", { clientId: "k1", body: "" })).resolves.toMatchObject({ body: "" });
     });
 });

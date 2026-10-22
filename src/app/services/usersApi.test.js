@@ -55,3 +55,40 @@ describe("usersApi", () => {
         await expect(searchUsers("Bo")).rejects.toMatchObject({ status: 429, code: "rate_limited" });
     });
 });
+
+describe("usersApi: проверка формы ответа", () => {
+    beforeEach(() => {
+        global.fetch = jest.fn();
+        setUnauthorizedHandler(null);
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+    });
+
+    it("name с неверным типом даёт ошибку запроса, как сбой сети", async () => {
+        fetch.mockResolvedValueOnce(reply(200, [{ id: "u2", name: 42, avatarUrl: "" }]));
+
+        await expect(searchUsers("Bo")).rejects.toThrow("Некорректный ответ GET /api/users");
+    });
+
+    it.each([
+        ["не массив", { id: "u2", name: "Bob", avatarUrl: "" }],
+        ["элемент не объект", [null]],
+        ["нет id", [{ name: "Bob", avatarUrl: "" }]],
+        ["пустой id", [{ id: "", name: "Bob", avatarUrl: "" }]],
+        ["нет avatarUrl", [{ id: "u2", name: "Bob" }]],
+        ["один битый среди валидных", [{ id: "u2", name: "Bob", avatarUrl: "" }, { id: "u3", name: null, avatarUrl: "" }]],
+    ])("отклоняет ответ: %s", async (_title, body) => {
+        fetch.mockResolvedValueOnce(reply(200, body));
+
+        await expect(searchUsers("Bo")).rejects.toThrow("Некорректный ответ");
+    });
+
+    it("пустое name и пустой список допустимы", async () => {
+        fetch.mockResolvedValueOnce(reply(200, [{ id: "u2", name: "", avatarUrl: "" }])).mockResolvedValueOnce(reply(200, []));
+
+        await expect(searchUsers("a")).resolves.toHaveLength(1);
+        await expect(searchUsers("b")).resolves.toEqual([]);
+    });
+});

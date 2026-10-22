@@ -55,3 +55,4 @@
 - **FE-168 (P3)** Причины повторных запусков `react-engineer`/`react-reviewer` (ревью 75 против инженеров 64 за 14 дней; аудит 2026-10-22). Подробности: `.ai/memory/backlog/FE-168.md`
 - **FE-170 (P3)** `GroupManage`: у кнопок `loading` остаётся `disabled={busy}`, фокус теряется (ревью FE-31). Подробности: `.ai/memory/backlog/FE-170.md`
 - **FE-172 (P3)** `ErrorBoundary`: фокус на fallback, тест границы `Login`, e2e без хаков (ревью FE-47). Подробности: `.ai/memory/backlog/FE-172.md`
+- **FE-173 (P3)** Outbox повторяет отправку при ошибке формы ответа (`messages.js`, 3 лишних повтора); MINOR ревью FE-171. Подробности: `.ai/memory/backlog/FE-173.md`

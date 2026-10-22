@@ -54,3 +54,4 @@
 - **FE-166 (P3)** `chatsApi.js`: комментарий у `postChatMember` ссылается на §3.5, должен §3.6. Подробности: `.ai/memory/backlog/FE-166.md`
 - **FE-168 (P3)** Причины повторных запусков `react-engineer`/`react-reviewer` (ревью 75 против инженеров 64 за 14 дней; аудит 2026-10-22). Подробности: `.ai/memory/backlog/FE-168.md`
 - **FE-170 (P3)** `GroupManage`: у кнопок `loading` остаётся `disabled={busy}`, фокус теряется (ревью FE-31). Подробности: `.ai/memory/backlog/FE-170.md`
+- **FE-172 (P3)** `ErrorBoundary`: фокус на fallback, тест границы `Login`, e2e без хаков (ревью FE-47). Подробности: `.ai/memory/backlog/FE-172.md`

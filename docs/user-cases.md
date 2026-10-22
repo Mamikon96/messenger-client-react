@@ -82,6 +82,7 @@
 |---|---|---|---|
 | UC-UI-01 | Видимый фокус при работе с клавиатуры | active | docs/user-cases/ui.md |
 | UC-UI-02 | Адаптивная раскладка | active | docs/user-cases/ui.md |
+| UC-UI-03 | Сбой отрисовки показывает запасной экран | active | docs/user-cases/ui.md |
 
 ### Профиль (PROFILE)
 

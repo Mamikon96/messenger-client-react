@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './styles/tokens.css';
 import './index.css';
 import App from './App';
+import ErrorBoundary from './app/modules/ui/error-boundary/ErrorBoundary';
 import store from './app/store'
 import { recoverCsrf, sessionClosed } from './app/reducers/auth'
 import { setCsrfRecoveryHandler, setUnauthorizedHandler } from './app/services/apiClient'
@@ -21,7 +22,9 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <Provider store={store}>
     <React.StrictMode>
-      <App />
+      <ErrorBoundary actionLabel="Перезагрузить страницу" onAction={() => window.location.reload()} fullscreen>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>
   </Provider>
 );

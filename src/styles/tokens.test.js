@@ -15,7 +15,8 @@ const THEMED = [
 ];
 // Общие токены: одинаковы в обеих темах.
 const SHARED = [
-    "--font-family", "--font-size-sm", "--font-size-md", "--font-size-lg", "--line-height",
+    "--font-family", "--font-size-sm", "--font-size-md", "--font-size-lg", "--font-size-xl", "--line-height",
+    "--control-height-md", "--control-height-lg", "--size-card-sm",
     "--space-1", "--space-2", "--space-3", "--space-4", "--space-6", "--space-8",
     "--radius-sm", "--radius-md", "--radius-lg", "--radius-full",
     "--duration-fast", "--duration-normal", "--easing",

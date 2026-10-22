@@ -29,6 +29,7 @@
   --font-size-sm: 13px;
   --font-size-md: 15px;
   --font-size-lg: 18px;
+  --font-size-xl: 28px;
   --line-height: 1.45;
 
   /* Отступы: шкала 4 px */
@@ -38,6 +39,11 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+
+  /* Размеры элементов */
+  --control-height-md: 36px;
+  --control-height-lg: 48px;
+  --size-card-sm: 380px;
 
   /* Радиусы */
   --radius-sm: 6px;

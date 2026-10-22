@@ -32,15 +32,43 @@ describe("Button", () => {
         expect(onClick).not.toHaveBeenCalled();
     });
 
-    test("loading: заблокирована, aria-busy, клик игнорируется, текст остаётся", () => {
+    test("loading: aria-disabled и aria-busy, не disabled, клик игнорируется, текст остаётся", () => {
         const onClick = jest.fn();
         render(<Button loading onClick={onClick}>Войти</Button>);
         const button = screen.getByRole("button", { name: /Войти/ });
-        expect(button).toBeDisabled();
+        expect(button).not.toBeDisabled();
+        expect(button).toHaveAttribute("aria-disabled", "true");
         expect(button).toHaveAttribute("aria-busy", "true");
         expect(button).toHaveClass("_loading");
         userEvent.click(button);
         expect(onClick).not.toHaveBeenCalled();
+    });
+
+    test("loading: фокус остаётся на кнопке", () => {
+        const { rerender } = render(<Button>Войти</Button>);
+        const button = screen.getByRole("button", { name: "Войти" });
+        button.focus();
+        rerender(<Button loading>Войти</Button>);
+        expect(button).toHaveFocus();
+        expect(button).not.toBeDisabled();
+    });
+
+    test("loading: submit формы не происходит", () => {
+        const onSubmit = jest.fn((event) => event.preventDefault());
+        render(
+            <form onSubmit={onSubmit}>
+                <Button loading type="submit">Войти</Button>
+            </form>
+        );
+        userEvent.click(screen.getByRole("button", { name: /Войти/ }));
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    test("явный disabled остаётся настоящим disabled без aria-disabled", () => {
+        render(<Button disabled>Go</Button>);
+        const button = screen.getByRole("button");
+        expect(button).toBeDisabled();
+        expect(button).not.toHaveAttribute("aria-disabled");
     });
 
     test("без loading нет aria-busy", () => {

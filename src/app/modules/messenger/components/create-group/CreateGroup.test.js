@@ -91,7 +91,7 @@ describe("CreateGroup", () => {
         await userEvent.dblClick(submit);
 
         expect(chatsApi.postGroupChat).toHaveBeenCalledTimes(1);
-        expect(submit).toBeDisabled();
+        expect(submit).toHaveAttribute("aria-disabled", "true");
     });
 
     test("400 — ошибка в форме, название остаётся, форма открыта", async () => {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Chat } from "../chat/Chat";
 import { Button } from "../../../ui/button/Button";
+import { Skeleton } from "../../../ui/skeleton/Skeleton";
 import "./Chats.css";
 import CreateGroup from "../create-group/CreateGroup";
 import PeopleSearch from "../people-search/PeopleSearch";
@@ -13,6 +14,8 @@ const CREATE_ERRORS = {
     not_found: "Пользователь недоступен",
     failed: "Не удалось открыть чат.",
 };
+
+const SKELETON_ROWS = [0, 1, 2, 3, 4];
 
 const WriteIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -68,7 +71,20 @@ function Chats({ onRetry }) {
                         ></Chat>
                     ));
             default:
-                return <p className="chats__status" role="status">Загрузка чатов…</p>;
+                return (
+                    <div className="chats__loading">
+                        <p className="chats__status" role="status">Загрузка чатов…</p>
+                        {SKELETON_ROWS.map((row) => (
+                            <div key={row} className="chats__skeleton">
+                                <Skeleton circle width="40px" height="40px" />
+                                <div className="chats__skeleton-text">
+                                    <Skeleton width="50%" />
+                                    <Skeleton width="80%" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
         }
     }
 

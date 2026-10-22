@@ -106,6 +106,26 @@ test('[UC-CHAT-02] у direct-чата заголовок — имя собесе
   await expect(page.locator('.dialog__message')).toHaveText('Привет, личка');
 });
 
+test('[UC-CHAT-02] пока история грузится, рядом с подписью видны скелетон-заглушки', async ({ page }) => {
+  let release;
+  const released = new Promise((resolve) => { release = resolve; });
+  await mockServer(page, {
+    messagesHandler: async (route) => {
+      await released;
+      await route.fulfill({ json: { messages: [message('g1', 1, 'u-bob', 'Привет, команда')], hasMore: false } });
+    },
+  });
+  await login(page);
+
+  await page.locator('.chat', { hasText: 'Команда' }).click();
+  await expect(page.locator('.dialog .skeleton').first()).toBeVisible();
+  await expect(page.locator('.dialog .skeleton').first()).toHaveAttribute('aria-hidden', 'true');
+  release();
+
+  await expect(page.locator('.dialog__message')).toHaveCount(1);
+  await expect(page.locator('.skeleton')).toHaveCount(0);
+});
+
 test('[UC-CHAT-02] пока история грузится, виден индикатор «Загрузка сообщений…»', async ({ page }) => {
   let release;
   const released = new Promise((resolve) => { release = resolve; });

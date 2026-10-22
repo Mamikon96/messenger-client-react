@@ -56,3 +56,4 @@
 - **FE-170 (P3)** `GroupManage`: у кнопок `loading` остаётся `disabled={busy}`, фокус теряется (ревью FE-31). Подробности: `.ai/memory/backlog/FE-170.md`
 - **FE-172 (P3)** `ErrorBoundary`: фокус на fallback, тест границы `Login`, e2e без хаков (ревью FE-47). Подробности: `.ai/memory/backlog/FE-172.md`
 - **FE-173 (P3)** Outbox повторяет отправку при ошибке формы ответа (`messages.js`, 3 лишних повтора); MINOR ревью FE-171. Подробности: `.ai/memory/backlog/FE-173.md`
+- **FE-174 (P3)** Вынести sr-only в примитив `ui/visually-hidden` и заменить копии CSS (`PeopleSearch.css`; ревью FE-169). Подробности: `.ai/memory/backlog/FE-174.md`

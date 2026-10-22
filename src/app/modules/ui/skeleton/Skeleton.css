@@ -1,0 +1,29 @@
+.skeleton {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    height: var(--space-4);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-border);
+    animation: skeleton-pulse calc(var(--duration-normal) * 6) var(--easing) infinite alternate;
+}
+
+.skeleton._circle {
+    border-radius: var(--radius-full);
+}
+
+@keyframes skeleton-pulse {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+
+/* Без анимации при reduced-motion: заглушка остаётся статичной */
+@media (prefers-reduced-motion: reduce) {
+    .skeleton {
+        animation: none;
+    }
+}

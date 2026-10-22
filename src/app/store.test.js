@@ -19,7 +19,7 @@ const withHasMore = (messages, hasMore = false) => ({ messages, hasMore });
 const user = { id: '1', login: 'ann', firstName: 'Ann', lastName: '', name: 'Ann', avatarUrl: 'http://a/b.png' };
 
 const emptyState = {
-  chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] },
+  chats: { ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, manageRequestId: null, managingTarget: null, openedWhileLoadingIds: [] },
   messages: {},
   outbox: { ids: [], entities: {} },
   users: { ids: [], entities: {} },
@@ -149,7 +149,7 @@ describe('rootReducer: запоздавшие ответы fetchChats после
     resolveRequest([direct]);
     await request;
 
-    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] });
+    expect(store.getState().chats).toEqual({ ids: [], entities: {}, status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, manageRequestId: null, managingTarget: null, openedWhileLoadingIds: [] });
     expect(store.getState().users).toEqual({ ids: [], entities: {} });
   });
 });

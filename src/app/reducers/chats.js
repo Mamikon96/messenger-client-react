@@ -1,5 +1,5 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from '@reduxjs/toolkit'
-import { fetchChat, fetchChats as fetchChatsRequest, postChatMember, postDirectChat, postGroupChat, postRead } from '../services/chatsApi'
+import { deleteChatMember, fetchChat, fetchChats as fetchChatsRequest, patchChat, postChatMember, postDirectChat, postGroupChat, postRead } from '../services/chatsApi'
 import { ApiError } from '../services/apiClient'
 import { selectAuthUserId } from './auth'
 import { chatRemoved, messageAdded } from './messageEvents'
@@ -88,6 +88,49 @@ export const addChatMember = createAsyncThunk(
     { condition: (_, { getState }) => getState().chats.inviteRequestId === null }
 )
 
+// Код отказа переименования по статусу ответа: 400 — название не подходит, 403 — не owner, 404 — нет группы.
+const RENAME_ERRORS = { 400: 'invalid', 403: 'forbidden', 404: 'not_found' }
+
+// Переименовать группу chatId (PATCH /api/chats/{id}); название берётся из ответа, состав не трогается. Пока идёт запрос управления группой, повторный запуск отменяется (condition).
+// Ошибка отклоняет thunk кодом: 'invalid' / 'forbidden' / 'not_found' / 'failed', 'stale' — store сбросили, пока шёл запрос.
+export const renameChat = createAsyncThunk(
+    'chats/renameChat',
+    async ({ chatId, title }, { signal, requestId, getState, rejectWithValue }) => {
+        try {
+            const dto = await patchChat(chatId, title, { signal })
+            if (getState().chats.manageRequestId !== requestId) return rejectWithValue('stale')
+            return { chatId, title: dto.title }
+        } catch (error) {
+            if (getState().chats.manageRequestId !== requestId) return rejectWithValue('stale')
+            return rejectWithValue((error instanceof ApiError && RENAME_ERRORS[error.status]) || 'failed')
+        }
+    },
+    { condition: (_, { getState }) => getState().chats.manageRequestId === null }
+)
+
+// Код отказа «убрать участника / выйти» по статусу ответа: 403 — не owner (или owner выходит сам), 404 — нет группы или участника.
+const REMOVE_ERRORS = { 403: 'forbidden', 404: 'not_found' }
+
+// Убрать участника userId из группы chatId или выйти из неё, если userId — я (DELETE /api/chats/{id}/members/{userId}: 204).
+// Успех: участник уходит из состава; если это я — чат убирается из стора через chatRemoved (активный чат сбрасывают слайсы). Пока идёт запрос управления группой, повторный запуск отменяется (condition).
+// Ошибка отклоняет thunk кодом: 'forbidden' / 'not_found' / 'failed', 'stale' — store сбросили, пока шёл запрос.
+export const removeChatMember = createAsyncThunk(
+    'chats/removeChatMember',
+    async ({ chatId, userId }, { dispatch, signal, requestId, getState, rejectWithValue }) => {
+        try {
+            await deleteChatMember(chatId, userId, { signal })
+        } catch (error) {
+            if (getState().chats.manageRequestId !== requestId) return rejectWithValue('stale')
+            return rejectWithValue((error instanceof ApiError && REMOVE_ERRORS[error.status]) || 'failed')
+        }
+        if (getState().chats.manageRequestId !== requestId) return rejectWithValue('stale')
+        const isMe = userId === selectAuthUserId(getState())
+        if (isMe) dispatch(chatRemoved(chatId))
+        return { chatId, userId }
+    },
+    { condition: (_, { getState }) => getState().chats.manageRequestId === null }
+)
+
 // Отметить чат прочитанным до seq (POST /api/chats/{id}/read). Ошибка запроса отклоняет thunk, счётчик остаётся как был.
 export const markChatRead = createAsyncThunk(
     'chats/markChatRead',
@@ -140,7 +183,8 @@ export const chatsSlice = createSlice({
     // createRequestId — запрос этого открытия, чей ответ ждём (после сброса store ответ прежнего запроса отбрасывается).
     // groupRequestId — запрос создания группы, чей ответ ждём (null — группа не создаётся).
     // inviteRequestId и invitingUserId — запрос приглашения в группу, чей ответ ждём, и приглашаемый (null — приглашения нет).
-    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, openedWhileLoadingIds: [] }),
+    // manageRequestId и managingTarget — запрос управления группой (переименование, «убрать», «выйти»), чей ответ ждём, и его цель: 'title' или id участника (null — запроса нет).
+    initialState: chatsAdapter.getInitialState({ status: 'idle', requestId: null, pendingUserId: null, createRequestId: null, groupRequestId: null, inviteRequestId: null, invitingUserId: null, manageRequestId: null, managingTarget: null, openedWhileLoadingIds: [] }),
     reducers: {
         // Чат, пришедший с сервера по событию: повтор с тем же id ничего не меняет.
         chatReceived: chatsAdapter.addOne,
@@ -222,6 +266,38 @@ export const chatsSlice = createSlice({
                 state.inviteRequestId = null
                 state.invitingUserId = null
             })
+        builder
+            .addCase(renameChat.pending, (state, action) => {
+                state.manageRequestId = action.meta.requestId
+                state.managingTarget = 'title'
+            })
+            .addCase(renameChat.fulfilled, (state, { payload }) => {
+                state.manageRequestId = null
+                state.managingTarget = null
+                const chat = state.entities[payload.chatId]
+                if (chat) chat.title = payload.title
+            })
+            .addCase(renameChat.rejected, (state, action) => {
+                if (action.meta.requestId !== state.manageRequestId) return
+                state.manageRequestId = null
+                state.managingTarget = null
+            })
+        builder
+            .addCase(removeChatMember.pending, (state, action) => {
+                state.manageRequestId = action.meta.requestId
+                state.managingTarget = action.meta.arg.userId
+            })
+            .addCase(removeChatMember.fulfilled, (state, { payload }) => {
+                state.manageRequestId = null
+                state.managingTarget = null
+                const chat = state.entities[payload.chatId]
+                if (chat?.members) chat.members = chat.members.filter(({ userId }) => userId !== payload.userId)
+            })
+            .addCase(removeChatMember.rejected, (state, action) => {
+                if (action.meta.requestId !== state.manageRequestId) return
+                state.manageRequestId = null
+                state.managingTarget = null
+            })
         // История чата (поле history): status — idle (поля нет) / loading / succeeded / failed; hasMore — есть ли старее;
         // olderStatus — подкачка старых (idle / loading / failed). requestId и olderRequestId — запросы, чьи ответы ждём.
         builder
@@ -296,6 +372,16 @@ export const selectIsCreatingGroup = (state) => state.chats.groupRequestId !== n
 
 // Id человека, которого приглашают в группу сейчас, или null.
 export const selectInvitingUserId = (state) => state.chats.invitingUserId
+
+// Цель текущего запроса управления группой: 'title' (переименование), id участника (убрать/выйти) или null.
+export const selectManagingTarget = (state) => state.chats.managingTarget
+
+// Я — участник группы (любая роль): false, пока состав не загружен, у direct и неизвестного чата.
+export const selectIsGroupMember = (state, chatId) => {
+    const meId = selectAuthUserId(state)
+    const chat = state.chats.entities[chatId]
+    return Boolean(meId) && chat?.type === 'group' && Boolean(chat.members?.some(({ userId }) => userId === meId))
+}
 
 // Я — owner чата: false, пока состав не загружен, у direct и неизвестного чата.
 export const selectIsChatOwner = (state, chatId) => {

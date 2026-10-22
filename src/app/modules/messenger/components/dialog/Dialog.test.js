@@ -8,7 +8,7 @@ import { ApiError } from '../../../../services/apiClient';
 import { checkSession } from '../../../../reducers/auth';
 import { chatSelected } from '../../../../reducers/activeChatId';
 import { chatReceived, fetchChats, selectChatById, selectChats } from '../../../../reducers/chats';
-import { messageAdded } from '../../../../reducers/messageEvents';
+import { chatRemoved, messageAdded } from '../../../../reducers/messageEvents';
 import { selectChatMessages, sendMessage } from '../../../../reducers/messages';
 
 jest.mock('../../../../services/authApi');
@@ -1054,6 +1054,7 @@ describe('Dialog: кнопка «Пригласить» в шапке (FE-108)',
         <Dialog />
       </Provider>
     );
+    return { store };
   };
 
   afterEach(() => {
@@ -1073,5 +1074,30 @@ describe('Dialog: кнопка «Пригласить» в шапке (FE-108)',
   it('в direct-чате кнопки нет', () => {
     renderChat({ id: 'd1', type: 'direct', peerId: 'u2', members: [{ userId: 'u1', role: 'member' }, { userId: 'u2', role: 'member' }] });
     expect(screen.queryByRole('button', { name: 'Пригласить' })).not.toBeInTheDocument();
+  });
+
+  it('после «Выйти из группы» фокус переходит на заголовок пустого состояния «Чат не выбран»', async () => {
+    chatsApi.deleteChatMember.mockResolvedValue(undefined);
+    renderChat({ id: 'g1', type: 'group', title: 'T', members: [{ userId: 'u2', role: 'owner' }, { userId: 'u1', role: 'member' }] });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Управление группой' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Управление группой' })).getByRole('button', { name: 'Выйти из группы' }));
+
+    await waitFor(() => expect(screen.getByText('Чат не выбран')).toHaveFocus());
+  });
+
+  it('чат закрылся по chat.removed, а фокус в стороннем поле: фокус остаётся в нём', async () => {
+    const { store } = renderChat({ id: 'g1', type: 'group', title: 'T', members: [{ userId: 'u2', role: 'owner' }, { userId: 'u1', role: 'member' }] });
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    outside.focus();
+
+    act(() => {
+      store.dispatch(chatRemoved('g1'));
+    });
+
+    expect(await screen.findByText('Чат не выбран')).toBeInTheDocument();
+    expect(outside).toHaveFocus();
+    outside.remove();
   });
 });

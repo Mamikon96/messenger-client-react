@@ -3,22 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { Button } from "../../../ui/button/Button";
 import { Input } from "../../../ui/input/Input";
 import { createGroupChat, selectIsCreatingGroup } from "../../../../reducers/chats";
+import { GROUP_TITLE_ERRORS, validateGroupTitle } from "../../groupTitle";
 import "./CreateGroup.css";
 
-const MAX_TITLE_LENGTH = 100;
-
-const ERRORS = {
-    required: "Введите название группы",
-    tooLong: `Название не длиннее ${MAX_TITLE_LENGTH} символов`,
-    invalid: "Название не подходит. Измените его и повторите.",
-};
 const FAILED = "Не удалось создать группу.";
-
-// Длина — в единицах UTF-16 (как на сервере), название — после trim.
-const validate = (title) => {
-    if (title === "") return ERRORS.required;
-    return title.length > MAX_TITLE_LENGTH ? ERRORS.tooLong : null;
-};
 
 // Кнопка «Новая группа» и форма с названием. Успех очищает и закрывает форму; открытие созданной группы — на слайсах (activeChatId).
 function CreateGroup() {
@@ -53,7 +41,7 @@ function CreateGroup() {
     const submit = (event) => {
         event.preventDefault();
         const trimmed = title.trim();
-        const invalid = validate(trimmed);
+        const invalid = validateGroupTitle(trimmed);
         if (invalid) {
             setError(invalid);
             return;
@@ -67,7 +55,7 @@ function CreateGroup() {
             }
             if (!createGroupChat.rejected.match(result)) return;
             if (result.meta.aborted || result.meta.condition || result.payload === "stale") return;
-            if (result.payload === "invalid") setError(ERRORS.invalid);
+            if (result.payload === "invalid") setError(GROUP_TITLE_ERRORS.invalid);
             else setFailed(true);
         });
     };
